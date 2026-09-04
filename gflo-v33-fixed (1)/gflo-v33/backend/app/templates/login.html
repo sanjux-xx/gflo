@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block anon %}
+<div class="auth">
+  <div class="auth-l">
+    <div class="logo"><b>G</b>-FLO
+      <span style="font-weight:500;font-size:14px;color:#7d8798;letter-spacing:0">Console</span>
+    </div>
+    <div class="mid">
+      <h2>Your catalogue,<br><em>under your control.</em></h2>
+      <p class="sub">Prices, stock, photos and product details — edit them here and the storefront
+         updates on the next page load. No spreadsheets to re-upload, no code to touch.</p>
+      <ul class="auth-pts">
+        <li><span class="tick">{{ icon('check', 12) }}</span> Edit prices and stock straight in the table</li>
+        <li><span class="tick">{{ icon('check', 12) }}</span> Bulk price changes across a whole category</li>
+        <li><span class="tick">{{ icon('check', 12) }}</span> Upload product photos by drag and drop</li>
+        <li><span class="tick">{{ icon('check', 12) }}</span> Export to Excel, edit, upload it back</li>
+      </ul>
+    </div>
+    <div class="foot">{{ store_name }} · Ahmedabad, Gujarat · staff access only</div>
+  </div>
+
+  <div class="auth-r">
+    <div class="auth-card">
+      <div class="auth-mini">
+        <span class="mark">G</span>
+        <span><b>G-FLO</b> Console</span>
+      </div>
+      <div class="hd">
+        <h1>Sign in</h1>
+        <p>Enter your staff credentials to manage the catalogue.</p>
+      </div>
+
+      {% if err %}<div class="alert alert-err">{{ icon('alert') }}<span>{{ err }}</span></div>{% endif %}
+      {% if msg %}<div class="alert alert-ok">{{ icon('check') }}<span>{{ msg }}</span></div>{% endif %}
+
+      <form method="post" action="/admin/login" autocomplete="on" data-busy>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="next" value="{{ next }}">
+        <div class="field">
+          <label class="lbl" for="username">Username</label>
+          <input class="inp" id="username" name="username" autocomplete="username"
+                 autocapitalize="none" spellcheck="false" required autofocus placeholder="e.g. gflo">
+        </div>
+        <div class="field">
+          <label class="lbl" for="password">Password</label>
+          <div class="pwd-wrap">
+            <input class="inp" id="password" name="password" type="password"
+                   autocomplete="current-password" required placeholder="••••••••••" data-caps="caps">
+            <button class="pwd-eye" type="button" data-pwd-toggle="password" aria-label="Show password">
+              {{ icon('eye', 17) }}{{ icon('eye-off', 17) }}
+            </button>
+          </div>
+          <span class="capslock" id="caps">Caps Lock is on</span>
+        </div>
+        <button class="btn btn-p btn-block" type="submit">{{ icon('lock', 16) }} Sign in</button>
+      </form>
+
+      <div class="auth-note">
+        {{ icon('shield', 15) }}
+        <span>Attempts are rate limited and logged with the IP address. Lost the password?
+              Another admin can reset it, or run <code>scripts/create_admin.py --reset</code> on the server.</span>
+      </div>
+    </div>
+  </div>
+</div>
+<style>.pwd-eye svg:nth-of-type(2){display:none}</style>
+{% endblock %}

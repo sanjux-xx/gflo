@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Categories{% endblock %}
+{% block body %}
+<div class="ph">
+  <div>
+    <h1>Categories</h1>
+    <p class="ph-sub">The tiles and filters shoppers browse by. Type an existing ID in the form below
+       to update that category instead of creating a new one.</p>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card" style="margin:0">
+    <div class="card-h">{{ icon('layers', 17) }}<h2>{{ rows|length }} categories</h2></div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th class="w-img">Tile</th>
+            <th>Name</th>
+            <th>ID</th>
+            <th class="c">Popular</th>
+            <th class="r">Products</th>
+            <th class="r">Order</th>
+            <th class="w-act"></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for c in rows %}
+          <tr>
+            <td>
+              {% if c.image_url %}<img class="thumb" src="{{ c.image_url }}" alt="" loading="lazy">
+              {% else %}<div class="thumb-none">{{ icon('layers', 15) }}</div>{% endif %}
+            </td>
+            <td>
+              <b>{{ c.name }}</b>
+              {% if c.description %}<div class="pmeta">{{ c.description }}</div>{% endif %}
+            </td>
+            <td><span class="mono sku">{{ c.id }}</span></td>
+            <td class="c">
+              {% if c.popular %}<span class="bdg bdg-ok"><span class="dot"></span>Yes</span>
+              {% else %}<span class="bdg bdg-mute">No</span>{% endif %}
+            </td>
+            <td class="r">
+              {% set n = counts_map.get(c.id, 0) %}
+              {% if n %}<a href="/admin/products?cat={{ c.id }}"><b>{{ n }}</b></a>{% else %}<span class="mut">0</span>{% endif %}
+            </td>
+            <td class="r mut">{{ c.sort_order }}</td>
+            <td>
+              <div class="rowacts">
+                <button class="btn btn-xs" type="button"
+                        data-edit-cat
+                        data-id="{{ c.id }}" data-name="{{ c.name }}" data-code="{{ c.code }}"
+                        data-desc="{{ c.description or '' }}" data-img="{{ c.image_url or '' }}"
+                        data-order="{{ c.sort_order }}" data-hue="{{ c.hue }}"
+                        data-popular="{{ 1 if c.popular else 0 }}">{{ icon('edit', 13) }} Edit</button>
+                <form method="post" action="/admin/categories/{{ c.id }}/delete" style="display:inline"
+                      onsubmit="return confirm('Delete category “{{ c.name }}”?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button class="btn btn-xs btn-ic btn-danger" {{ 'disabled' if counts_map.get(c.id, 0) }}
+                          title="{{ 'Move its products first' if counts_map.get(c.id, 0) else 'Delete' }}">
+                    {{ icon('trash', 13) }}
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin:0">
+    <div class="card-h">{{ icon('plus', 17) }}<h2 id="catformtitle">Add a category</h2></div>
+    <form class="card-b" method="post" action="/admin/categories/save" id="catform" data-busy>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div style="display:flex;flex-direction:column;gap:15px">
+        <div class="field">
+          <label class="lbl" for="c-name">Name <span class="req">*</span></label>
+          <input class="inp" id="c-name" name="name" required placeholder="e.g. Fan Pipes &amp; Rods">
+        </div>
+        <div class="field">
+          <label class="lbl" for="c-id">ID / slug</label>
+          <input class="inp mono" id="c-id" name="id" placeholder="fan-pipes">
+          <span class="help">Blank = generated from the name. An existing ID updates that category.</span>
+        </div>
+        <div class="field">
+          <label class="lbl" for="c-desc">Description</label>
+          <input class="inp" id="c-desc" name="description" placeholder="Down rods, clamps and canopies">
+        </div>
+        <div class="field">
+          <label class="lbl" for="c-img">Tile image URL</label>
+          <input class="inp" id="c-img" name="image_url" placeholder="/media/products/… or https://…">
+        </div>
+        <div class="fg">
+          <div class="field">
+            <label class="lbl" for="c-code">Short code</label>
+            <input class="inp" id="c-code" name="code" maxlength="8" placeholder="FP">
+          </div>
+          <div class="field">
+            <label class="lbl" for="c-order">Sort order</label>
+            <input class="inp" id="c-order" name="sort_order" value="100" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label class="lbl" for="c-hue">Hue (0–360)</label>
+            <input class="inp" id="c-hue" name="hue" value="210" inputmode="numeric">
+            <span class="help">Colour for generated artwork.</span>
+          </div>
+        </div>
+        <label class="sw">
+          <input type="checkbox" name="popular" id="c-popular">
+          <span class="track"></span>
+          <span class="sw-txt">Show in “popular categories”</span>
+        </label>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:18px">
+        <button class="btn btn-p" type="submit">{{ icon('save', 15) }} Save category</button>
+        <button class="btn" type="reset" id="catreset">Clear</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-edit-cat]").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var d = btn.dataset;
+    document.getElementById("catformtitle").textContent = "Update “" + d.name + "”";
+    document.getElementById("c-name").value = d.name;
+    document.getElementById("c-id").value = d.id;
+    document.getElementById("c-desc").value = d.desc;
+    document.getElementById("c-img").value = d.img;
+    document.getElementById("c-code").value = d.code;
+    document.getElementById("c-order").value = d.order;
+    document.getElementById("c-hue").value = d.hue;
+    document.getElementById("c-popular").checked = d.popular === "1";
+    document.getElementById("catform").scrollIntoView({ behavior: "smooth", block: "center" });
+    if (window.gfloToast) window.gfloToast("Editing " + d.name + " — change what you need and save", "info");
+  });
+});
+document.getElementById("catreset").addEventListener("click", function () {
+  document.getElementById("catformtitle").textContent = "Add a category";
+});
+</script>
+{% endblock %}

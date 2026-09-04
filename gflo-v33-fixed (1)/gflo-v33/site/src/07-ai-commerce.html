@@ -1,0 +1,565 @@
+<script>
+"use strict";
+/* ================= AI HUB / FINDER ================= */
+const FINDER = { step: 1, cat: null, pt: null, brand: null };
+Pages.finder = tab => {
+  const t = tab || "wizard";
+  return `
+  <div class="wrap">
+    ${crumb([["Spare Part Finder"]])}
+    <div class="hub-hero rv in">
+      <span class="badge" style="background:rgba(255,255,255,.2);color:#fff">${U.icon("spark", "ic-s")} G-FLO AI · on-device demo</span>
+      <h1 style="font-size:clamp(24px,3.6vw,40px);margin:12px 0 8px">Find the exact part in seconds</h1>
+      <p style="opacity:.9;max-width:560px;font-size:14.5px">Answer three quick questions, upload a photo, or scan your appliance's model sticker — G-FLO AI matches it against ${DB.products.length} certified parts.</p>
+    </div>
+    <div class="hub-tabs" role="tablist">
+      ${[["wizard", "spark", "Guided finder"], ["photo", "camera", "Photo ID"], ["ocr", "scan", "Model sticker OCR"], ["voice", "mic", "Voice search"]].map(x => `<a class="hub-tab ${t === x[0] ? "on" : ""}" href="#/finder/${x[0]}" role="tab" aria-selected="${t === x[0]}">${U.icon(x[1], "ic-s")} ${x[2]}</a>`).join("")}
+    </div>
+    <div style="padding-bottom:50px" id="hub-body">${t === "photo" ? finderPhoto() : t === "ocr" ? finderOcr() : t === "voice" ? finderVoice() : finderWizard()}</div>
+  </div>`;
+};
+function finderWizard(){
+  return `<div class="wizard">
+    <div class="wz-steps" id="wz-steps"></div>
+    <div class="card" style="padding:20px" id="wz-result"><div class="empty" style="padding:40px 10px"><div class="e-ic">${U.icon("spark")}</div><h3 style="font-size:16px">Your matches appear here</h3><p class="mut" style="font-size:13px">Complete the steps to see AI-ranked parts with verified fitment.</p></div></div>
+  </div>`;
+}
+function wzRender(){
+  const s = FINDER;
+  const steps = document.getElementById("wz-steps"); if (!steps) return;
+  steps.innerHTML = `
+    <div class="wz-step ${s.step === 1 ? "on" : s.cat ? "done" : ""}"><span class="wz-num">${s.cat ? "✓" : "1"}</span><div style="flex:1"><b>Which appliance needs fixing?</b>
+      ${s.step === 1 ? `<div class="opt-grid">${CATS.map(c => `<button class="opt-tile ${s.cat === c.id ? "on" : ""}" data-wz-cat="${c.id}">${U.icon("c-" + c.id)}${U.esc(c.name)}</button>`).join("")}</div>` : `<p class="mut" style="font-size:13px;margin-top:4px">${s.cat ? CAT_MAP[s.cat].name : ""} <button class="meta-act" data-wz-goto="1" style="color:var(--brand2)">change</button></p>`}</div></div>
+    <div class="wz-step ${s.step === 2 ? "on" : s.pt ? "done" : ""}"><span class="wz-num">${s.pt ? "✓" : "2"}</span><div style="flex:1"><b>Which part is worn out?</b>
+      ${s.step === 2 && s.cat ? `<div class="opt-grid">${CAT_MAP[s.cat].pts.map(id => `<button class="opt-tile ${s.pt === id ? "on" : ""}" data-wz-pt="${id}">${U.icon("cog")}${PT_MAP[id].name}</button>`).join("")}<button class="opt-tile" data-wz-pt="any">${U.icon("spark")}Not sure</button></div>` : s.pt ? `<p class="mut" style="font-size:13px;margin-top:4px">${s.pt === "any" ? "Not sure — show everything" : PT_MAP[s.pt].name} <button class="meta-act" data-wz-goto="2" style="color:var(--brand2)">change</button></p>` : `<p class="mut3" style="font-size:12.5px;margin-top:4px">Pick your appliance first</p>`}</div></div>
+    <div class="wz-step ${s.step === 3 ? "on" : s.brand ? "done" : ""}"><span class="wz-num">${s.brand ? "✓" : "3"}</span><div style="flex:1"><b>Which brand is your appliance?</b>
+      ${s.step === 3 && s.cat ? `<div class="opt-grid">${CAT_MAP[s.cat].brands.map(id => `<button class="opt-tile ${s.brand === id ? "on" : ""}" data-wz-brand="${id}">${brandMark(BRAND_MAP[id], 30)}${BRAND_MAP[id].name}</button>`).join("")}<button class="opt-tile" data-wz-brand="any">${U.icon("grid")}Any / other</button></div>` : s.brand ? `<p class="mut" style="font-size:13px;margin-top:4px">${s.brand === "any" ? "Any brand" : BRAND_MAP[s.brand].name} <button class="meta-act" data-wz-goto="3" style="color:var(--brand2)">change</button></p>` : `<p class="mut3" style="font-size:12.5px;margin-top:4px">Almost there</p>`}</div></div>`;
+  const res = document.getElementById("wz-result");
+  if (s.cat && s.pt && s.brand){
+    const list = DB.products.filter(p => p.cat === s.cat && (s.pt === "any" || p.pt === s.pt) && (s.brand === "any" || p.brandFor.includes(s.brand))).sort((a, b) => b.rating - a.rating).slice(0, 6);
+    res.innerHTML = `<div class="row" style="margin-bottom:14px">${U.icon("spark")}<div><b>${list.length ? list.length + " AI-ranked matches" : "No exact match"}</b><div class="mut3" style="font-size:12px">${CAT_MAP[s.cat].name}${s.pt !== "any" ? " · " + PT_MAP[s.pt].name : ""}${s.brand !== "any" ? " · " + BRAND_MAP[s.brand].name : ""}</div></div></div>
+      ${list.length ? `<div class="grid-cards" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">${list.map(p => productCard(p)).join("")}</div><a class="btn btn-ghost btn-block" style="margin-top:14px" href="#/c/${s.cat}${s.pt !== "any" ? "?pt=" + s.pt : ""}">See all in category ${U.icon("arr-r", "ic-s")}</a>` : emptyState("box", "Nothing exact yet", "Try 'Any brand', or chat with the assistant — we restock weekly.", "#/c/" + s.cat, "Browse category")}`;
+    revealInit(res);
+  }
+}
+function finderPhoto(){
+  return `<div class="wizard">
+    <div>
+      <label class="drop" id="ph-drop" for="ph-file" style="cursor:pointer">${U.icon("upload")}<b>Upload a photo of the part or appliance</b><span class="mut3" style="font-size:12.5px">JPG / PNG · analysed on-device in this demo · nothing leaves your browser</span><input id="ph-file" type="file" accept="image/*" class="hide"></label>
+      <div class="card" style="padding:16px;margin-top:14px"><b style="font-size:13.5px">Tips for a confident match</b><ul style="margin-top:9px;display:grid;gap:7px">${["Shoot the part straight-on, in good light", "Include any printed numbers or codes", "For appliances, capture the full front"].map(t => `<li class="row" style="font-size:13px;color:var(--tx2)">${U.icon("check", "ic-s")} ${t}</li>`).join("")}</ul></div>
+    </div>
+    <div id="ph-result" class="card" style="padding:20px">${emptyState("camera", "AI vision preview", "Upload an image — G-FLO AI identifies the appliance and suggests matching part families.")}</div>
+  </div>`;
+}
+function finderOcr(){
+  return `<div class="wizard">
+    <div>
+      <label class="drop" id="ocr-drop" for="ocr-file" style="cursor:pointer">${U.icon("scan")}<b>Scan the model-number sticker</b><span class="mut3" style="font-size:12.5px">Usually a silver label on the base, back or door frame</span><input id="ocr-file" type="file" accept="image/*" class="hide"></label>
+      <div class="card" style="padding:16px;margin-top:14px"><b style="font-size:13.5px">Or type it manually</b>
+        <div class="row" style="margin-top:10px"><input class="inp" id="ocr-manual" placeholder="e.g. ${DB.modelList[3].code}" list="ocr-models"><datalist id="ocr-models">${DB.modelList.slice(0, 60).map(m => `<option value="${m.code}">`).join("")}</datalist><button class="btn btn-p" id="ocr-manual-go">Match</button></div>
+      </div>
+    </div>
+    <div id="ocr-result" class="card" style="padding:20px">${emptyState("scan", "OCR model detection", "Upload the sticker photo — we extract the model number and list every part verified for it.")}</div>
+  </div>`;
+}
+function finderVoice(){
+  return `<div class="card" style="max-width:560px;margin:0 auto;padding:30px;text-align:center">
+    <span class="kick" style="display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--brand2)">Voice search</span>
+    <h3 style="margin:10px 0 6px">Say it like you'd say it to a mechanic</h3>
+    <p class="mut" style="font-size:13.5px">“Preethi mixer coupler under 300” · “LG washing machine drain pump” · “ceiling fan chal nahi raha”</p>
+    <button class="mic-big" id="voice-big" aria-label="Start voice search">${U.icon("mic")}</button>
+    <p class="mut3" style="font-size:12px" id="voice-status">Tap the mic and speak — if the mic is blocked in this preview, a demo phrase is typed for you.</p>
+    <div class="hero-search" style="margin:18px auto 0;max-width:460px"><div class="sbox">${U.icon("search")}<input id="voice-q" placeholder="Your words appear here…" aria-label="Voice search text"><button class="btn btn-p" id="voice-go" style="height:40px">Search</button></div><div class="sug" id="voice-sug"></div></div>
+  </div>`;
+}
+Mount.finder = tab => {
+  bindSearch("hd-q", "hd-sug");
+  const body = document.getElementById("hub-body");
+  if (!tab || tab === "wizard"){
+    FINDER.step = 1; FINDER.cat = FINDER.pt = FINDER.brand = null; wzRender();
+    body.addEventListener("click", e => {
+      const c = e.target.closest("[data-wz-cat]"), p = e.target.closest("[data-wz-pt]"), b = e.target.closest("[data-wz-brand]"), g = e.target.closest("[data-wz-goto]");
+      if (c){ FINDER.cat = c.getAttribute("data-wz-cat"); FINDER.pt = FINDER.brand = null; FINDER.step = 2; }
+      if (p){ FINDER.pt = p.getAttribute("data-wz-pt"); FINDER.brand = null; FINDER.step = 3; }
+      if (b){ FINDER.brand = b.getAttribute("data-wz-brand"); FINDER.step = 4; }
+      if (g){ FINDER.step = +g.getAttribute("data-wz-goto"); if (FINDER.step === 1){ FINDER.cat = null; } if (FINDER.step <= 2){ FINDER.pt = null; } FINDER.brand = null; }
+      if (c || p || b || g) wzRender();
+    });
+  }
+  if (tab === "photo"){
+    const file = document.getElementById("ph-file");
+    file.addEventListener("change", () => {
+      const f = file.files[0]; if (!f) return;
+      const url = URL.createObjectURL(f);
+      const res = document.getElementById("ph-result");
+      res.innerHTML = `<div class="scan-vis" style="margin:0 auto"><img src="${url}" alt="Uploaded appliance photo"><div class="scan-line"></div></div><p class="mut" style="text-align:center;font-size:13px;margin-top:12px">Analysing shapes, text and context…</p>`;
+      setTimeout(() => {
+        const d = AI.detectFromFile(f.name, f.size);
+        const picks = DB.products.filter(p => p.cat === d.cat.id && d.pts.some(t => t.id === p.pt)).sort((a, b) => b.rating - a.rating).slice(0, 4);
+        res.innerHTML = `<div class="row" style="gap:12px"><img src="${url}" alt="" style="width:74px;height:74px;object-fit:cover;border-radius:14px;border:1px solid var(--line)"><div><b>Looks like a ${d.cat.name}</b><div class="mut3" style="font-size:12px">Confidence</div><div class="conf-bar" style="width:160px"><i style="width:0"></i></div></div><span class="badge b-ok" style="margin-left:auto">${d.conf}%</span></div>
+        <p class="mut" style="font-size:13px;margin:14px 0 10px">Common failure parts for this appliance:</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${d.pts.map(t => `<a class="chip" href="#/c/${d.cat.id}?pt=${t.id}">${U.esc(t.name)}</a>`).join("")}</div>
+        ${picks.length ? `<p class="mut" style="font-size:13px;margin:16px 0 10px">Top matches:</p><div class="grid-cards" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${picks.map(p => productCard(p)).join("")}</div>` : ""}
+        <p class="mut3" style="font-size:11px;margin-top:14px">Demo classifier — production uses a vision model + your catalogue embeddings.</p>`;
+        setTimeout(() => { const cb = res.querySelector(".conf-bar i"); if (cb) cb.style.width = d.conf + "%"; }, 60);
+        revealInit(res);
+      }, 1700);
+    });
+  }
+  if (tab === "ocr"){
+    const showModel = (code, imgUrl, conf, serial) => {
+      const m = DB.modelList.find(x => x.code === code.toUpperCase()) || null;
+      const res = document.getElementById("ocr-result");
+      if (!m){ res.innerHTML = emptyState("alert", "Model not in fitment DB yet", "We add models weekly. Chat with support and we'll source parts for it.", "#/support", "Contact support"); return; }
+      const parts = DB.products.filter(p => p.compat.includes(m.code)).sort((a, b) => b.rating - a.rating);
+      res.innerHTML = `${imgUrl ? `<div class="row" style="gap:12px;margin-bottom:12px"><img src="${imgUrl}" alt="" style="width:74px;height:74px;object-fit:cover;border-radius:14px;border:1px solid var(--line)"><div><div class="mut3" style="font-size:11px">EXTRACTED</div><b class="mono" style="font-size:17px">${m.code}</b>${serial ? `<div class="mut3" style="font-size:11px">Serial ${serial}</div>` : ""}</div><span class="badge b-ok" style="margin-left:auto">${conf || 95}% OCR</span></div>` : `<div class="row" style="margin-bottom:12px"><b class="mono" style="font-size:17px">${m.code}</b><span class="badge b-ok">Verified model</span></div>`}
+      <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:14px"><span class="tag">${BRAND_MAP[m.brand].name}</span><span class="tag">${CAT_MAP[m.cat].name}</span><span class="tag">${parts.length} verified parts</span></div>
+      ${parts.length ? `<div class="grid-cards" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${parts.slice(0, 6).map(p => productCard(p)).join("")}</div>` : emptyState("box", "No parts mapped yet", "Support can source this — usually within 48 hours.", "#/support", "Request part")}`;
+      revealInit(res);
+    };
+    document.getElementById("ocr-file").addEventListener("change", e => {
+      const f = e.target.files[0]; if (!f) return;
+      const url = URL.createObjectURL(f);
+      const res = document.getElementById("ocr-result");
+      res.innerHTML = `<div class="scan-vis" style="margin:0 auto"><img src="${url}" alt="Uploaded model sticker"><div class="scan-line"></div></div><p class="mut" style="text-align:center;font-size:13px;margin-top:12px">Reading label text (OCR)…</p>`;
+      setTimeout(() => { const o = AI.ocrFromFile(f.name, f.size); showModel(o.model.code, url, o.conf, o.serial); }, 1600);
+    });
+    document.getElementById("ocr-manual-go").addEventListener("click", () => { const v = document.getElementById("ocr-manual").value.trim(); if (v) showModel(v); });
+  }
+  if (tab === "voice"){
+    bindSearch("voice-q", "voice-sug");
+    document.getElementById("voice-big").addEventListener("click", e => startVoice("voice-q", e.currentTarget));
+    document.getElementById("voice-go").addEventListener("click", () => { const v = document.getElementById("voice-q").value.trim(); if (v) location.hash = "#/search/" + encodeURIComponent(v); });
+  }
+};
+
+/* ================= CART PAGE ================= */
+Pages.cart = () => {
+  const t = State.cartTotals();
+  if (!State.cart.length) return `<div class="wrap">${crumb([["Cart"]])}${emptyState("cart", "Your cart is empty", "Every repair starts with the right part.", "#/categories", "Start browsing")}</div>`;
+  return `<div class="wrap">${crumb([["Cart"]])}
+  <div class="sec-head" style="margin-top:12px"><div><span class="kick">Cart</span><h2>${t.count} item${t.count > 1 ? "s" : ""} ready to ship</h2></div></div>
+  <div class="co-grid">
+    <div>
+      <div class="co-sec">
+        ${State.cart.map(i => { const p = DB.prodMap[i.sku]; return `
+        <div class="citem"><a class="art" href="#/p/${p.sku}">${prodArt(p)}</a>
+          <div class="inf"><b><a href="#/p/${p.sku}">${U.esc(p.name)}</a></b>
+            <span class="mut3" style="font-size:11.5px">${catOf(p).name} · <span class="mono">${p.sku}</span> · ${p.warranty} warranty</span>
+            ${stockHtml(p)}
+            <div class="spread" style="margin-top:5px"><div class="qty"><button data-act="qty" data-sku="${p.sku}" data-d="-1" aria-label="Decrease">${U.icon("minus", "ic-s")}</button><b>${i.qty}</b><button data-act="qty" data-sku="${p.sku}" data-d="1" aria-label="Increase">${U.icon("plus", "ic-s")}</button></div>
+            ${CATALOG_MODE ? "" : `<div class="row"><span class="mrp">${p.off ? U.inr(p.mrp * i.qty) : ""}</span><span class="price">${U.inr(p.price * i.qty)}</span></div>`}</div></div>
+          <button class="btn btn-icon" data-act="rm-cart" data-sku="${p.sku}" aria-label="Remove">${U.icon("trash", "ic-s")}</button></div>`; }).join("")}
+      </div>
+      ${CATALOG_MODE ? "" : `<div class="co-sec"><h3>${U.icon("percent", "ic-s")} Apply coupon</h3>
+        <div class="row"><input class="inp" id="coupon-inp" placeholder="Try GFLO10 or FLAT100" style="max-width:260px" value="${State.coupon ? State.coupon.code : ""}"><button class="btn btn-p" id="coupon-go">Apply</button>${State.coupon ? `<button class="btn btn-ghost" id="coupon-rm">Remove</button>` : ""}</div>
+        <p class="mut3" style="font-size:12px;margin-top:9px">GFLO10 — 10% off above ₹999 · FLAT100 — ₹100 off above ₹599 · FREESHIP — free delivery</p></div>`}
+    </div>
+    <div><div class="co-sec sum-card"><h3>Order summary</h3>
+      <div style="display:grid;gap:9px">
+        ${CATALOG_MODE ? `<div class="tot-row big"><span>Items</span><span>${t.count}</span></div>
+        <p class="mut3" style="font-size:12.5px;margin:0">Pricing is shared on your final quote. Place the enquiry and our team confirms availability, pricing and delivery within 2 business hours.</p>` : `<div class="tot-row"><span>MRP total</span><span>${U.inr(t.mrp)}</span></div>
+        <div class="tot-row" style="color:var(--ok)"><span>Discount on MRP</span><span>−${U.inr(t.saveMrp)}</span></div>
+        ${t.disc ? `<div class="tot-row" style="color:var(--ok)"><span>Coupon (${State.coupon.code})</span><span>−${U.inr(t.disc)}</span></div>` : ""}
+        <div class="tot-row"><span>Delivery</span><span>${t.ship ? U.inr(t.ship) : "FREE"}</span></div>
+        <div class="tot-row"><span>GST (included)</span><span>${U.inr(t.gst)}</span></div>
+        <hr style="border:0;border-top:1px dashed var(--line)">
+        <div class="tot-row big"><span>Payable</span><span class="price">${U.inr(t.total)}</span></div>
+        <span class="badge b-ok" style="justify-self:start">You save ${U.inr(t.saveMrp + t.disc)} on this order</span>`}
+      </div>
+      <a class="btn btn-p btn-lg btn-block" style="margin-top:16px" href="#/checkout">Proceed to checkout ${U.icon("arr-r", "ic-s")}</a>
+      <p class="mut3" style="font-size:11.5px;margin-top:10px;text-align:center">${U.icon("shield", "ic-s")} Demo checkout — no payment is collected</p>
+    </div></div>
+  </div></div>`;
+};
+Mount.cart = () => {
+  bindSearch("hd-q", "hd-sug");
+  const go = document.getElementById("coupon-go");
+  go && go.addEventListener("click", () => {
+    const v = (document.getElementById("coupon-inp").value || "").trim().toUpperCase();
+    const t = State.cartTotals();
+    const C = { GFLO10: { code: "GFLO10", type: "pct", val: 10, min: 999 }, FLAT100: { code: "FLAT100", type: "flat", val: 100, min: 599 }, FREESHIP: { code: "FREESHIP", type: "flat", val: 99, min: 0 } };
+    if (!C[v]){ toast("Coupon not recognised", "warn"); return; }
+    if (t.sub < C[v].min){ toast(`Needs a minimum order of ₹${C[v].min}`, "warn"); return; }
+    State.coupon = C[v]; State.save(); toast("Coupon applied 🎉"); Router.go();
+  });
+  const rm = document.getElementById("coupon-rm");
+  rm && rm.addEventListener("click", () => { State.coupon = null; State.save(); Router.go(); });
+};
+
+/* ================= CHECKOUT ================= */
+Pages.checkout = () => {
+  if (!State.cart.length) return `<div class="wrap">${crumb([["Checkout"]])}${emptyState("cart", "Nothing to checkout", "Add a part to your cart first.", "#/categories", "Browse parts")}</div>`;
+  const t = State.cartTotals();
+  return `<div class="wrap">${crumb([["Cart", "#/cart"], ["Checkout"]])}
+  <div class="sec-head" style="margin-top:12px"><div><span class="kick">Secure checkout</span><h2>Almost done</h2><p>Demo mode — no payment is processed, no data leaves your browser.</p></div></div>
+  <form class="co-grid" id="co-form" novalidate>
+    <div>
+      <div class="co-sec"><h3><span class="n">1</span> Delivery address</h3>
+        <div class="form-grid">
+          <div class="fld"><label for="f-name">Full name</label><input class="inp" id="f-name" required placeholder="Asha Sharma"><span class="err-tx">Enter your name</span></div>
+          <div class="fld"><label for="f-phone">Mobile</label><input class="inp" id="f-phone" required inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="10-digit mobile"><span class="err-tx">Enter a valid 10-digit mobile</span></div>
+          <div class="fld full"><label for="f-addr">Address (house, street, area)</label><input class="inp" id="f-addr" required placeholder="Flat 14B, MG Road…"><span class="err-tx">Enter your address</span></div>
+          <div class="fld"><label for="f-pin">Pincode</label><input class="inp" id="f-pin" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" value="${State.pin}"><span class="err-tx">6-digit pincode</span></div>
+          <div class="fld"><label for="f-city">City & state</label><input class="inp" id="f-city" required placeholder="Ahmedabad, Gujarat"><span class="err-tx">Enter city & state</span></div>
+        </div></div>
+      <div class="co-sec"><h3><span class="n">2</span> Delivery speed</h3>
+        <label class="pay-opt on"><input type="radio" name="ship" checked value="std"><div style="flex:1"><b>Standard</b><div class="mut3" style="font-size:12.5px">${deliveryEta(State.pin).label} · tracked</div></div>${CATALOG_MODE ? "" : `<b>${t.ship ? U.inr(t.ship) : "FREE"}</b>`}</label>
+        <label class="pay-opt"><input type="radio" name="ship" value="exp"><div style="flex:1"><b>Express</b><div class="mut3" style="font-size:12.5px">Next-day in metro pincodes</div></div>${CATALOG_MODE ? "" : `<b>₹99</b>`}</label>
+        <label class="pay-opt"><input type="radio" name="ship" value="install"><div style="flex:1"><b>Expert install <span class="badge b-info">popular</span></b><div class="mut3" style="font-size:12.5px">Certified technician fits it for you</div></div>${CATALOG_MODE ? "" : `<b>₹249</b>`}</label></div>
+      <div class="co-sec"><h3><span class="n">3</span> Payment (demo)</h3>
+        ${[["upi", "UPI", "GPay, PhonePe, Paytm"], ["card", "Card", "Credit / debit · EMI available"], ["nb", "Netbanking", "All major banks"], ["cod", "Cash on Delivery", CATALOG_MODE ? "Availability confirmed on quote" : "₹20 collection fee"]].map((m, i) => `<label class="pay-opt ${i === 0 ? "on" : ""}"><input type="radio" name="pay" ${i === 0 ? "checked" : ""} value="${m[0]}"><div style="flex:1"><b>${m[1]}</b><div class="mut3" style="font-size:12.5px">${m[2]}</div></div></label>`).join("")}
+        <p class="mut3" style="font-size:12px;margin-top:8px">${U.icon("shield", "ic-s")} This is a frontend demo — the button below places a mock order locally. No gateway, no charge.</p></div>
+    </div>
+    <div><div class="co-sec sum-card"><h3>Order summary</h3>
+      ${State.cart.map(i => { const p = DB.prodMap[i.sku]; return `<div class="tot-row" style="margin-bottom:7px"><span style="display:flex;gap:8px;align-items:center;min-width:0"><span style="width:34px;height:34px;border-radius:8px;overflow:hidden;flex:none;background:var(--art-bg1)">${prodArt(p)}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${U.esc(p.short)} × ${i.qty}</span></span>${CATALOG_MODE ? "" : `<span>${U.inr(p.price * i.qty)}</span>`}</div>`; }).join("")}
+      <hr style="border:0;border-top:1px dashed var(--line)">
+      <div style="display:grid;gap:8px;margin-top:8px">
+        ${CATALOG_MODE ? `<div class="tot-row big"><span>Items</span><span>${t.count}</span></div>
+        <p class="mut3" style="font-size:12px;margin:0">Final pricing and delivery charges are confirmed on your quote before anything ships.</p>` : `<div class="tot-row"><span>Subtotal</span><span>${U.inr(t.sub)}</span></div>
+        ${t.disc ? `<div class="tot-row" style="color:var(--ok)"><span>Coupon</span><span>−${U.inr(t.disc)}</span></div>` : ""}
+        <div class="tot-row"><span>Delivery</span><span id="co-ship">${t.ship ? U.inr(t.ship) : "FREE"}</span></div>
+        <div class="tot-row big"><span>Total</span><span class="price" id="co-total">${U.inr(t.total)}</span></div>`}
+      </div>
+      <button class="btn btn-p btn-lg btn-block" style="margin-top:16px" type="submit">${U.icon("shield", "ic-s")} Place demo order</button>
+      <p class="mut3" style="font-size:11.5px;margin-top:10px;text-align:center">By placing this order you accept the demo T&Cs.</p>
+    </div></div>
+  </form></div>`;
+};
+Mount.checkout = () => {
+  bindSearch("hd-q", "hd-sug");
+  const form = document.getElementById("co-form");
+  let shipExtra = 0;
+  form.addEventListener("change", e => {
+    if (e.target.name === "ship" || e.target.name === "pay"){
+      form.querySelectorAll(`[name=${e.target.name}]`).forEach(r => r.closest(".pay-opt").classList.toggle("on", r.checked));
+      if (e.target.name === "ship"){ shipExtra = e.target.value === "exp" ? 99 : e.target.value === "install" ? 249 : 0; }
+      const t = State.cartTotals();
+      const cs = document.getElementById("co-ship"), ct = document.getElementById("co-total");
+      if (cs) cs.textContent = (t.ship + shipExtra) ? U.inr(t.ship + shipExtra) : "FREE";
+      if (ct) ct.textContent = U.inr(t.total + shipExtra);
+    }
+  });
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    let ok = true;
+    form.querySelectorAll(".fld input[required]").forEach(i => { const bad = !i.checkValidity(); i.closest(".fld").classList.toggle("bad", bad); if (bad) ok = false; });
+    if (!ok){ toast("Please fix the highlighted fields", "err"); return; }
+    const btn = form.querySelector("[type=submit]");
+    btn.disabled = true; btn.innerHTML = `<span class="spinner" style="width:18px;height:18px;border-width:2.5px"></span> Placing order…`;
+    setTimeout(() => {
+      const order = State.placeOrder({
+        name: document.getElementById("f-name").value, phone: document.getElementById("f-phone").value,
+        addr: document.getElementById("f-addr").value + ", " + document.getElementById("f-city").value + " — " + document.getElementById("f-pin").value,
+        gstin: null,
+        pay: form.querySelector("[name=pay]:checked").value, shipExtra
+      });
+      location.hash = "#/order/" + order.id;
+    }, 900);
+  });
+};
+
+/* ================= ORDER CONFIRMATION + TRACK ================= */
+const ORDER_STEPS = ["Order confirmed", "Quality check & packing", "Shipped", "Out for delivery", "Delivered"];
+function orderTimeline(o){
+  const eta = deliveryEta((o.addr || "").slice(-6));
+  return `<div class="timeline">${ORDER_STEPS.map((s, i) => {
+    const st = i < o.status ? "done" : i === o.status ? "act" : "";
+    const when = i < o.status ? new Date(o.ts + i * 864e5 * .6).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : i === o.status ? "In progress" : i === 4 ? "Expected " + eta.label : "Pending";
+    return `<div class="tl ${st}"><span class="dot">${i < o.status ? U.icon("check", "ic-s") : U.icon(["doc", "box", "truck", "pin", "home"][i], "ic-s")}</span><div><b>${s}</b><span>${when}</span></div></div>`;
+  }).join("")}</div>`;
+}
+Pages.order = id => {
+  const o = State.orders.find(x => x.id === id);
+  if (!o) return `<div class="wrap">${emptyState("box", "Order not found", "This demo stores orders locally in your browser.", "#/", "Go home")}</div>`;
+  return `<div class="wrap" style="max-width:820px">
+    <div class="empty" style="padding:40px 10px 20px"><div class="e-ic" style="background:rgba(16,185,129,.14);color:var(--ok)">${U.icon("check")}</div>
+      <h2 style="font-size:clamp(21px,3vw,28px)">Order placed! 🎉</h2>
+      <p class="mut">Order <b class="mono">${o.id}</b> · ${o.items.length} item(s)${CATALOG_MODE ? " · quote enquiry received" : ` · <b>${U.inr(o.totals.total + (o.shipExtra || 0))}</b> ${o.pay === "cod" ? "payable on delivery" : "paid (demo)"}`}</p>
+      <div class="row"><a class="btn btn-p" href="#/track/${o.id}">${U.icon("truck", "ic-s")} Track order</a>${CATALOG_MODE ? "" : `<button class="btn btn-ghost" data-invoice="${o.id}">${U.icon("doc", "ic-s")} GST invoice</button>`}<a class="btn btn-soft" href="#/categories">Continue shopping</a></div>
+    </div>
+    <div class="co-sec"><h3>What happens next</h3>${orderTimeline(o)}</div>
+  </div>`;
+};
+Mount.order = () => { bindSearch("hd-q", "hd-sug"); bindInvoiceButtons(); };
+
+Pages.track = id => {
+  const o = id ? State.orders.find(x => x.id === id) : null;
+  return `<div class="wrap" style="max-width:860px">
+    ${crumb([["Track order"]])}
+    <div class="sec-head" style="margin-top:12px"><div><span class="kick">Self-serve tracking</span><h2>Track your order</h2><p>Live status for every shipment — no phone calls needed.</p></div></div>
+    <div class="co-sec"><div class="row" style="flex-wrap:wrap">
+      <input class="inp" id="trk-inp" placeholder="Order ID e.g. GFLO123456" style="max-width:280px" value="${id || (State.orders[0] ? State.orders[0].id : "")}">
+      <button class="btn btn-p" id="trk-go">Track</button>
+      ${State.orders.length ? `<span class="mut3" style="font-size:12.5px">Recent: ${State.orders.slice(0, 3).map(x => `<a href="#/track/${x.id}" class="mono" style="color:var(--brand2)">${x.id}</a>`).join(" · ")}</span>` : `<span class="mut3" style="font-size:12.5px">Place a demo order to see live tracking.</span>`}
+    </div></div>
+    ${o ? `<div class="co-grid" style="grid-template-columns:1fr;max-width:640px">
+      <div class="co-sec"><div class="spread" style="margin-bottom:10px"><h3 style="margin:0">Order <span class="mono">${o.id}</span></h3><span class="st-chip b-info" style="background:var(--g-soft);color:var(--brand2)">${ORDER_STEPS[Math.min(o.status, 4)]}</span></div>
+      ${orderTimeline(o)}
+      <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px"><button class="btn btn-soft btn-sm" data-adv-order="${o.id}">${U.icon("bolt", "ic-s")} Simulate next scan</button>${CATALOG_MODE ? "" : `<button class="btn btn-ghost btn-sm" data-invoice="${o.id}">${U.icon("doc", "ic-s")} Invoice</button>`}<a class="btn btn-ghost btn-sm" href="#/support">${U.icon("headset", "ic-s")} Need help?</a></div></div>
+      <div class="co-sec"><h3>Items in this shipment</h3>${o.items.map(i => { const p = DB.prodMap[i.sku]; return p ? `<div class="citem"><span class="art">${prodArt(p)}</span><div class="inf"><b>${U.esc(p.short)}</b><span class="mut3" style="font-size:11.5px">Qty ${i.qty} · <span class="mono">${p.sku}</span></span></div>${CATALOG_MODE ? "" : `<span class="price" style="font-size:14px">${U.inr(p.price * i.qty)}</span>`}</div>` : ""; }).join("")}</div>
+    </div>` : id ? emptyState("alert", "Order " + id + " not found", "Orders live in your browser for this demo — place one to try tracking.", "#/categories", "Shop parts") : ""}
+  </div>`;
+};
+Mount.track = () => {
+  bindSearch("hd-q", "hd-sug");
+  document.getElementById("trk-go").addEventListener("click", () => { const v = document.getElementById("trk-inp").value.trim().toUpperCase(); if (v) location.hash = "#/track/" + v; });
+  document.querySelectorAll("[data-adv-order]").forEach(b => b.addEventListener("click", () => {
+    const o = State.orders.find(x => x.id === b.getAttribute("data-adv-order"));
+    if (o && o.status < 5){ o.status += 1; State.save(); toast("Courier scan received 📦"); Router.go(); }
+    else toast("Delivered! Enjoy the repair 🎉");
+  }));
+  bindInvoiceButtons();
+};
+
+/* ================= GST INVOICE ================= */
+function invoiceHtml(o){
+  const rows = o.items.map(i => { const p = DB.prodMap[i.sku]; const base = p.price * i.qty / 1.18; return { p, i, base, gst: p.price * i.qty - base }; });
+  const baseT = rows.reduce((s, r) => s + r.base, 0), gstT = rows.reduce((s, r) => s + r.gst, 0);
+  return `<div class="inv"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><h2 style="font-family:var(--fd)">G-FLO</h2><div style="font-size:11px;color:#555">G-FLO Electrical Solutions<br>${CONTACT.address}</div></div><div style="text-align:right"><b>TAX INVOICE</b><div style="font-size:11px;color:#555">No: INV-${o.id}<br>Date: ${new Date(o.ts).toLocaleDateString("en-IN")}</div></div></div>
+  <div style="margin-top:12px;font-size:12px"><b>Bill to:</b> ${U.esc(o.name || "Demo Customer")} · ${U.esc(o.phone || "")}<br>${U.esc(o.addr || "")}${o.gstin ? `<br>GSTIN: ${U.esc(o.gstin)}` : ""}</div>
+  <table><tr><th>#</th><th>Item</th><th>HSN</th><th>Qty</th><th>Taxable ₹</th><th>CGST 9%</th><th>SGST 9%</th><th>Total ₹</th></tr>
+  ${rows.map((r, i) => `<tr><td>${i + 1}</td><td>${U.esc(r.p.short)}<br><span style="font-size:10px;color:#666">${r.p.sku}</span></td><td>8509</td><td>${r.i.qty}</td><td>${r.base.toFixed(2)}</td><td>${(r.gst / 2).toFixed(2)}</td><td>${(r.gst / 2).toFixed(2)}</td><td>${(r.p.price * r.i.qty).toFixed(2)}</td></tr>`).join("")}
+  <tr class="tot"><td colspan="4">Totals</td><td>${baseT.toFixed(2)}</td><td>${(gstT / 2).toFixed(2)}</td><td>${(gstT / 2).toFixed(2)}</td><td>${(baseT + gstT).toFixed(2)}</td></tr>
+  ${o.totals.disc ? `<tr><td colspan="7">Coupon discount</td><td>−${o.totals.disc.toFixed(2)}</td></tr>` : ""}
+  <tr><td colspan="7">Delivery${o.shipExtra ? " + services" : ""}</td><td>${(o.totals.ship + (o.shipExtra || 0)).toFixed(2)}</td></tr>
+  <tr class="tot"><td colspan="7">Grand total</td><td>₹${(o.totals.total + (o.shipExtra || 0)).toFixed(2)}</td></tr></table>
+  <div style="font-size:10.5px;color:#666">Payment: ${(o.pay || "demo").toUpperCase()} · This is a computer-generated demo invoice.</div></div>`;
+}
+function bindInvoiceButtons(){
+  document.querySelectorAll("[data-invoice]").forEach(b => b.addEventListener("click", () => {
+    const o = State.orders.find(x => x.id === b.getAttribute("data-invoice")); if (!o) return;
+    modal(invoiceHtml(o) + `<div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn btn-p" onclick="printInvoice('${o.id}')">${U.icon("download", "ic-s")} Print / save PDF</button></div>`, { title: "GST invoice", wide: true });
+  }));
+}
+window.printInvoice = id => {
+  const o = State.orders.find(x => x.id === id); if (!o) return;
+  const z = document.getElementById("print-zone"); z.innerHTML = invoiceHtml(o);
+  try { window.print(); } catch(e){ toast("Printing is blocked in this preview", "warn"); }
+};
+
+/* ================= ACCOUNT ACCESS =================
+   The fake "Continue with Google" / on-screen OTP sign-in that shipped with
+   v32 is gone, along with the Firebase build that replaced it. Shoppers browse
+   and raise enquiries without an account; the only real login on this site is
+   the staff one at /admin, served by the Python backend.                    */
+function syncAuth(){
+  document.querySelectorAll("[data-auth-ava]").forEach(el => {
+    el.innerHTML = U.icon("user");
+    el.setAttribute("title", "Your orders & wishlist");
+  });
+}
+function wireAuth(){ /* nothing to wire — no customer sign-in */ }
+
+/* ================= ACCOUNT ================= */
+Pages.account = tab => {
+  const U0 = State.user || { name: "Guest", email: "", via: "guest", hue: 358 };
+  const t = tab || "overview";
+  const lnk = (id, ic, label) => `<a class="acc-lnk ${t === id ? "on" : ""}" href="#/account/${id}">${U.icon(ic, "ic-s")} ${label}</a>`;
+  let body = "";
+  if (t === "orders" || t === "overview"){
+    body = `<h3 style="margin-bottom:14px">${t === "overview" ? "Welcome back, " + U.esc(U0.name.split(" ")[0]) + " 👋" : "Your orders"}</h3>
+    ${t === "overview" ? `<div class="kpis" style="margin-bottom:18px"><div class="kpi"><span class="k-ic">${U.icon("package")}</span><b>${State.orders.length}</b><span>Orders placed</span></div><div class="kpi"><span class="k-ic">${U.icon("heart")}</span><b>${State.wish.length}</b><span>Wishlisted parts</span></div>${CATALOG_MODE ? `<div class="kpi"><span class="k-ic">${U.icon("eye")}</span><b>${State.recent.length}</b><span>Recently viewed</span></div>` : `<div class="kpi"><span class="k-ic">${U.icon("bolt")}</span><b>${U.inr(State.orders.reduce((s, o) => s + o.totals.total, 0))}</b><span>Lifetime spend</span></div>`}<div class="kpi"><span class="k-ic">${U.icon("shield")}</span><b>Gold</b><span>G-FLO Circle tier</span></div></div>` : ""}
+    ${State.orders.length ? State.orders.map(o => `<div class="order-card"><div class="spread" style="flex-wrap:wrap;gap:10px"><div><b class="mono">${o.id}</b><div class="mut3" style="font-size:12px">${new Date(o.ts).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} · ${o.items.length} item(s)${CATALOG_MODE ? "" : " · " + U.inr(o.totals.total + (o.shipExtra || 0))}</div></div><div class="row"><span class="st-chip b-info" style="background:var(--g-soft);color:var(--brand2)">${ORDER_STEPS[Math.min(o.status, 4)]}</span><a class="btn btn-soft btn-sm" href="#/track/${o.id}">Track</a>${CATALOG_MODE ? "" : `<button class="btn btn-ghost btn-sm" data-invoice="${o.id}">Invoice</button>`}<button class="btn btn-ghost btn-sm" data-return="${o.id}">Return</button></div></div>
+      <div class="row" style="margin-top:11px;gap:7px">${o.items.slice(0, 5).map(i => { const p = DB.prodMap[i.sku]; return p ? `<a href="#/p/${p.sku}" style="width:44px;height:44px;border-radius:10px;overflow:hidden;background:var(--art-bg1);border:1px solid var(--line)" title="${U.esc(p.short)}">${prodArt(p)}</a>` : ""; }).join("")}</div></div>`).join("") : emptyState("package", "No orders yet", "Your demo orders will appear here.", "#/categories", "Shop parts")}`;
+  } else if (t === "addresses"){
+    body = `<h3 style="margin-bottom:14px">Saved addresses</h3>
+    <div class="order-card"><b>Home</b> <span class="badge b-info">Default</span><p class="mut" style="font-size:13px;margin-top:6px">Flat 14B, Volt Residency, MG Road, Bengaluru 560048<br>Asha Sharma · 98450 00000</p></div>
+    <div class="order-card"><b>Workshop</b><p class="mut" style="font-size:13px;margin-top:6px">Unit 7, Service Lane, Whitefield, Bengaluru 560066<br>Asha Sharma · 98450 00000</p></div>
+    <button class="btn btn-ghost" onclick="toast('Address book is read-only in the demo','info')">${U.icon("plus", "ic-s")} Add address</button>`;
+  } else if (t === "returns"){
+    body = `<h3 style="margin-bottom:14px">Returns & warranty claims</h3>${emptyState("rotate", "No active returns", "Start a return from any delivered order within 7 days.", "#/account/orders", "View orders")}`;
+  } else if (t === "settings"){
+    body = `<h3 style="margin-bottom:14px">Preferences</h3>
+    <div class="order-card spread"><div><b>Newsletter</b><div class="mut3" style="font-size:12.5px">Weekly parts drops & repair tips</div></div><span class="badge ${State.news ? "b-ok" : "b-off"}">${State.news ? "Subscribed" : "Off"}</span></div>
+    <div class="order-card spread"><div><b>This browser</b><div class="mut3" style="font-size:12.5px">Your cart, wishlist and enquiries are stored on this device only</div></div></div>
+    <div class="order-card spread"><div><b>Demo data</b><div class="mut3" style="font-size:12.5px">Clear cart, orders and wishlist stored in this browser</div></div><button class="btn btn-hot btn-sm" id="reset-demo">Reset demo</button></div>`;
+  }
+  return `<div class="wrap">${crumb([["Account"]])}
+    <div class="sec-head" style="margin-top:12px"><div><span class="kick">My G-FLO</span><h2>Account</h2></div></div>
+    <div class="acc-user"><span class="ava" style="background:linear-gradient(135deg,hsl(358 62% 46%),hsl(48 66% 40%))">${U.icon("package", "ic-s")}</span><div><b style="font-family:var(--fd);font-size:16px">Your orders &amp; enquiries</b><div class="mut3" style="font-size:12.5px">Saved in this browser — no account needed</div></div></div>
+    <div class="acc-grid">
+      <nav class="acc-nav" aria-label="Account sections">${lnk("overview", "dash", "Overview")}${lnk("orders", "package", "Orders")}${lnk("addresses", "pin", "Addresses")}${lnk("returns", "rotate", "Returns")}${lnk("settings", "cog", "Settings")}<a class="acc-lnk" href="#/wishlist">${U.icon("heart", "ic-s")} Wishlist</a><a class="acc-lnk" href="#/seller">${U.icon("store", "ic-s")} Seller studio</a></nav>
+      <div>${body}</div>
+    </div>
+  </div>`;
+};
+Mount.account = () => {
+  bindSearch("hd-q", "hd-sug");
+  bindInvoiceButtons();
+  const r = document.getElementById("reset-demo");
+  r && r.addEventListener("click", () => { State.cart = []; State.orders = []; State.wish = []; State.cmp = []; State.recent = []; State.coupon = null; State.save(); toast("Demo data cleared", "info"); Router.go(); });
+  document.querySelectorAll("[data-return]").forEach(b => b.addEventListener("click", () => {
+    modal(`<p style="font-size:14px">Pick a reason — pickup is scheduled within 24 hours and refunds land in 48 hours after QC.</p>
+    <div style="display:grid;gap:8px;margin-top:14px">${["Doesn't fit my model", "Damaged in transit", "Ordered wrong part", "Quality not as expected"].map(x => `<label class="pay-opt"><input type="radio" name="ret"><b style="font-size:13.5px">${x}</b></label>`).join("")}</div>
+    <button class="btn btn-p btn-block" style="margin-top:14px" onclick="closeOverlays();toast('Return initiated — pickup scheduled 📦')">Confirm return</button>`, { title: "Start a return — " + b.getAttribute("data-return") });
+  }));
+};
+
+/* ================= WISHLIST / COMPARE ================= */
+Pages.wishlist = () => {
+  const items = State.wish.map(s => DB.prodMap[s]).filter(Boolean);
+  return `<div class="wrap">${crumb([["Wishlist"]])}
+  <div class="sec-head" style="margin-top:12px"><div><span class="kick">Saved for later</span><h2>Wishlist${items.length ? ` (${items.length})` : ""}</h2></div>${items.length ? `<button class="btn btn-ghost btn-sm" id="wish-all">${U.icon("cart", "ic-s")} Add all to cart</button>` : ""}</div>
+  ${items.length ? `<div class="grid-cards" style="padding-bottom:50px">${items.map((p, i) => productCard(p, i)).join("")}</div>` : emptyState("heart", "Nothing saved yet", "Tap the heart on any part to keep it here.", "#/categories", "Discover parts")}</div>`;
+};
+Mount.wishlist = () => {
+  bindSearch("hd-q", "hd-sug");
+  const b = document.getElementById("wish-all");
+  b && b.addEventListener("click", () => { State.wish.forEach(s => State.addCart(s, 1, true)); toast("Wishlist moved to cart"); renderCartDrawer(); openDrawer("cart-drawer"); });
+};
+
+Pages.compare = () => {
+  const items = State.cmp.map(s => DB.prodMap[s]).filter(Boolean);
+  if (!items.length) return `<div class="wrap">${crumb([["Compare"]])}${emptyState("scale", "Nothing to compare", "Add up to 4 parts using the ⚖ button on any card.", "#/categories", "Browse parts")}</div>`;
+  const rows = [["Illustration", p => `<div class="art">${prodArt(p)}</div>`], ["Part", p => `<a href="#/p/${p.sku}" style="font-weight:700;color:var(--brand2)">${U.esc(p.short)}</a><div class="mono mut3" style="font-size:10.5px;margin-top:4px">${p.sku}</div>`], ...(CATALOG_MODE ? [] : [["Price", p => `<span class="price">${U.inr(p.price)}</span>${p.off ? ` <span class="off">${p.off}% off</span>` : ""}`]]), ["Rating", p => `${U.stars(p.rating)} ${p.rating} (${p.reviews})`], ["Appliance", p => catOf(p).name], ["Part family", p => ptOf(p).name], ["Fits brands", p => brandNames(p, 5)], ["Verified models", p => p.compat.length + " models"], ["Stock", p => stockHtml(p)], ["Warranty", p => p.warranty], ["Install", p => p.install], ["", p => `<button class="btn btn-p btn-sm" data-act="add-cart" data-sku="${p.sku}">Add to cart</button> <button class="btn btn-ghost btn-sm" data-act="cmp" data-sku="${p.sku}">Remove</button>`]];
+  return `<div class="wrap">${crumb([["Compare"]])}
+  <div class="sec-head" style="margin-top:12px"><div><span class="kick">Side by side</span><h2>Compare ${items.length} parts</h2></div></div>
+  <div class="cmp-wr"><table class="cmp-tbl">${rows.map(r => `<tr><td>${r[0]}</td>${items.map(p => `<td>${r[1](p)}</td>`).join("")}</tr>`).join("")}</table></div></div>`;
+};
+Mount.compare = () => bindSearch("hd-q", "hd-sug");
+
+/* ================= GUIDES ================= */
+Pages.guides = () => `<div class="wrap">${crumb([["Repair guides"]])}
+  <div class="sec-head" style="margin-top:12px"><div><span class="kick">Fix it yourself</span><h2>Repair guides</h2><p>Written by service engineers. Every guide links the exact parts and tools you need — with safety first.</p></div></div>
+  <div class="guide-grid" style="padding-bottom:50px">${GUIDES.map((g, i) => guideCard(g, i)).join("")}</div></div>`;
+Mount.guides = () => bindSearch("hd-q", "hd-sug");
+
+Pages.guide = id => {
+  const g = GUIDES.find(x => x.id === id);
+  if (!g) return Pages.notfound();
+  const c = CAT_MAP[g.cat];
+  const parts = DB.products.filter(p => p.cat === g.cat).sort((a, b) => b.rating - a.rating).slice(0, 4);
+  const lvlColor = { Easy: "b-ok", Moderate: "b-best", Pro: "b-deal" }[g.level];
+  return `<div class="wrap" style="max-width:880px">${crumb([["Repair guides", "#/guides"], [g.title]])}
+    <div style="margin:16px 0 8px" class="row"><span class="badge ${lvlColor}">${g.level}</span><span class="tag">${U.icon("clock", "ic-s")} ${g.mins} min</span><span class="tag">${U.icon("wrench", "ic-s")} ${U.esc(c.name)}</span></div>
+    <h1 style="font-size:clamp(24px,3.6vw,36px);margin-bottom:12px">${U.esc(g.title)}</h1>
+    <p class="mut" style="font-size:15px;max-width:640px">${U.esc(g.intro)}</p>
+    <div class="g-art" style="aspect-ratio:21/9;border-radius:var(--r-xl);margin:22px 0;display:grid;place-items:center;background:linear-gradient(150deg,var(--art-bg1),var(--art-bg2));border:1px solid var(--line)">${artFor(PT_MAP[c.pts[0]].art, c.hue, g.id, g.title)}</div>
+    <div class="lock-note">${U.icon("alert")} Safety first: ${U.esc(g.safety[0])}</div>
+    <div style="display:grid;gap:26px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));padding-bottom:40px">
+      <div><h3 style="margin-bottom:14px">Steps</h3><div class="step-list">${g.steps.map(s => `<div class="step"><span class="n"></span><div><p style="font-size:14px;color:var(--tx)">${U.esc(s)}</p></div></div>`).join("")}</div>
+        <h3 style="margin:22px 0 10px">Tools needed</h3><div style="display:flex;gap:8px;flex-wrap:wrap">${g.tools.map(t => `<span class="tag">${U.icon("wrench", "ic-s")} ${t}</span>`).join("")}</div>
+        ${g.safety[1] ? `<div class="lock-note" style="margin-top:16px">${U.icon("info")} ${U.esc(g.safety[1])}</div>` : ""}</div>
+      <div><h3 style="margin-bottom:14px">Parts for this repair</h3><div style="display:grid;gap:12px">${parts.map(p => `<a class="dl-row" href="#/p/${p.sku}" style="margin:0"><span style="width:52px;height:52px;border-radius:12px;overflow:hidden;flex:none;background:var(--art-bg1)">${prodArt(p)}</span><div><b>${U.esc(p.short)}</b><small>★ ${p.rating}${CATALOG_MODE ? "" : " · " + U.inr(p.price)}</small></div><span class="btn btn-soft btn-sm" style="margin-left:auto">View</span></a>`).join("")}</div>
+      <a class="btn btn-p btn-block" style="margin-top:14px" href="#/c/${c.id}">All ${U.esc(c.name)} parts ${U.icon("arr-r", "ic-s")}</a></div>
+    </div></div>`;
+};
+Mount.guide = () => bindSearch("hd-q", "hd-sug");
+
+/* ================= SUPPORT ================= */
+Pages.support = () => `<div class="wrap">${crumb([["Support"]])}
+  <div class="sec-head" style="margin-top:12px"><div><span class="kick">We're here to help</span><h2>Help & support</h2><p>Most questions are answered instantly by the assistant. Humans take over Mon–Sat, 9 AM – 8 PM IST.</p></div></div>
+  <div class="sup-grid" style="margin-bottom:30px">
+    <button class="sup-tile" data-act="chat" style="text-align:left">${U.icon("spark")}<b>Chat with G-FLO AI</b><span class="mut3" style="font-size:12.5px">Parts, fitment, orders — instant answers</span></button>
+    <a class="sup-tile" href="#/track">${U.icon("truck")}<b>Track an order</b><span class="mut3" style="font-size:12.5px">Live courier scans, self-serve</span></a>
+    <a class="sup-tile" href="#/account/returns">${U.icon("rotate")}<b>Returns & refunds</b><span class="mut3" style="font-size:12.5px">7-day easy returns, 48-hr refunds</span></a>
+    <a class="sup-tile" href="#/guides">${U.icon("book")}<b>Repair guides</b><span class="mut3" style="font-size:12.5px">DIY with engineer-written steps</span></a>
+    <a class="sup-tile" href="tel:${CONTACT.phone}">${U.icon("phone")}<b>${CONTACT.phone}</b><span class="mut3" style="font-size:12.5px">Order status & complaints · Mon–Sat 9–8</span></a>
+    <a class="sup-tile" href="mailto:${CONTACT.email}">${U.icon("mail")}<b>${CONTACT.email}</b><span class="mut3" style="font-size:12.5px">Replies within 4 business hours</span></a>
+  </div>
+  <h3 style="margin-bottom:14px">Frequently asked questions</h3>
+  <div style="max-width:760px;padding-bottom:40px">
+    ${[["How do I know a part will fit my appliance?", "Every listing has a compatibility checker — enter your brand and model number and we verify against the fitment database. You can also photograph the model sticker in the AI finder and we'll match it automatically."], ["What are the delivery charges and timelines?", CATALOG_MODE ? "Delivery charges are confirmed on your quote before dispatch. Standard delivery reaches most pincodes in 5–6 days; express options are available in metros." : "Delivery is a flat ₹99, and FREE on orders above ₹4,999. Standard delivery reaches most pincodes in 5–6 days; express options are available in metros."], ["What is the return policy?", "7-day easy returns on unused parts in original packaging. Refunds are processed within 48 hours of pickup QC. Installed electrical parts aren't returnable unless defective."], ["Do parts come with a warranty?", "Yes — every certified part carries a 3, 6 or 12-month replacement warranty as listed in its specifications, backed by doorstep replacement support."], ["Is Cash on Delivery available?", CATALOG_MODE ? "Yes — COD is available in most pincodes, confirmed along with your quote. UPI, cards, netbanking and EMI are also supported." : "COD is available on orders up to ₹5,000 in most pincodes (₹20 collection fee). UPI, cards, netbanking and EMI are also supported."], ["Can you install the part for me?", "Choose 'Expert Install' at checkout — a certified technician fits the part at your home. Available in 60+ cities."]].map((f, i) => `
+    <div class="faq-item ${i === 0 ? "open" : ""}"><button class="faq-q" aria-expanded="${i === 0}">${f[0]} ${U.icon("chev-d")}</button><div class="faq-a"><div>${f[1]}</div></div></div>`).join("")}
+  </div></div>`;
+Mount.support = () => {
+  bindSearch("hd-q", "hd-sug");
+  document.querySelectorAll(".faq-q").forEach(q => q.addEventListener("click", () => { const it = q.closest(".faq-item"); const open = it.classList.toggle("open"); q.setAttribute("aria-expanded", open); }));
+};
+
+/* ================= ABOUT / CONTACT / POLICIES ================= */
+Pages.about = () => `<div class="wrap" style="max-width:980px">${crumb([["About us"]])}
+  <div class="ab-hero">
+    <div>
+      <span class="kick" style="display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--brand2)">G-FLO Electrical Solutions</span>
+      <h1 style="font-size:clamp(26px,4vw,42px);margin:12px 0 14px;letter-spacing:-.02em">We don't just sell spare parts.<br><span class="grad-tx">We make them.</span></h1>
+      <p class="mut" style="font-size:15.5px;line-height:1.8">Open a G-FLO fan and you'll find our answer to every rattle, wobble and burnt winding in the market: double ball bearings, 100% copper windings, precision-balanced blades and batch-tested capacitors — engineered in Ahmedabad, and sold right here as spares. When the maker of the part is the seller of the part, "will it fit?" stops being a gamble.</p>
+      <div class="row" style="margin-top:20px;flex-wrap:wrap"><a class="btn btn-p" href="#/c/ceiling-fan">Shop G-FLO fan parts ${U.icon("arr-r","ic-s")}</a><a class="btn btn-ghost" href="#/categories">Browse all ${CATS.length} categories</a></div>
+    </div>
+    <div class="ah-img"><img src="${typeof USER_IMGS !== "undefined" ? USER_IMGS.poster : ""}" alt="G-FLO ceiling fan, engineered component by component" loading="lazy"></div>
+  </div>
+  <div class="kpis" style="margin:26px 0"><div class="kpi"><span class="k-ic">${U.icon("cog")}</span><b>In-house</b><span>Windings, blades & canopies</span></div><div class="kpi"><span class="k-ic">${U.icon("box")}</span><b>${DB.products.length}+</b><span>Genuine spares live</span></div><div class="kpi"><span class="k-ic">${U.icon("grid")}</span><b>${CATS.length}</b><span>Appliance & tool categories</span></div><div class="kpi"><span class="k-ic">${U.icon("pin")}</span><b>19,000+</b><span>Pincodes served</span></div></div>
+  <h2 style="font-size:clamp(19px,2.6vw,26px);margin:6px 0 4px">Straight from our line — not a stock library</h2>
+  <p class="mut" style="font-size:14px">Every photo below was shot on our own bench. What you see is exactly what ships.</p>
+  <div class="ab-gallery">
+    ${[["winding","100% copper winding"],["bearing","Double ball bearings"],["blades","Precision-balanced blades"],["capacitor","Batch-tested capacitors"],["canopyset","Canopy sets"],["shaft","Ground shafts"],["hooks","Safety clamps & hooks"],["spring","Music-grade springs"],["screws","Zinc-passivated fasteners"],["harness","Pre-terminated wiring"],["canopy","Powder-coated covers"],["varnish_s","Insulating varnish"]].map(g => `
+    <figure><img src="${typeof USER_IMGS !== "undefined" ? USER_IMGS[g[0]] : ""}" alt="${U.esc(g[1])}" loading="lazy"><figcaption>${U.esc(g[1])}</figcaption></figure>`).join("")}
+  </div>
+  <p class="mut" style="font-size:14.5px;line-height:1.8">Beyond our own fan components, G-FLO curates ${DB.products.length}+ genuine spares across ${CATS.length} categories — mixers, grinders, geysers, pumps, power tools and more — each verified for fitment, foam-packed, and backed by 7-day easy returns with humans on the phone when you need them. Technicians and service centres: the Seller Studio and bulk ordering were built for you.</p>
+  <div class="row" style="margin:22px 0 44px;flex-wrap:wrap"><a class="btn btn-p" href="#/categories">Browse the catalogue ${U.icon("arr-r","ic-s")}</a><a class="btn btn-soft" href="#/contact">Talk to us</a></div>
+</div>`;
+Mount.about = () => bindSearch("hd-q", "hd-sug");
+
+Pages.contact = () => `<div class="wrap" style="max-width:860px">${crumb([["Contact"]])}
+  <div class="sec-head" style="margin-top:12px"><div><span class="kick">We're listening</span><h2>Contact G-FLO</h2><p>Order status, fitment doubts, bulk quotes or seller onboarding — pick any channel.</p></div></div>
+  <div class="sup-grid" style="margin-bottom:26px">
+    <a class="sup-tile" href="tel:${CONTACT.phone}">${U.icon("phone")}<b>${CONTACT.phone}</b><span class="mut3" style="font-size:12.5px">Order status & complaints · Mon–Sat, 9 AM–8 PM</span></a>
+    <a class="sup-tile" href="mailto:${CONTACT.email}">${U.icon("mail")}<b>${CONTACT.email}</b><span class="mut3" style="font-size:12.5px">Replies within 4 business hours</span></a>
+    <button class="sup-tile" data-act="chat" style="text-align:left">${U.icon("spark")}<b>G-FLO AI assistant</b><span class="mut3" style="font-size:12.5px">Instant answers, 24×7</span></button>
+    <a class="sup-tile" href="#/track">${U.icon("truck")}<b>Track an order</b><span class="mut3" style="font-size:12.5px">Live courier scans</span></a>
+  </div>
+  <div class="co-sec"><h3>Send us a message</h3>
+    <form id="contact-form" class="form-grid" novalidate>
+      <div class="fld"><label for="cf-name">Your name</label><input class="inp" id="cf-name" required placeholder="Full name"><span class="err-tx">Enter your name</span></div>
+      <div class="fld"><label for="cf-phone">Mobile</label><input class="inp" id="cf-phone" required pattern="[0-9]{10}" maxlength="10" inputmode="numeric" placeholder="10-digit mobile"><span class="err-tx">Enter a valid mobile</span></div>
+      <div class="fld full"><label for="cf-msg">How can we help?</label><textarea class="inp" id="cf-msg" rows="4" required placeholder="Order ID, appliance model, or your question…"></textarea><span class="err-tx">Tell us a little more</span></div>
+      <div class="full"><button class="btn btn-p" type="submit">${U.icon("send","ic-s")} Send message</button></div>
+    </form></div>
+  <p class="mut3" style="font-size:12px;padding-bottom:40px">Registered office: ${CONTACT.address}</p>
+</div>`;
+Mount.contact = () => {
+  bindSearch("hd-q", "hd-sug");
+  const f = document.getElementById("contact-form");
+  f.addEventListener("submit", e => {
+    e.preventDefault();
+    let ok = true;
+    f.querySelectorAll("input[required],textarea[required]").forEach(i => { const bad = !i.checkValidity(); i.closest(".fld").classList.toggle("bad", bad); if (bad) ok = false; });
+    if (!ok) return;
+    f.innerHTML = `<p style="font-weight:700">✅ Message received! Ticket created — our team replies within 4 business hours.</p>`;
+    toast("Message sent to G-FLO support");
+  });
+};
+
+const POLICIES = {
+  privacy: ["Privacy Policy", [
+    ["What we collect", "Account details (name, phone, email), delivery addresses, order history, and device data that keeps the store fast and secure. In this demo, everything stays in your browser's local storage — nothing is transmitted anywhere."],
+    ["How it's used", "To fulfil orders, send delivery updates, prevent fraud, and personalise recommendations like 'parts for your appliances'. We never sell personal data."],
+    ["Your controls", "Download or erase your data anytime from Account → Settings. Newsletter and WhatsApp updates are strictly opt-in and one-tap to leave."]
+  ]],
+  refund: ["Refund Policy", [
+    ["When refunds apply", "Approved returns, cancelled prepaid orders, failed deliveries, and verified damage-in-transit claims qualify for a full refund."],
+    ["Timelines", "Refunds are initiated within 48 hours of pickup quality-check and reach your original payment method in 3–5 bank days. COD refunds go to UPI or bank transfer."],
+    ["Partial refunds", "If a kit is returned incomplete, the missing components are deducted at listed prices before the refund is released."]
+  ]],
+  return: ["Return Policy", [
+    ["7-day easy returns", "Raise a return within 7 days of delivery for unused parts in original packaging with all fasteners and documentation."],
+    ["What can't be returned", "Electrical parts that have been installed or energised (unless defective on arrival), cut-to-size items, and consumables with broken seals."],
+    ["How it works", "Start from Account → Orders → Return. Pickup is scheduled within 24 hours, QC happens on collection, and your refund follows the Refund Policy timelines."]
+  ]],
+  terms: ["Terms & Conditions", [
+    ["The service", "G-FLO is a marketplace connecting buyers with certified spare-part sellers. Product listings describe the part's fitment; always verify with the compatibility checker or our support before installation."],
+    ["Pricing & invoicing", "All prices are in INR. Every order generates a tax invoice; business details can be added at checkout."],
+    ["Safe use", "Spare parts must be installed per the included guide. Mains-voltage repairs should be performed by qualified persons; G-FLO isn't liable for damage from incorrect installation."],
+    ["Demo notice", "This experience is a frontend demonstration — orders, payments and accounts are simulated locally in your browser."]
+  ]],
+  shipping: ["Shipping Policy", [
+    ["Charges", "Flat ₹99 delivery on all orders; FREE delivery on orders above ₹4,999. Express and Expert-Install options are shown at checkout where serviceable."],
+    ["Timelines", "Dispatch within 24 hours on working days. Standard delivery reaches most of India in 5–6 days; metros usually sooner. Every shipment is tracked end-to-end."],
+    ["Coverage", "19,000+ pincodes across India via our courier partners. ODA pincodes may take 1–2 extra days."],
+    ["Packaging", "Parts ship in protective foam with batch slips; fragile components get double-boxing as standard."]
+  ]]
+};
+Pages.policy = id => {
+  const pol = POLICIES[id] || null;
+  if (!pol) return `<div class="wrap">${crumb([["Policies"]])}<div class="sec-head" style="margin-top:12px"><div><span class="kick">Store policies</span><h2>Policies</h2></div></div><div class="sup-grid" style="padding-bottom:50px">${Object.keys(POLICIES).map(k => `<a class="sup-tile" href="#/policy/${k}">${U.icon("doc")}<b>${POLICIES[k][0]}</b></a>`).join("")}</div></div>`;
+  return `<div class="wrap" style="max-width:780px">${crumb([["Policies", "#/policy"], [pol[0]]])}
+    <div class="sec-head" style="margin-top:12px"><div><span class="kick">Store policy</span><h2>${pol[0]}</h2><p>Last updated: July 2026 · Plain-language version</p></div></div>
+    ${pol[1].map(s => `<div class="co-sec"><h3 style="margin-bottom:8px">${s[0]}</h3><p class="mut" style="font-size:14px;line-height:1.75">${s[1]}</p></div>`).join("")}
+    <div class="row" style="padding-bottom:44px;flex-wrap:wrap"><a class="btn btn-soft" href="#/support">${U.icon("headset","ic-s")} Questions? Help centre</a><a class="btn btn-ghost" href="#/contact">Contact us</a></div>
+  </div>`;
+};
+Mount.policy = () => bindSearch("hd-q", "hd-sug");
+
+Pages.notfound = () => `<div class="wrap">${emptyState("alert", "Page not found", "The link may be old — but the parts are all still here.", "#/", "Back to home")}</div>`;
+</script>

@@ -1,0 +1,331 @@
+<script>
+"use strict";
+/* ================= DB BUILD ================= */
+const DB = { products: [], prodMap: {}, models: {}, modelList: [] };
+function buildDB(){
+  // model numbers per brand+cat
+  CATS.forEach(cat => {
+    cat.brands.forEach(bid => {
+      const b = BRAND_MAP[bid]; if (!b) return;
+      const r = U.rng(bid + cat.id);
+      const codes = [];
+      const n = 3 + Math.floor(r() * 3);
+      for (let i = 0; i < n; i++){
+        const code = (b.name.replace(/[^A-Za-z]/g, "").slice(0, 2).toUpperCase()) + "-" + cat.code + Math.floor(300 + r() * 700) + "XZKQVLM"[Math.floor(r() * 7)];
+        codes.push(code);
+        DB.modelList.push({ code, brand: bid, cat: cat.id });
+      }
+      DB.models[bid + "|" + cat.id] = codes;
+    });
+  });
+  // catalogue ingestion — rows come from the backend (/api/catalog), or from the
+  // copy baked into this file when the API can't be reached. See src/026-api.html.
+  let serial = 100;
+  DB.products.length = 0;
+  const CAT_ROWS = (typeof GFLO !== "undefined" && GFLO.rows && GFLO.rows.length)
+    ? GFLO.rows : (typeof bakedRows === "function" ? bakedRows() : []);
+  CAT_ROWS.forEach((row, idx) => {
+    const name = row.name, cat = CAT_MAP[row.cat];
+    if (!cat) return;
+    const price = (row.price === null || row.price === undefined || row.price === "") ? null : Number(row.price);
+    const mrp0 = (row.mrp === null || row.mrp === undefined || row.mrp === "") ? 0 : Number(row.mrp);
+    const rating0 = Number(row.rating) || 0, reviews0 = Number(row.reviews) || 0;
+    const pt = PT_MAP[row.pt] || PT_MAP.spares;
+    const r = U.rng(name + "|" + idx);
+    serial += 1 + Math.floor(r() * 4);
+    const sku = row.sku || ("GF-" + cat.code + "-" + pt.id.replace(/[^a-z]/g, "").slice(0, 3).toUpperCase() + "-" + String(serial).padStart(4, "0"));
+    const nl = name.toLowerCase();
+    let bFor = (row.brands || []).map(b => String(b).toLowerCase().replace(/[^a-z0-9]/g, "")).filter(b => BRAND_MAP[b]);
+    if (!bFor.length) bFor = BRANDS.filter(b => b.id.length > 3 && nl.includes(b.id)).map(b => b.id);
+    if (!bFor.length) bFor = [...cat.brands].sort(() => r() - .5).slice(0, 2 + Math.floor(r() * 3));
+    const mrp = (price !== null && mrp0 > price) ? mrp0 : price;
+    const off = (price !== null && mrp !== null && mrp > price) ? Math.round((1 - price / mrp) * 100) : 0;
+    const rating = rating0 > 0 ? Math.round(rating0 * 10) / 10 : Math.round((3.8 + r() * 1.1) * 10) / 10;
+    const reviews = reviews0 > 0 ? reviews0 : 4 + Math.floor(r() * 210);
+    const stock = Math.max(0, parseInt(row.stock, 10) || 0);
+    const compat = [];
+    bFor.forEach(bid => { (DB.models[bid + "|" + cat.id] || []).forEach(code => { if (r() > .3) compat.push(code); }); });
+    const p = {
+      sku, cat: cat.id, pt: pt.id,
+      name: name, short: name,
+      brandFor: bFor, price, mrp, off,
+      rating, reviews, stock,
+      isNew: row.isNew || r() < .14,
+      isBest: row.isBest || (rating0 >= 4.2 && reviews0 >= 3) || r() < .07,
+      isFeat: row.isFeat || r() < .1,
+      por: price === null,
+      unit: row.unit || "piece", size: row.size || "", pack: row.pack || "",
+      colours: row.colours || "", material: row.material || "",
+      note: row.note || "", group: row.group || "",
+      sold: 40 + Math.floor(r() * 2600),
+      art: pt.art, hue: cat.hue, seed: name + "|" + idx,
+      img: row.img || "",
+      gallery: Array.isArray(row.imgs) ? row.imgs : [],
+      warranty: row.warranty || ["3 months", "6 months", "6 months", "12 months"][Math.floor(r() * 4)],
+      weight: row.weight || (0.05 + r() * 1.8).toFixed(2) + " kg",
+      compat,
+      install: ["Easy — DIY", "Moderate — some tools", "Pro recommended"][Math.floor(r() * 3)],
+      qa: [Math.floor(r() * QA_POOL.length), (1 + Math.floor(r() * (QA_POOL.length - 1)))],
+      revSeed: Math.floor(r() * 1000)
+    };
+    DB.products.push(p); DB.prodMap[sku] = p;
+  });
+  // derive each category's part families from the real catalog
+  CATS.forEach(c => {
+    const counts = {};
+    DB.products.forEach(p => { if (p.cat === c.id) counts[p.pt] = (counts[p.pt] || 0) + 1; });
+    c.pts = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  });
+  // categories with nothing in them are hidden from the storefront
+  CATS.forEach(c => { c.count = DB.products.filter(p => p.cat === c.id).length; });
+}
+function prodArt(p, label){ return artFor(p.art, p.hue, p.seed, label || p.name); }
+function catOf(p){ return CAT_MAP[p.cat]; }
+function ptOf(p){ return PT_MAP[p.pt]; }
+function brandNames(p, max){ return p.brandFor.slice(0, max || 3).map(b => BRAND_MAP[b].name).join(", "); }
+function deliveryEta(pin){ const d = 3 + (U.hash(String(pin || "560001")) % 4); const dt = new Date(Date.now() + d * 864e5); return { days: d, label: dt.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }) }; }
+
+/* ================= STATE ================= */
+const State = {
+  cart: U.store.get("cart", []), wish: U.store.get("wish", []), cmp: U.store.get("cmp", []),
+  orders: U.store.get("orders", []), recent: U.store.get("recent", []), pin: U.store.get("pin", "560001"),
+  role: U.store.get("role", "admin"), coupon: U.store.get("coupon", null), news: U.store.get("news", false),
+  user: U.store.get("user", null),
+  save(){ ["cart","wish","cmp","orders","recent","pin","role","coupon","news","user"].forEach(k => U.store.set(k, this[k])); syncBadges(); if (typeof syncAuth === "function") syncAuth(); },
+  login(email, via){
+    const local = (email || "").split("@")[0].replace(/[._]+/g, " ").trim();
+    const name = local ? local.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") : "G-FLO Member";
+    this.user = { email: email, name: name, via: via || "email", hue: U.hash(email || "g") % 360, since: Date.now() };
+    this.save();
+  },
+  logout(){ this.user = null; this.save(); },
+  inCart(sku){ return this.cart.find(i => i.sku === sku); },
+  addCart(sku, qty, silent){
+    const p = DB.prodMap[sku]; if (!p) return;
+    if (p.stock === 0){ toast("This part is out of stock", "warn"); return; }
+    const it = this.inCart(sku);
+    if (it) it.qty = U.clamp(it.qty + (qty || 1), 1, 99); else this.cart.push({ sku, qty: qty || 1 });
+    this.save();
+    if (!silent){ toast("Added to cart — " + p.short); renderCartDrawer(); openDrawer("cart-drawer"); }
+  },
+  setQty(sku, qty){ const it = this.inCart(sku); if (!it) return; it.qty = U.clamp(qty, 0, 99); if (it.qty === 0) this.cart = this.cart.filter(i => i.sku !== sku); this.save(); },
+  rmCart(sku){ this.cart = this.cart.filter(i => i.sku !== sku); this.save(); },
+  cartTotals(){
+    let sub = 0, mrp = 0, count = 0;
+    let quote = 0;
+    this.cart.forEach(i => { const p = DB.prodMap[i.sku]; if (!p) return;
+      if (p.price === null){ quote += i.qty; } else { sub += p.price * i.qty; mrp += (p.mrp === null ? p.price : p.mrp) * i.qty; }
+      count += i.qty; });
+    let disc = 0; const c = this.coupon;
+    if (c){ if (c.type === "pct") disc = Math.round(sub * c.val / 100); if (c.type === "flat") disc = c.val; disc = Math.min(disc, Math.round(sub * .4)); }
+    const afterDisc = sub - disc;
+    const ship = afterDisc >= 4999 || count === 0 ? 0 : 99;
+    const gst = Math.round(afterDisc * .18);
+    return { sub, mrp, saveMrp: mrp - sub, disc, ship, gst, total: afterDisc + ship, count, quote,
+             freeGap: Math.max(0, 4999 - afterDisc) };
+  },
+  toggleWish(sku){ const i = this.wish.indexOf(sku); if (i >= 0){ this.wish.splice(i, 1); toast("Removed from wishlist", "info"); } else { this.wish.push(sku); toast("Saved to wishlist ♥"); } this.save(); },
+  toggleCmp(sku){
+    const i = this.cmp.indexOf(sku);
+    if (i >= 0){ this.cmp.splice(i, 1); }
+    else { if (this.cmp.length >= 4){ toast("Compare holds up to 4 parts", "warn"); return; } this.cmp.push(sku); toast("Added to compare"); }
+    this.save();
+  },
+  pushRecent(sku){ this.recent = [sku, ...this.recent.filter(s => s !== sku)].slice(0, 12); this.save(); },
+  placeOrder(payload){
+    const id = "GFLO" + String(100000 + Math.floor(Math.random() * 900000));
+    const t = this.cartTotals();
+    const order = { id, ts: Date.now(), items: this.cart.map(i => ({ ...i })), totals: t, ...payload, status: 1 };
+    this.orders.unshift(order); this.cart = []; this.coupon = null; this.save();
+    return order;
+  }
+};
+
+/* ================= OVERLAYS: toast / drawer / modal ================= */
+function toast(msg, type){
+  const wrap = document.getElementById("toasts");
+  const el = document.createElement("div");
+  el.className = "toast " + (type || "");
+  el.innerHTML = U.icon(type === "err" ? "alert" : type === "warn" ? "alert" : type === "info" ? "info" : "check") + `<span>${U.esc(msg)}</span>`;
+  wrap.appendChild(el);
+  setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 350); }, 2600);
+}
+let lastFocus = null;
+function openDrawer(id){
+  const d = document.getElementById(id); if (!d) return;
+  lastFocus = document.activeElement;
+  document.getElementById("ovl-bg").classList.add("open");
+  d.classList.add("open"); d.setAttribute("aria-hidden", "false");
+  const f = d.querySelector("button,a,input,select"); if (f) f.focus();
+}
+function closeOverlays(){
+  document.querySelectorAll(".drawer.open,.modal-wr.open,.chat.open").forEach(e => { e.classList.remove("open"); e.setAttribute("aria-hidden", "true"); });
+  document.getElementById("ovl-bg").classList.remove("open");
+  document.querySelectorAll(".mega.open").forEach(m => m.classList.remove("open"));
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
+}
+function modal(html, opts){
+  const wr = document.getElementById("modal-wr");
+  wr.querySelector(".modal").className = "modal" + (opts && opts.wide ? " wide" : "");
+  wr.querySelector(".modal-hd h3").innerHTML = (opts && opts.title) || "";
+  wr.querySelector(".modal-bd").innerHTML = html;
+  lastFocus = document.activeElement;
+  document.getElementById("ovl-bg").classList.add("open");
+  wr.classList.add("open"); wr.setAttribute("aria-hidden", "false");
+  wr.querySelector(".modal-hd button").focus();
+}
+
+/* ================= SEARCH ENGINE ================= */
+const Search = {
+  tokens(q){ return U.slug(q).split("-").filter(Boolean); },
+  intent(q){
+    const toks = this.tokens(q);
+    const it = { brand: null, cat: null, pt: null, maxPrice: null, model: null, terms: [] };
+    const mm = q.match(/\b([A-Za-z]{2}-[A-Z]{2}\d{3}[A-Z])\b/i);
+    if (mm) it.model = mm[1].toUpperCase();
+    const um = q.toLowerCase().match(/under\s*₹?\s*(\d{2,6})|below\s*₹?\s*(\d{2,6})|<\s*(\d{2,6})/);
+    if (um) it.maxPrice = +(um[1] || um[2] || um[3]);
+    toks.forEach(t => {
+      if (!it.brand){ const b = BRANDS.find(b => U.slug(b.name) === t || U.slug(b.name).startsWith(t) && t.length > 3); if (b){ it.brand = b.id; return; } }
+      it.terms.push(t);
+    });
+    const joined = toks.join(" ");
+    CATS.forEach(c => { const s = U.slug(c.name).split("-"); if (s.every(w => joined.includes(w))) it.cat = it.cat || c.id; });
+    if (!it.cat){ CATS.forEach(c => { const s = U.slug(c.name).split("-"); if (s.some(w => w.length > 3 && joined.includes(w))) it.cat = it.cat || c.id; }); }
+    PT.forEach(p => { const s = U.slug(p.name).replace(/s$/, ""); if (toks.some(t => s.includes(t.replace(/s$/, "")) && t.length > 3)) it.pt = it.pt || p.id; });
+    return it;
+  },
+  score(p, toks, it){
+    let s = 0;
+    const hay = U.slug(p.name + " " + p.sku + " " + catOf(p).name + " " + ptOf(p).name + " " + brandNames(p, 6));
+    toks.forEach(t => { if (hay.includes(t)) s += t.length > 3 ? 3 : 1.5; });
+    if (it.cat && p.cat === it.cat) s += 6;
+    if (it.pt && p.pt === it.pt) s += 6;
+    if (it.brand && p.brandFor.includes(it.brand)) s += 5;
+    if (it.model && p.compat.includes(it.model)) s += 10;
+    if (it.maxPrice && p.price <= it.maxPrice) s += 2;
+    if (it.maxPrice && p.price > it.maxPrice) s -= 8;
+    s += p.rating / 2 + Math.min(2, p.sold / 1500);
+    return s;
+  },
+  query(q, limit){
+    const toks = this.tokens(q); if (!toks.length) return { items: [], intent: {} };
+    const it = this.intent(q);
+    const scored = [];
+    DB.products.forEach(p => { const s = this.score(p, toks, it); if (s > 3) scored.push([s, p]); });
+    scored.sort((a, b) => b[0] - a[0]);
+    return { items: scored.slice(0, limit || 24).map(x => x[1]), intent: it };
+  },
+  suggest(q){
+    const it = this.intent(q);
+    const res = this.query(q, 5);
+    const toks = this.tokens(q);
+    const cats = CATS.filter(c => toks.some(t => U.slug(c.name).includes(t))).slice(0, 3);
+    const brands = BRANDS.filter(b => toks.some(t => U.slug(b.name).includes(t) && t.length > 2)).slice(0, 3);
+    const pts = PT.filter(p => toks.some(t => U.slug(p.name).includes(t) && t.length > 3)).slice(0, 3);
+    return { products: res.items, cats, brands, pts, intent: it };
+  }
+};
+
+/* ================= AI HELPERS ================= */
+const AI = {
+  intentLabel(it){
+    const bits = [];
+    if (it.brand) bits.push("brand: " + BRAND_MAP[it.brand].name);
+    if (it.cat) bits.push("appliance: " + CAT_MAP[it.cat].name);
+    if (it.pt) bits.push("part: " + PT_MAP[it.pt].name);
+    if (it.model) bits.push("model: " + it.model);
+    if (it.maxPrice) bits.push("budget: under ₹" + it.maxPrice);
+    return bits.join(" · ");
+  },
+  detectFromFile(name, size){
+    const r = U.rng(name + size);
+    const cat = CATS[Math.floor(r() * CATS.length)];
+    const lower = (name || "").toLowerCase();
+    const hit = CATS.find(c => lower.includes(c.id.split("-")[0])) || cat;
+    const pts = hit.pts.slice(0, 3 + Math.floor(r() * 3)).map(id => PT_MAP[id]);
+    const conf = 82 + Math.floor(r() * 16);
+    return { cat: hit, pts, conf };
+  },
+  ocrFromFile(name, size){
+    const r = U.rng("ocr" + name + size);
+    const m = DB.modelList[Math.floor(r() * DB.modelList.length)];
+    const lower = (name || "").toLowerCase();
+    const catHit = CATS.find(c => lower.includes(c.id.split("-")[0]));
+    const pick = catHit ? DB.modelList.find(x => x.cat === catHit.id) || m : m;
+    return { model: pick, conf: 88 + Math.floor(r() * 11), serial: "SN" + String(Math.floor(r() * 9e7 + 1e7)) };
+  },
+  compatCheck(p, brandId, model){
+    if (!model) return { ok: false, msg: "Enter your model number to verify." };
+    const M = model.toUpperCase().trim();
+    if (p.compat.includes(M)) return { ok: true, msg: `Verified fit — ${M} is in the fitment list for this part.` };
+    const near = p.compat.filter(c => !brandId || c.startsWith((BRAND_MAP[brandId] ? BRAND_MAP[brandId].name.replace(/[^A-Za-z]/g, "").slice(0, 2).toUpperCase() : ""))).slice(0, 3);
+    const alt = DB.products.find(x => x.cat === p.cat && x.pt === p.pt && x.compat.includes(M));
+    return { ok: false, msg: `${M} isn't in this part's verified list.`, near, alt };
+  },
+  recsFor(p, n){
+    return DB.products.filter(x => x.sku !== p.sku && (x.cat === p.cat || x.pt === p.pt))
+      .sort((a, b) => (b.cat === p.cat ? 1 : 0) - (a.cat === p.cat ? 1 : 0) || b.rating - a.rating).slice(0, n || 8);
+  },
+  smartPicks(n){
+    const seen = State.recent.map(s => DB.prodMap[s]).filter(Boolean);
+    if (!seen.length) return DB.products.filter(p => p.isBest).slice(0, n || 8);
+    const cats = [...new Set(seen.map(p => p.cat))];
+    return DB.products.filter(p => cats.includes(p.cat) && !State.recent.includes(p.sku)).sort((a, b) => b.rating - a.rating).slice(0, n || 8);
+  }
+};
+
+/* ================= ROUTER ================= */
+const Pages = {}, Mount = {};
+const Router = {
+  parse(){
+    const h = location.hash.replace(/^#\/?/, "");
+    const seg = h.split("/").map(decodeURIComponent);
+    const map = { "": ["home"], categories: ["categories"], c: ["category", seg[1]], brands: ["brands"], b: ["brand", seg[1]], deals: ["deals"], search: ["search", seg.slice(1).join("/")], p: ["product", seg[1]], finder: ["finder", seg[1]], guides: ["guides"], g: ["guide", seg[1]], support: ["support"], track: ["track", seg[1]], account: ["account", seg[1]], cart: ["cart"], checkout: ["checkout"], order: ["order", seg[1]], wishlist: ["wishlist"], seller: ["seller", seg[1]], admin: ["admin", seg[1]], about: ["about"], contact: ["contact"], policy: ["policy", seg[1]], login: ["account", "overview"] };  /* no customer sign-in — #/login lands on the account page */
+    const m = map[seg[0]] || ["notfound"];
+    return { page: m[0], param: m[1] };
+  },
+  titles: {
+    home: "G-FLO — Genuine Appliance Spare Parts", categories: "All Categories — G-FLO", brands: "Shop by Brand — G-FLO",
+    deals: "Deals & Offers — G-FLO", finder: "AI Spare Part Finder — G-FLO", guides: "Repair Guides — G-FLO",
+    support: "Help & Support — G-FLO", track: "Track Order — G-FLO", account: "My Account — G-FLO",
+    cart: "Cart — G-FLO", checkout: "Checkout — G-FLO", wishlist: "Wishlist — G-FLO",
+    seller: "Seller Studio — G-FLO", admin: "Staff sign-in — G-FLO", about: "About Us — G-FLO", contact: "Contact — G-FLO", policy: "Store Policies — G-FLO"
+  },
+  go(){
+    closeOverlays();
+    const { page, param } = this.parse();
+    const app = document.getElementById("app");
+    const fn = Pages[page] || Pages.notfound;
+    app.innerHTML = `<div class="pg" id="pg-${page}">${fn(param)}</div>`;
+    let t = this.titles[page] || "G-FLO";
+    if (page === "product" && DB.prodMap[param]) t = DB.prodMap[param].short + (typeof CATALOG_MODE !== "undefined" && CATALOG_MODE ? "" : " | " + U.inr(DB.prodMap[param].price)) + " — G-FLO";
+    if (page === "category" && CAT_MAP[param]) t = CAT_MAP[param].name + " Spare Parts — G-FLO";
+    if (page === "brand" && BRAND_MAP[param]) t = BRAND_MAP[param].name + " Spare Parts — G-FLO";
+    document.title = t;
+    window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+    if (Mount[page]) Mount[page](param);
+    revealInit(app);
+    syncNav(page);
+    if (typeof renderFooter === "function") renderFooter(page);
+    document.body.classList.toggle("brand-page", page === "home");
+    app.focus({ preventScroll: true });
+  }
+};
+function revealInit(root){
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: .08 });
+  (root || document).querySelectorAll(".rv:not(.in)").forEach(el => io.observe(el));
+}
+function syncNav(page){
+  document.querySelectorAll("[data-nav]").forEach(a => {
+    const k = a.getAttribute("data-nav");
+    a.classList.toggle("on", k === page || (k === "home" && page === "home"));
+  });
+}
+function syncBadges(){
+  const t = State.cartTotals();
+  document.querySelectorAll("[data-badge=cart]").forEach(e => { e.textContent = t.count; e.style.display = t.count ? "grid" : "none"; });
+  document.querySelectorAll("[data-badge=wish]").forEach(e => { e.textContent = State.wish.length; e.style.display = State.wish.length ? "grid" : "none"; });
+  document.querySelectorAll("[data-cart-total]").forEach(e => { e.textContent = t.count ? (CATALOG_MODE ? t.count + " item" + (t.count > 1 ? "s" : "") : U.inr(t.total)) : "Cart"; });
+}
+</script>

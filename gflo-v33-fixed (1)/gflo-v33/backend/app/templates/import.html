@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Import / Export{% endblock %}
+{% block body %}
+<div class="ph">
+  <div>
+    <h1>Import &amp; export</h1>
+    <p class="ph-sub">Bulk-edit the catalogue in Excel or Google Sheets and upload it back.
+       {{ count }} products in the catalogue right now.</p>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div>
+    <div class="card" style="margin:0">
+      <div class="card-h">
+        <span class="bdg bdg-mute">Step 1</span><h2>Download the catalogue</h2>
+      </div>
+      <div class="card-b">
+        <p class="mut" style="font-size:13.5px;margin-bottom:14px">
+          One row per product with every editable field. Edit prices, stock or names, keep the
+          <code>sku</code> column untouched — that's how rows are matched on the way back in.
+        </p>
+        <a class="btn btn-p" href="/admin/export.csv">{{ icon('download', 15) }} Download CSV ({{ count }} rows)</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">
+        <span class="bdg bdg-mute">Step 2</span><h2>Upload your changes</h2>
+      </div>
+      <form class="card-b" method="post" action="/admin/import" enctype="multipart/form-data" data-busy>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="fg">
+          <div class="field">
+            <label class="lbl" for="file">CSV file</label>
+            <input class="inp" type="file" id="file" name="file" accept=".csv,text/csv" required
+                   style="padding:8px 10px;height:auto">
+          </div>
+          <div class="field">
+            <label class="lbl" for="mode">Rows with an unknown SKU</label>
+            <select class="sel" id="mode" name="mode">
+              <option value="update">Skip them — only update existing products</option>
+              <option value="create">Create them as new products</option>
+            </select>
+            <span class="help">“Create” needs a valid <code>category_id</code> on those rows.</span>
+          </div>
+        </div>
+        <div class="alert alert-info" style="margin:16px 0 0">
+          {{ icon('info') }}
+          <span>An empty <b>price</b> cell means “price on request”, not free. An empty
+                <b>visible</b> cell hides the product.</span>
+        </div>
+        <button class="btn btn-p" type="submit" style="margin-top:16px">{{ icon('upload', 15) }} Upload and apply</button>
+      </form>
+    </div>
+  </div>
+
+  <div>
+    <div class="card" style="margin:0">
+      <div class="card-h">{{ icon('list', 17) }}<h2>Columns recognised</h2></div>
+      <div class="card-b">
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          {% for f in fields %}
+          <span class="bdg {{ 'bdg-info' if f == 'sku' else 'bdg-mute' }}"><code>{{ f }}</code></span>
+          {% endfor %}
+        </div>
+        <p class="help" style="margin-top:12px">Any other column is ignored, so you can keep your own
+           working notes in the sheet.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">{{ icon('package', 17) }}<h2>Re-run the price list</h2></div>
+      <div class="card-b">
+        <p class="mut" style="font-size:13.5px;margin-bottom:12px">
+          The 2026 price list loads from a script that ships with the backend, so it can be re-run
+          whenever the printed list changes:
+        </p>
+        <pre class="mono" style="background:var(--card-2);border:1px solid var(--line);border-radius:9px;
+                                 padding:12px;overflow:auto;font-size:12px;line-height:1.7;margin:0">python scripts/import_pricelist.py
+python scripts/import_pricelist.py --prices</pre>
+        <p class="help" style="margin-top:10px">
+          The first adds or refreshes price-list products; the second only updates rates.
+          Edit <code>data/pl_products.json</code> to change what they load.
+          Products you added by hand are never touched.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

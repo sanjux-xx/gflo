@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% block title %}{{ 'New product' if new else p.name }}{% endblock %}
+{% block body %}
+<div class="crumb">
+  <a href="/admin/products">Products</a>{{ icon('chev-r', 13) }}
+  <span>{{ 'New product' if new else p.name }}</span>
+</div>
+
+<div class="ph">
+  <div>
+    <h1>{{ 'Add a product' if new else 'Edit product' }}</h1>
+    <p class="ph-sub">
+      {% if new %}
+        Only the name and category are required. Leave the price blank to show “price on request”.
+      {% else %}
+        <span class="mono">{{ p.sku }}</span>
+        {% if p.updated_at %} · last saved {{ p.updated_at.strftime('%d %b %Y, %H:%M') }} UTC{% endif %}
+        {% if p.source and p.source != 'manual' %} · imported from
+          {{ 'the 2026 price list' if p.source == 'pricelist' else p.source }}{% endif %}
+      {% endif %}
+    </p>
+  </div>
+  <div class="ph-acts">
+    {% if not new %}
+      <a class="btn" href="/#/p/{{ p.sku }}" target="_blank" rel="noopener">{{ icon('ext', 15) }} View on store</a>
+      <form method="post" action="/admin/products/{{ p.id }}/duplicate" style="display:inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn">{{ icon('copy', 15) }} Duplicate</button>
+      </form>
+      <form method="post" action="/admin/products/{{ p.id }}/delete" style="display:inline"
+            onsubmit="return confirm('Delete “{{ p.name }}” permanently? This can\'t be undone.')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn btn-danger">{{ icon('trash', 15) }} Delete</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<form method="post" action="{{ '/admin/products/new' if new else '/admin/products/' ~ p.id ~ '/edit' }}"
+      data-guard data-busy>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="grid-2">
+    <div>
+      <div class="card" style="margin:0">
+        <div class="card-h">{{ icon('box', 17) }}<h2>Basics</h2></div>
+        <div class="card-b">
+          <div class="fg">
+            <div class="field span2">
+              <label class="lbl" for="name">Product name <span class="req">*</span></label>
+              <input class="inp" id="name" name="name" value="{{ p.name }}" required
+                     placeholder="e.g. 12 Inch Fan Rod — Ultra Heavy (Powder Coated)">
+            </div>
+            <div class="field">
+              <label class="lbl" for="sku">G-FLO code / SKU</label>
+              <input class="inp mono" id="sku" name="sku" value="{{ p.sku or '' }}" placeholder="GF-1101-012">
+              <span class="help">Leave blank and one is generated. Must be unique.</span>
+            </div>
+            <div class="field">
+              <label class="lbl" for="category_id">Category <span class="req">*</span></label>
+              <select class="sel" id="category_id" name="category_id" required>
+                <option value="">Choose a category…</option>
+                {% for c in cats %}
+                <option value="{{ c.id }}" {{ 'selected' if p.category_id == c.id }}>{{ c.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label class="lbl" for="group_name">Price-list section</label>
+              <input class="inp" id="group_name" name="group_name" value="{{ p.group_name or '' }}"
+                     placeholder="e.g. Ultra Heavy Fan Pipes">
+              <span class="help">Shown under the product name in listings.</span>
+            </div>
+            <div class="field">
+              <label class="lbl" for="part_family">Part family</label>
+              <select class="sel" id="part_family" name="part_family">
+                {% for fam in families %}
+                <option value="{{ fam }}" {{ 'selected' if p.part_family == fam }}>{{ fam }}</option>
+                {% endfor %}
+              </select>
+              <span class="help">Drives storefront filters and the fallback illustration.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">{{ icon('rupee', 17) }}<h2>Price &amp; stock</h2></div>
+        <div class="card-b">
+          <div class="fg">
+            <div class="field">
+              <label class="lbl" for="price">Selling price</label>
+              <div class="prefix">
+                <span class="sym">₹</span>
+                <input class="inp" id="price" name="price" inputmode="decimal"
+                       value="{{ '' if p.price is none else p.price }}" placeholder="blank = on request">
+              </div>
+              <span class="help">Leave empty to show “{{ 'price on request' }}” and keep it out of cart totals.</span>
+            </div>
+            <div class="field">
+              <label class="lbl" for="mrp">MRP</label>
+              <div class="prefix">
+                <span class="sym">₹</span>
+                <input class="inp" id="mrp" name="mrp" inputmode="decimal"
+                       value="{{ '' if p.mrp is none else p.mrp }}" placeholder="optional">
+              </div>
+              <span class="help">Struck through with a discount badge when higher than the price.</span>
+            </div>
+            <div class="field">
+              <label class="lbl" for="stock">Stock quantity</label>
+              <input class="inp" id="stock" name="stock" inputmode="numeric" value="{{ p.stock or 0 }}">
+              <span class="help">0 shows “out of stock” and blocks add-to-cart.</span>
+            </div>
+            <div class="field">
+              <label class="lbl" for="unit">Sold per</label>
+              <select class="sel" id="unit" name="unit">
+                {% for u in units %}<option value="{{ u }}" {{ 'selected' if p.unit == u }}>{{ u }}</option>{% endfor %}
+              </select>
+              <span class="help">Appears next to the price, e.g. “per 1000 pcs”.</span>
+            </div>
+            <div class="field">
+              <label class="lbl" for="size">Size / variant</label>
+              <input class="inp" id="size" name="size" value="{{ p.size or '' }}"
+                     placeholder="e.g. 12 inch, 8 mm, 3 m">
+            </div>
+            <div class="field">
+              <label class="lbl" for="pack">Packing</label>
+              <input class="inp" id="pack" name="pack" value="{{ p.pack or '' }}"
+                     placeholder="e.g. 100 pcs per packet">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">{{ icon('list', 17) }}<h2>Details shoppers see</h2></div>
+        <div class="card-b">
+          <div class="fg">
+            <div class="field span2">
+              <label class="lbl" for="description">Description</label>
+              <textarea class="ta" id="description" name="description"
+                        placeholder="What it is, where it fits, what's in the box.">{{ p.description or '' }}</textarea>
+            </div>
+            <div class="field">
+              <label class="lbl" for="colours">Colours</label>
+              <input class="inp" id="colours" name="colours" value="{{ p.colours or '' }}"
+                     placeholder="Ivory, Black, White, Silver…">
+            </div>
+            <div class="field">
+              <label class="lbl" for="material">Material / finish</label>
+              <input class="inp" id="material" name="material" value="{{ p.material or '' }}"
+                     placeholder="180 gm CRC pipe, powder coated">
+            </div>
+            <div class="field">
+              <label class="lbl" for="warranty">Warranty</label>
+              <input class="inp" id="warranty" name="warranty" value="{{ p.warranty or '' }}" placeholder="6 months">
+            </div>
+            <div class="field">
+              <label class="lbl" for="weight">Weight</label>
+              <input class="inp" id="weight" name="weight" value="{{ p.weight or '' }}" placeholder="0.40 kg">
+            </div>
+            <div class="field">
+              <label class="lbl" for="brand_names">Brand / fits brands</label>
+              <input class="inp" id="brand_names" name="brand_names" value="{{ p.brand_names or '' }}"
+                     placeholder="G-FLO, Usha, Crompton">
+              <span class="help">Comma separated.</span>
+            </div>
+            <div class="field">
+              <label class="lbl">Rating &amp; review count</label>
+              <div style="display:flex;gap:8px">
+                <input class="inp" name="rating" value="{{ p.rating or 0 }}" inputmode="decimal" aria-label="Rating">
+                <input class="inp" name="reviews" value="{{ p.reviews or 0 }}" inputmode="numeric" aria-label="Reviews">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card" style="margin:0">
+        <div class="card-h">{{ icon('eye', 17) }}<h2>Visibility</h2></div>
+        <div class="card-b" style="display:flex;flex-direction:column;gap:15px">
+          <label class="sw">
+            <input type="checkbox" name="visible" {{ 'checked' if p.visible }}>
+            <span class="track"></span>
+            <span class="sw-txt">Show on the storefront<small>Hidden products stay in the catalogue</small></span>
+          </label>
+          <label class="ck-row">
+            <input type="checkbox" class="ck" name="is_new" {{ 'checked' if p.is_new }}>
+            <span>“New” badge<small>Highlights it in listings</small></span>
+          </label>
+          <label class="ck-row">
+            <input type="checkbox" class="ck" name="is_best" {{ 'checked' if p.is_best }}>
+            <span>“Bestseller” badge</small></span>
+          </label>
+          <label class="ck-row">
+            <input type="checkbox" class="ck" name="is_featured" {{ 'checked' if p.is_featured }}>
+            <span>Feature on the homepage</span>
+          </label>
+          <div class="field">
+            <label class="lbl" for="sort_order">Sort order</label>
+            <input class="inp" id="sort_order" name="sort_order" value="{{ p.sort_order or 1000 }}" inputmode="numeric">
+            <span class="help">Lower numbers show first.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">{{ icon('image', 17) }}<h2>Main photo</h2></div>
+        <div class="card-b">
+          {% if p.image_url %}
+          <img src="{{ p.image_url }}" alt=""
+               style="width:100%;height:170px;object-fit:contain;background:#f7f8fa;
+                      border:1px solid var(--line-2);border-radius:10px;margin-bottom:12px">
+          {% endif %}
+          <div class="field">
+            <label class="lbl" for="image_url">Photo URL</label>
+            <input class="inp" id="image_url" name="image_url" value="{{ p.image_url or '' }}"
+                   placeholder="/media/products/… or https://…">
+            <span class="help">Uploading below sets this for you.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="savebar">
+    <span class="st" data-dirty-note>All changes saved</span>
+    <span class="tiny">Tip: {{ 'Ctrl' }}+S saves</span>
+    <div class="acts">
+      <a class="btn" href="/admin/products">Cancel</a>
+      <button class="btn btn-p" type="submit">{{ icon('save', 15) }} {{ 'Create product' if new else 'Save changes' }}</button>
+    </div>
+  </div>
+</form>
+
+{% if not new %}
+<div class="card" style="margin-top:20px">
+  <div class="card-h">
+    {{ icon('image', 17) }}<h2>Photo gallery</h2>
+    <div class="card-acts"><span class="bdg bdg-mute">{{ p.images|length }} photo(s)</span></div>
+  </div>
+  <div class="card-b">
+    {% if p.images %}
+    <div class="photos" style="margin-bottom:16px">
+      {% for img in p.images %}
+      <div class="photo {{ 'main' if p.image_url == img.url }}">
+        {% if p.image_url == img.url %}<span class="mainflag">Main</span>{% endif %}
+        <img src="{{ img.url }}" alt="" loading="lazy">
+        <div class="pf">
+          {% if p.image_url != img.url %}
+          <form method="post" action="/admin/products/{{ p.id }}/images/{{ img.id }}/primary">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="btn btn-xs" title="Use as the main photo">{{ icon('star', 12) }} Make main</button>
+          </form>
+          {% endif %}
+          <form method="post" action="/admin/products/{{ p.id }}/images/{{ img.id }}/delete"
+                onsubmit="return confirm('Remove this photo?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="btn btn-xs btn-danger btn-ic" title="Remove photo">{{ icon('trash', 12) }}</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" action="/admin/products/{{ p.id }}/images" enctype="multipart/form-data" data-busy>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose photos to upload">
+        <span class="ic">{{ icon('upload', 20) }}</span>
+        <b>Drop photos here, or click to choose</b>
+        <span>JPG, PNG, WebP, GIF or AVIF · up to 8 MB each · resized to 1600 px automatically</span>
+        <input type="file" name="files" id="files" multiple accept="image/*" style="display:none">
+        <div class="tiny" id="filelist" style="margin-top:9px;font-weight:600"></div>
+      </div>
+      <button class="btn btn-p" type="submit" style="margin-top:12px">{{ icon('upload', 15) }} Upload photos</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

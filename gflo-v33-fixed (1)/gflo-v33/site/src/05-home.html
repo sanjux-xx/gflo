@@ -1,0 +1,188 @@
+<script>
+"use strict";
+/* ================= HOME ================= */
+Pages.home = () => {
+  const featured = DB.products.filter(p => p.isFeat).sort((a, b) => b.rating - a.rating).slice(0, 10);
+  const fresh = DB.products.filter(p => p.isNew).sort((a, b) => b.reviews - a.reviews).slice(0, 10);
+  const best = DB.products.filter(p => p.isBest).sort((a, b) => b.sold - a.sold).slice(0, 10);
+  const recs = AI.smartPicks(10);
+  const heroParts = [DB.products[8], DB.products[60], DB.products[130], DB.products[220]].filter(Boolean);
+  const dealsTop = DB.products.filter(p => p.off >= 30 && p.stock > 0).sort((a, b) => b.off - a.off).slice(0, 10);
+  return `
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <span class="hero-kick rv in"><span class="pulse"></span> ${DB.products.length}+ genuine parts · ${CATS.length} appliance categories · AI-verified fit</span>
+        <h1 class="rv in">Every appliance deserves<br>a <span class="grad-tx">second life.</span></h1>
+        <p class="sub rv in rv-d1">Find the exact spare part for your mixer, drill, fan, cooler, pump or geyser — verified against your model number, delivered across India.</p>
+        <div class="hero-search rv in rv-d1">
+          <div class="sbox">${U.icon("search")}<input id="hero-q" type="search" placeholder='Try “Preethi mixer coupler” or a model number…' autocomplete="off" aria-label="Search spare parts" role="combobox" aria-expanded="false" aria-controls="hero-sug">
+          <button class="btn-icon btn" data-mic="hero-q" aria-label="Voice search">${U.icon("mic", "ic-s")}</button>
+          <button class="btn btn-p" data-go="finder" onclick="location.hash='#/finder'" style="height:42px">${U.icon("spark", "ic-s")} AI Finder</button></div>
+          <div class="sug" id="hero-sug" role="listbox"></div>
+        </div>
+        <div class="hero-chips rv in rv-d2">
+          <span class="mut3" style="font-size:12px;align-self:center">Trending:</span>
+          ${["Mixer coupler", "Fan capacitor", "Carbon brush", "Armature", "Geyser element"].map(t => `<a class="chip" href="#/search/${encodeURIComponent(t)}">${t}</a>`).join("")}
+        </div>
+        <div class="hero-stats rv in rv-d3">
+          <div class="hstat"><b data-count="98.2">0</b><span>% first-time fit rate</span></div>
+          <div class="hstat"><b data-count="19000">0</b><span>pincodes served</span></div>
+          <div class="hstat"><b data-count="120000">0</b><span>repairs powered</span></div>
+          <div class="hstat"><b>4.8 ★</b><span>50k+ ratings</span></div>
+        </div>
+      </div>
+      <div class="hero-vis" aria-hidden="true">
+        <div class="hv-core">
+          <div class="hv-ring" style="width:420px;height:420px"></div>
+          <div class="hv-ring" style="width:300px;height:300px;animation-direction:reverse;animation-duration:28s"></div>
+          <div class="hv-hero-art">${heroParts[0] ? prodArt(heroParts[0]) : ""}</div>
+        </div>
+        ${heroParts[1] ? `<div class="hv-part" style="top:6%;left:4%;animation-delay:.6s">${prodArt(heroParts[1])}</div>` : ""}
+        ${heroParts[2] ? `<div class="hv-part" style="bottom:10%;left:10%;animation-delay:1.4s">${prodArt(heroParts[2])}</div>` : ""}
+        ${heroParts[3] ? `<div class="hv-part" style="top:12%;right:2%;animation-delay:2s">${prodArt(heroParts[3])}</div>` : ""}
+        <div class="hv-tag" style="bottom:24%;right:0">${U.icon("check", "ic-s")} Fits SJ-MG512X ✓</div>
+        <div class="hv-tag" style="top:44%;left:-2%;animation-delay:1s">${U.icon("truck", "ic-s")} Delivery in 2 days</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="trust"><div class="wrap">
+    <div class="titem rv"><span class="ti-ic">${U.icon("shield")}</span><div><b>100% genuine parts</b><span>Brand-certified, batch traceable</span></div></div>
+    <div class="titem rv rv-d1"><span class="ti-ic">${U.icon("rotate")}</span><div><b>7-day easy returns</b><span>No-questions refund</span></div></div>
+    <div class="titem rv rv-d2"><span class="ti-ic">${U.icon("truck")}</span><div><b>Fast, tracked delivery</b><span>FREE above ₹4,999 · 19k+ pincodes</span></div></div>
+    <div class="titem rv rv-d3"><span class="ti-ic">${U.icon("spark")}</span><div><b>AI-verified fitment</b><span>Match by model number or photo</span></div></div>
+  </div></section>
+
+  <section class="sec"><div class="wrap">
+    ${sectionHead("Popular categories", "What are we fixing today?", "Complete spare-part catalogues for every major home appliance.", "#/categories", "All 26 categories")}
+    <div class="cat-grid">${CATS.filter(c => c.popular).concat(CATS.filter(c => !c.popular).slice(0, 4)).slice(0, 12).map((c, i) => `
+      <a class="cat-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" href="#/c/${c.id}"><span class="ct-ic">${U.icon("c-" + c.id)}</span><div><b>${U.esc(c.name)}</b><br><span>${c.pts.length} part families</span></div></a>`).join("")}
+    </div>
+  </div></section>
+
+  <section class="sec-tight"><div class="wrap">
+    <div class="deal-hero rv" style="margin-top:0">
+      <div class="spread" style="flex-wrap:wrap;gap:18px">
+        <div><span class="badge" style="background:rgba(255,255,255,.2);color:#fff">⚡ Deal Zone</span>
+        <h2 style="font-size:clamp(20px,3vw,30px);margin:10px 0 6px">Up to 40% off service-season essentials</h2>
+        <p style="opacity:.85;font-size:13.5px">Capacitors, couplers, filters & more — refreshed every day at midnight.</p>
+        <div class="cd" id="home-cd" aria-label="Deal countdown"></div></div>
+        <a class="btn btn-lg" style="background:#fff;color:#be123c" href="#/deals">Explore deals ${U.icon("arr-r", "ic-s")}</a>
+      </div>
+    </div>
+  </div></section>
+
+  <section class="sec-tight"><div class="wrap">
+    ${sectionHead("Featured spare parts", "Hand-picked, service-grade", null, "#/search/featured", "See more")}
+    ${railOf(featured)}
+  </div></section>
+
+  <section class="sec-tight"><div class="wrap">
+    ${sectionHead("Shop by brand", "Parts for the brands you own", "Compatible spares for 55+ appliance brands sold in India.", "#/brands", "All brands")}
+    <div class="brand-grid">${BRANDS.slice(0, 12).map((b, i) => `<a class="brand-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" href="#/b/${b.id}">${brandMark(b)}<b>${U.esc(b.name)}</b><span>${DB.products.filter(p => p.brandFor.includes(b.id)).length} parts</span></a>`).join("")}</div>
+  </div></section>
+
+  <section class="sec-tight"><div class="wrap">
+    ${sectionHead("New arrivals", "Fresh off the assembly line", null, "#/search/new arrivals", "See more")}
+    ${railOf(fresh)}
+  </div></section>
+
+  <section class="sec-tight"><div class="wrap">
+    ${sectionHead("Best sellers", "Trusted by 1,20,000+ repairs", null, "#/search/best sellers", "See more")}
+    ${railOf(best)}
+  </div></section>
+
+  <section class="sec-tight"><div class="wrap">
+    ${sectionHead("Recommended for you", State.recent.length ? "Based on parts you viewed" : "Smart picks to start with", "G-FLO AI pairs accessories and consumables with your appliances.")}
+    ${railOf(recs)}
+  </div></section>
+
+  <section class="sec"><div class="wrap">
+    ${sectionHead("Repair guides", "Fix it yourself, the safe way", "Step-by-step guides written by service engineers — with the exact parts linked.", "#/guides", "All guides")}
+    <div class="guide-grid">${GUIDES.slice(0, 4).map((g, i) => guideCard(g, i)).join("")}</div>
+  </div></section>
+
+  <section class="sec-tight"><div class="wrap">
+    ${sectionHead("Customer stories", "Fixed, not replaced", "Real repairs from homes and service shops across India.")}
+    <div class="tst-grid">${TESTIMONIALS.map((t, i) => `
+      <figure class="tst rv ${i % 3 ? "rv-d" + (i % 3) : ""}"><div class="rt-ln">${U.stars(t[2])}<span>${t[2]}</span></div><p>“${U.esc(t[3])}”</p>
+      <figcaption class="who"><span class="ava" style="background:linear-gradient(135deg,hsl(${(i * 47) % 360} 60% 45%),hsl(${(i * 47 + 60) % 360} 65% 38%))">${t[0].split(" ").map(w => w[0]).join("").slice(0, 2)}</span><span><b>${t[0]}</b><span>${t[1]}</span></span></figcaption></figure>`).join("")}
+    </div>
+  </div></section>
+
+  <section class="sec-tight"><div class="wrap">
+    <div class="news rv">
+      <h2>Parts drop alerts, repair tips, zero spam.</h2>
+      <p>Join 45,000+ DIYers and technicians. One useful email a week — new stock, seasonal checklists and subscriber-only deals.</p>
+      <form id="news-form"><input class="inp" type="email" required placeholder="you@example.com" aria-label="Email address"><button class="btn">Subscribe</button></form>
+      <p style="font-size:11px;opacity:.7;margin-top:12px">By subscribing you agree to our privacy policy. Unsubscribe anytime.</p>
+    </div>
+  </div></section>`;
+};
+Mount.home = () => {
+  bindSearch("hero-q", "hero-sug");
+  bindSearch("hd-q", "hd-sug");
+  // animated counters
+  document.querySelectorAll("[data-count]").forEach(el => {
+    const target = parseFloat(el.getAttribute("data-count")); const dec = target % 1 !== 0;
+    let cur = 0; const steps = 50; const inc = target / steps;
+    const t = setInterval(() => { cur += inc; if (cur >= target){ cur = target; clearInterval(t); } el.textContent = dec ? cur.toFixed(1) : Math.round(cur).toLocaleString("en-IN"); }, 26);
+  });
+  countdownInto("home-cd");
+  const nf = document.getElementById("news-form");
+  nf && nf.addEventListener("submit", e => { e.preventDefault(); State.news = true; State.save(); nf.innerHTML = `<p style="font-weight:700">🎉 You're in! Check your inbox for a welcome surprise.</p>`; toast("Subscribed to G-FLO Weekly"); });
+};
+function countdownInto(id){
+  const el = document.getElementById(id); if (!el) return;
+  const tick = () => {
+    const end = new Date(); end.setHours(24, 0, 0, 0);
+    let s = Math.max(0, Math.floor((end - Date.now()) / 1000));
+    const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
+    el.innerHTML = [["Hrs", h], ["Min", m], ["Sec", ss]].map(x => `<div class="cell"><b>${String(x[1]).padStart(2, "0")}</b><span>${x[0]}</span></div>`).join("");
+  };
+  tick(); clearInterval(el._t); el._t = setInterval(tick, 1000);
+}
+function guideCard(g, i){
+  const c = CAT_MAP[g.cat];
+  const lvlColor = { Easy: "b-ok", Moderate: "b-best", Pro: "b-deal" }[g.level] || "b-info";
+  return `<a class="gcard rv ${i % 4 ? "rv-d" + (i % 4) : ""}" href="#/g/${g.id}">
+    <div class="g-art"><span class="badge ${lvlColor} g-lvl">${g.level}</span>${artFor(PT_MAP[c.pts[0]].art, c.hue, g.id, g.title)}</div>
+    <div class="body"><span class="cat-ln" style="font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--tx3)">${U.esc(c.name)}</span><h3>${U.esc(g.title)}</h3>
+    <div class="meta"><span>${U.icon("clock", "ic-s")} ${g.mins} min</span><span>${U.icon("wrench", "ic-s")} ${g.tools.length} tools</span><span>${U.icon("book", "ic-s")} ${g.steps.length} steps</span></div></div></a>`;
+}
+
+/* ================= CATEGORIES INDEX ================= */
+Pages.categories = () => `
+  <div class="wrap">
+    ${crumb([["Categories"]])}
+    <div class="sec-head" style="margin-top:14px"><div><span class="kick">Browse everything</span><h2>All appliance categories</h2><p>${CATS.length} appliances · ${PT.length} part families · ${DB.products.length} genuine parts. Every category carries the complete spare-part catalogue.</p></div></div>
+    <div class="fan-banner rv in">
+      <div class="fb-img"><img src="${typeof USER_IMGS !== "undefined" ? USER_IMGS.poster : ""}" alt="G-FLO ceiling fan — engineered component by component" loading="lazy"></div>
+      <div>
+        <span class="badge" style="background:rgba(236,51,56,.2);color:#ff9d95">G-FLO Originals</span>
+        <h3 style="margin-top:10px">Tranquillity in every rotation — built from parts we make ourselves</h3>
+        <p>From double ball bearings and 100% copper windings to precision-balanced blades, every G-FLO fan component on this store comes straight from our own line — the same parts inside our fans.</p>
+        <div class="fb-tags"><span class="tag">Copper windings</span><span class="tag">Ball bearings</span><span class="tag">Balanced blades</span><span class="tag">Batch-tested capacitors</span></div>
+        <div class="row" style="flex-wrap:wrap"><a class="btn btn-p" href="#/c/ceiling-fan">Shop Ceiling Fan parts ${U.icon("arr-r", "ic-s")}</a><a class="btn" style="background:rgba(255,255,255,.12);color:#fff" href="#/about">Our story</a></div>
+      </div>
+    </div>
+    <div class="cat-grid" style="padding-bottom:50px">${CATS.map((c, i) => `
+      <a class="cat-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" style="--i:${i}" href="#/c/${c.id}"><span class="cat-img"><span class="ct-ic">${U.icon("c-" + c.id)}</span>${CAT_IMG[c.id] ? `<img src="${CAT_IMG[c.id]}" alt="${U.esc(c.name)} spare parts" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</span>
+        <div><b>${U.esc(c.name)}</b><br><span>${DB.products.filter(p => p.cat === c.id).length} parts · ${c.pts.length} families</span></div>
+        <span class="mut3" style="font-size:11.5px">${U.esc(c.desc)}</span></a>`).join("")}
+    </div>
+  </div>`;
+Mount.categories = () => bindSearch("hd-q", "hd-sug");
+
+/* ================= BRANDS INDEX ================= */
+Pages.brands = () => `
+  <div class="wrap">
+    ${crumb([["Brands"]])}
+    <div class="sec-head" style="margin-top:14px"><div><span class="kick">Shop by brand</span><h2>Compatible parts for ${BRANDS.length}+ brands</h2><p>Pick your appliance's brand — we'll show every part with verified model fitment.</p></div></div>
+    <div class="brand-grid" style="padding-bottom:50px">${BRANDS.map((b, i) => `
+      <a class="brand-tile rv ${i % 5 ? "rv-d" + Math.min(3, i % 5) : ""}" href="#/b/${b.id}">${brandMark(b)}<b>${U.esc(b.name)}</b><span>${DB.products.filter(p => p.brandFor.includes(b.id)).length} parts</span></a>`).join("")}
+    </div>
+  </div>`;
+Mount.brands = () => bindSearch("hd-q", "hd-sug");
+</script>

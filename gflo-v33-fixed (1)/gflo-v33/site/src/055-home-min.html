@@ -1,0 +1,40 @@
+<script>
+"use strict";
+/* ================= BRAND SHOWCASE HOME — full-screen hero, product lines, Store CTA ================= */
+Pages.home = () => `
+  <section class="bhero bhero-full">
+    <div class="wrap">
+      <div class="bbar">
+        <a href="#/" aria-label="G-FLO home"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
+        <nav aria-label="Brand page"><a class="blnk" href="#/about">About</a><a class="blnk" href="#/contact">Contact</a><a class="btn btn-p" href="#/categories">${U.icon("store", "ic-s")} Store</a></nav>
+      </div>
+      <div class="bh-grid">
+      <div>
+        <span class="bh-kick">G-FLO Electrical Solutions</span>
+        <h1>Tranquillity in<br><span class="grad-tx">every rotation.</span></h1>
+        <p>The fan overhead, the mixer on the counter, the geyser in the bathroom, the pump in the yard, the drill in your toolbox — when any of them stops, G-FLO has the exact genuine part to bring it back. ${DB.products.length}+ spares across ${CATS.length} categories, led by fan components we engineer in-house.</p>
+        <div class="row" style="margin-top:24px;flex-wrap:wrap">
+          <a class="btn btn-lg" style="background:rgba(255,255,255,.1);color:#fff" href="#/about">Our story</a>
+        </div>
+        <div class="bh-stats">
+          <div><b>${DB.products.length}+</b><span>Genuine spares</span></div>
+          <div><b>${CATS.length}</b><span>Categories</span></div>
+          <div><b>19,000+</b><span>Pincodes served</span></div>
+        </div>
+      </div>
+      <div class="bh-img"><img src="${typeof USER_IMGS !== "undefined" ? USER_IMGS.fanHero : ""}" alt="G-FLO ceiling fan — engineered component by component"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec-tight"><div class="wrap">
+    ${sectionHead("Engineered in-house", "The parts behind the performance", "Shot on our own bench — and stocked in the Store.")}
+    <div class="line-grid">
+      <a class="line-card rv" href="#/search/${encodeURIComponent("winding")}"><img src="${USER_IMGS.winding}" alt="100% copper winding" loading="lazy"><span class="lc-cap"><b>Copper Windings</b><span>Shop in Store ${U.icon("arr-r", "ic-s")}</span></span></a>
+      <a class="line-card rv rv-d1" href="#/c/ceiling-fan?pt=fan-blade"><img src="${USER_IMGS.blades}" alt="Precision-balanced blades" loading="lazy"><span class="lc-cap"><b>Blades & Canopies</b><span>Shop in Store ${U.icon("arr-r", "ic-s")}</span></span></a>
+      <a class="line-card rv rv-d2" href="#/c/ceiling-fan?pt=capacitor"><img src="${USER_IMGS.capacitor}" alt="Batch-tested capacitor" loading="lazy"><span class="lc-cap"><b>Capacitors</b><span>Shop in Store ${U.icon("arr-r", "ic-s")}</span></span></a>
+      <a class="line-card rv rv-d3" href="#/search/${encodeURIComponent("bearing")}"><img src="${USER_IMGS.bearing}" alt="Double ball bearings" loading="lazy"><span class="lc-cap"><b>Bearings & Hardware</b><span>Shop in Store ${U.icon("arr-r", "ic-s")}</span></span></a>
+    </div>
+  </div></section>`;
+Mount.home = () => {};
+</script>

@@ -1,0 +1,381 @@
+<script>
+"use strict";
+/* ================= LISTING ENGINE ================= */
+const LX = { pool: [], shown: 0, f: {}, sort: "pop", io: null };
+function listingHtml(cfg){
+  LX.pool = cfg.pool; LX.shown = 0; LX.sort = "pop";
+  LX.f = { pts: new Set(cfg.pt ? [cfg.pt] : []), brands: new Set(cfg.brand ? [cfg.brand] : []), cats: new Set(), min: "", max: "", rating: 0, stock: false, deal: false };
+  const ptCounts = {}, brandCounts = {}, catCounts = {};
+  cfg.pool.forEach(p => { ptCounts[p.pt] = (ptCounts[p.pt] || 0) + 1; catCounts[p.cat] = (catCounts[p.cat] || 0) + 1; p.brandFor.forEach(b => brandCounts[b] = (brandCounts[b] || 0) + 1); });
+  const fblocks = `
+    ${cfg.showCats ? `<div class="fblock"><h4>Appliance</h4>${Object.keys(catCounts).sort((a, b) => catCounts[b] - catCounts[a]).slice(0, 10).map(id => `<label class="fopt"><input type="checkbox" data-f="cats" value="${id}"> ${CAT_MAP[id].name}<span class="cnt">${catCounts[id]}</span></label>`).join("")}</div>` : ""}
+    <div class="fblock"><h4>Part family</h4>${Object.keys(ptCounts).sort((a, b) => ptCounts[b] - ptCounts[a]).slice(0, 14).map(id => `<label class="fopt"><input type="checkbox" data-f="pts" value="${id}" ${LX.f.pts.has(id) ? "checked" : ""}> ${PT_MAP[id].name}<span class="cnt">${ptCounts[id]}</span></label>`).join("")}</div>
+    <div class="fblock"><h4>Compatible brand</h4>${Object.keys(brandCounts).sort((a, b) => brandCounts[b] - brandCounts[a]).slice(0, 10).map(id => `<label class="fopt"><input type="checkbox" data-f="brands" value="${id}" ${LX.f.brands.has(id) ? "checked" : ""}> ${BRAND_MAP[id].name}<span class="cnt">${brandCounts[id]}</span></label>`).join("")}</div>
+    ${CATALOG_MODE ? "" : `<div class="fblock"><h4>Price (₹)</h4><div class="range-row"><input class="inp" type="number" min="0" placeholder="Min" data-f="min" aria-label="Minimum price"><span class="mut3">–</span><input class="inp" type="number" min="0" placeholder="Max" data-f="max" aria-label="Maximum price"></div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:11px">${[[0, 199], [200, 499], [500, 999], [1000, 4999]].map(r => `<button class="chip" data-price="${r[0]}-${r[1]}" style="font-size:11.5px;padding:5px 10px">₹${r[0]}–${r[1]}</button>`).join("")}</div></div>`}
+    <div class="fblock"><h4>Rating</h4>${[4.5, 4, 3.5].map(r => `<label class="fopt"><input type="radio" name="frt" data-f="rating" value="${r}"> ${r}★ & above</label>`).join("")}<label class="fopt"><input type="radio" name="frt" data-f="rating" value="0" checked> Any rating</label></div>
+    <div class="fblock"><h4>More</h4><label class="fopt"><input type="checkbox" data-f="stock"> In stock only</label>${CATALOG_MODE ? "" : `<label class="fopt"><input type="checkbox" data-f="deal"> On deal (25%+ off)</label>`}</div>
+    <button class="btn btn-soft btn-block btn-sm" data-clear-f>Clear all filters</button>`;
+  return `
+  <div class="wrap">
+    ${crumb(cfg.crumbs)}
+    <div class="sec-head" style="margin-top:12px"><div style="display:flex;gap:14px;align-items:center">${cfg.img ? `<img class="cat-thumb" src="${cfg.img}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<div><span class="kick">${U.esc(cfg.kick)}</span><h2>${U.esc(cfg.title)}</h2>${cfg.sub ? `<p>${U.esc(cfg.sub)}</p>` : ""}</div></div></div>
+    ${cfg.hero || ""}
+    <div class="listing">
+      <aside class="filters" id="filters" aria-label="Filters">${fblocks}</aside>
+      <div>
+        <div class="toolbar">
+          <span class="res" id="res-count" role="status"></span>
+          <div class="row">
+            <button class="btn btn-ghost btn-sm f-open" id="f-open" style="display:none">${U.icon("filter", "ic-s")} Filters</button>
+            <label class="mut3" style="font-size:12.5px" for="sort-sel">Sort</label>
+            <select class="sel" id="sort-sel" aria-label="Sort products"><option value="pop">Popularity</option><option value="new">Newest first</option>${CATALOG_MODE ? "" : `<option value="plh">Price: low to high</option><option value="phl">Price: high to low</option>`}<option value="rate">Top rated</option>${CATALOG_MODE ? "" : `<option value="off">Biggest discount</option>`}</select>
+          </div>
+        </div>
+        <div class="active-f" id="active-f"></div>
+        <div class="grid-cards" id="plist" aria-live="polite"></div>
+        <div class="sentinel" id="sentinel"></div>
+      </div>
+    </div>
+  </div>`;
+}
+function listingApply(){
+  const f = LX.f;
+  let list = LX.pool.filter(p =>
+    (!f.pts.size || f.pts.has(p.pt)) &&
+    (!f.cats.size || f.cats.has(p.cat)) &&
+    (!f.brands.size || p.brandFor.some(b => f.brands.has(b))) &&
+    (f.min === "" || p.price >= +f.min) && (f.max === "" || p.price <= +f.max) &&
+    (!f.rating || p.rating >= f.rating) && (!f.stock || p.stock > 0) && (!f.deal || p.off >= 25));
+  const S = { pop: (a, b) => b.sold - a.sold, new: (a, b) => (b.isNew - a.isNew) || b.sold - a.sold, plh: (a, b) => a.price - b.price, phl: (a, b) => b.price - a.price, rate: (a, b) => b.rating - a.rating, off: (a, b) => b.off - a.off };
+  list.sort(S[LX.sort] || S.pop);
+  return list;
+}
+function listingChips(){
+  const f = LX.f, out = [];
+  f.pts.forEach(x => out.push(["pts", x, PT_MAP[x].name]));
+  f.cats.forEach(x => out.push(["cats", x, CAT_MAP[x].name]));
+  f.brands.forEach(x => out.push(["brands", x, BRAND_MAP[x].name]));
+  if (f.min !== "" || f.max !== "") out.push(["price", "", `₹${f.min || 0}–${f.max || "∞"}`]);
+  if (f.rating) out.push(["rating", "", f.rating + "★+"]);
+  if (f.stock) out.push(["stock", "", "In stock"]);
+  if (f.deal) out.push(["deal", "", "On deal"]);
+  document.getElementById("active-f").innerHTML = out.map(c => `<button class="chip on" data-rm-f="${c[0]}" data-v="${c[1]}" style="font-size:12px">${U.esc(c[2])} ${U.icon("x", "ic-s")}</button>`).join("");
+}
+function listingRender(reset){
+  const grid = document.getElementById("plist"), sent = document.getElementById("sentinel");
+  const list = listingApply();
+  document.getElementById("res-count").textContent = list.length + " parts found";
+  listingChips();
+  if (reset){ LX.shown = 0; grid.innerHTML = skeletonCards(8); }
+  const draw = () => {
+    if (reset) grid.innerHTML = "";
+    const next = list.slice(LX.shown, LX.shown + 12);
+    grid.insertAdjacentHTML("beforeend", next.map((p, i) => productCard(p, i)).join(""));
+    LX.shown += next.length;
+    revealInit(grid);
+    if (!list.length) grid.innerHTML = `<div style="grid-column:1/-1">${emptyState("box", "No parts match these filters", "Try clearing a filter or use the AI finder to locate your part.", "#/finder", "Open AI finder")}</div>`;
+    sent.innerHTML = LX.shown < list.length ? `<div class="spinner" aria-label="Loading more"></div>` : (list.length ? `<span>— you've seen all ${list.length} parts —</span>` : "");
+  };
+  reset ? setTimeout(draw, 420) : draw();
+}
+function listingMount(){
+  bindSearch("hd-q", "hd-sug");
+  const filters = document.getElementById("filters");
+  listingRender(true);
+  filters.addEventListener("change", e => {
+    const el = e.target, k = el.getAttribute("data-f"); if (!k) return;
+    if (k === "min" || k === "max") LX.f[k] = el.value;
+    else if (k === "rating") LX.f.rating = +el.value;
+    else if (k === "stock" || k === "deal") LX.f[k] = el.checked;
+    else { el.checked ? LX.f[k].add(el.value) : LX.f[k].delete(el.value); }
+    listingRender(true);
+  });
+  filters.addEventListener("input", U.debounce(e => { const k = e.target.getAttribute("data-f"); if (k === "min" || k === "max"){ LX.f[k] = e.target.value; listingRender(true); } }, 400));
+  filters.addEventListener("click", e => {
+    const pr = e.target.closest("[data-price]");
+    if (pr){ const [a, b] = pr.getAttribute("data-price").split("-"); LX.f.min = a; LX.f.max = b; filters.querySelector("[data-f=min]").value = a; filters.querySelector("[data-f=max]").value = b; listingRender(true); }
+    if (e.target.closest("[data-clear-f]")){ Router.go(); }
+  });
+  document.getElementById("sort-sel").addEventListener("change", e => { LX.sort = e.target.value; listingRender(true); });
+  document.getElementById("active-f").addEventListener("click", e => {
+    const c = e.target.closest("[data-rm-f]"); if (!c) return;
+    const k = c.getAttribute("data-rm-f"), v = c.getAttribute("data-v");
+    if (k === "price"){ LX.f.min = LX.f.max = ""; } else if (k === "rating") LX.f.rating = 0; else if (k === "stock" || k === "deal") LX.f[k] = false; else LX.f[k].delete(v);
+    filters.querySelectorAll("input").forEach(i => { const fk = i.getAttribute("data-f"); if (fk === k && (i.value === v || k === "price" || k === "rating")) { if (i.type === "checkbox" || i.type === "radio") i.checked = fk === "rating" && i.value === "0"; else i.value = ""; } if ((k === "stock" || k === "deal") && fk === k) i.checked = false; });
+    listingRender(true);
+  });
+  // infinite scroll
+  if (LX.io) LX.io.disconnect();
+  LX.io = new IntersectionObserver(es => { if (es[0].isIntersecting && LX.shown > 0) listingRender(false); }, { rootMargin: "600px" });
+  LX.io.observe(document.getElementById("sentinel"));
+  // mobile filters
+  const fo = document.getElementById("f-open");
+  if (window.matchMedia("(max-width:999px)").matches){
+    fo.style.display = "inline-flex";
+    fo.addEventListener("click", () => {
+      modal(`<div id="modal-filters"></div>`, { title: "Filters" });
+      const mf = document.getElementById("modal-filters");
+      mf.appendChild(filters); filters.classList.add("as-drawer");
+      const putBack = () => { document.querySelector(".listing").prepend(filters); filters.classList.remove("as-drawer"); };
+      document.getElementById("modal-wr").addEventListener("transitionend", function h(){ if (!document.getElementById("modal-wr").classList.contains("open")){ putBack(); this.removeEventListener("transitionend", h); } });
+    });
+  }
+}
+function parseParam(param){
+  const [id, qs] = String(param || "").split("?");
+  const q = new URLSearchParams(qs || "");
+  return { id, q };
+}
+
+/* ================= LISTING PAGES ================= */
+Pages.category = param => {
+  const { id, q } = parseParam(param);
+  const c = CAT_MAP[id];
+  if (!c) return Pages.notfound();
+  return listingHtml({ pool: DB.products.filter(p => p.cat === id), pt: q.get("pt") || undefined, kick: "Category", title: c.name + " spare parts", sub: c.desc + ". Every part ships with fitment data and install guidance.", img: typeof CAT_IMG !== "undefined" ? CAT_IMG[id] : "", crumbs: [["Categories", "#/categories"], [c.name]] });
+};
+Mount.category = listingMount;
+
+Pages.brand = param => {
+  const { id } = parseParam(param);
+  const b = BRAND_MAP[id];
+  if (!b) return Pages.notfound();
+  return listingHtml({ pool: DB.products.filter(p => p.brandFor.includes(id)), brand: id, showCats: true, kick: "Brand store", title: "Parts compatible with " + b.name, sub: "Verified-fit spares for " + b.name + " appliances. Match your exact model with the compatibility checker.", crumbs: [["Brands", "#/brands"], [b.name]] });
+};
+Mount.brand = listingMount;
+
+Pages.deals = () => listingHtml({
+  pool: DB.products.filter(p => p.off >= 15), showCats: true, kick: "Deal zone",
+  title: CATALOG_MODE ? "Featured picks" : "Today's best part deals",
+  sub: CATALOG_MODE ? "Hand-picked fast movers across every category." : "Genuine parts, honest discounts. Prices refresh at midnight.", crumbs: [["Deals"]],
+  hero: CATALOG_MODE ? "" : `<div class="deal-hero rv" style="margin:6px 0 22px"><div class="spread" style="flex-wrap:wrap;gap:18px"><div><span class="badge" style="background:rgba(255,255,255,.2);color:#fff">⚡ Flash window live</span><h2 style="font-size:clamp(20px,3vw,28px);margin:10px 0 6px">Extra savings end at midnight</h2><p style="opacity:.85;font-size:13.5px">Use coupon <b class="mono">GFLO10</b> for 10% off over ₹999.</p><div class="cd" id="deal-cd"></div></div></div></div>`
+});
+Mount.deals = p => { listingMount(p); countdownInto("deal-cd"); };
+
+Pages.search = param => {
+  const q = decodeURIComponent(param || "").trim();
+  let pool, sub;
+  if (/^featured$/i.test(q)) { pool = DB.products.filter(p => p.isFeat); sub = "Hand-picked, service-grade parts."; }
+  else if (/^new arrivals$/i.test(q)) { pool = DB.products.filter(p => p.isNew); sub = "Recently added to the catalogue."; }
+  else if (/^best sellers$/i.test(q)) { pool = DB.products.filter(p => p.isBest); sub = "The parts India repairs with."; }
+  else { const r = Search.query(q, 500); pool = r.items; sub = AI.intentLabel(r.intent) ? "AI understood — " + AI.intentLabel(r.intent) : "Semantic + keyword matches across the catalogue."; }
+  return listingHtml({ pool, showCats: true, kick: "Search", title: `Results for “${q}”`, sub, crumbs: [["Search"], [q]] });
+};
+Mount.search = listingMount;
+
+/* ================= PRODUCT PAGE ================= */
+let V360 = null;
+Pages.product = sku => {
+  const p = DB.prodMap[sku];
+  if (!p) return Pages.notfound();
+  State.pushRecent(sku);
+  const c = catOf(p), pt = ptOf(p);
+  const eta = deliveryEta(State.pin);
+  const rel = AI.recsFor(p, 10);
+  const fbt = rel.filter(x => x.pt !== p.pt).slice(0, 2);
+  const rr = U.rng("rev" + p.revSeed);
+  const revs = Array.from({ length: Math.min(5, 2 + Math.floor(rr() * 4)) }, () => ({ ...(a => ({ who: a[0], city: a[1], txt: a[2] }))(REVIEW_POOL[Math.floor(rr() * REVIEW_POOL.length)]), stars: Math.min(5, Math.max(3, Math.round(p.rating + (rr() - .5) * 1.4))), days: Math.floor(rr() * 320) + 3, helpful: Math.floor(rr() * 60) }));
+  const dist = [0, 0, 0, 0, 0]; revs.forEach(r => dist[5 - r.stars] += 1);
+  const distPct = i => revs.length ? Math.round(dist[i] / revs.length * 100) : 0;
+  const wished = State.wish.includes(sku), inCmp = State.cmp.includes(sku);
+  const specRows = [["SKU", `<span class="mono">${p.sku}</span>`], ["Part family", pt.name], ["Appliance", c.name], ...pt.specs.map(s => [s[0], s[1]]), ["Compatible brands", brandNames(p, 6)], ["Verified models", p.compat.length + " model numbers"], ["Warranty", p.warranty + " replacement"], ["Net weight", p.weight], ["Installation", p.install], ["Country of origin", "India"]];
+  return `
+  <div class="wrap">
+    ${crumb([["Categories", "#/categories"], [c.name, "#/c/" + c.id], [pt.name]])}
+    <div class="pdp">
+      <div class="gal">
+        <div class="gal-main" id="gal-main" aria-label="Product image, hover to zoom">
+          <div class="gal-badges">${p.off >= 25 && !CATALOG_MODE ? `<span class="badge b-deal">${p.off}% off</span>` : ""}${p.isNew ? `<span class="badge b-new">New</span>` : ""}${p.isBest ? `<span class="badge b-best">★ Bestseller</span>` : ""}<span class="badge b-brand">${U.icon("shield", "ic-s")} Genuine</span></div>
+          <div id="gal-stage" style="width:100%;height:100%">${prodArt(p)}</div>
+          <button class="btn btn-soft btn-sm gal-360" id="btn-360">${U.icon("rotate", "ic-s")} 360° view</button>
+        </div>
+        <div class="gal-thumbs" role="tablist" aria-label="Image views">
+          ${["Front", "Detail", "Angle", "Schematic"].map((t, i) => `<button class="gth ${i === 0 ? "on" : ""}" data-thumb="${i}" role="tab" aria-selected="${i === 0}" aria-label="${t} view">${i === 3 ? `<span class="pm">${artFor(p.art, p.hue, p.seed + "|t3", t + " view")}</span>` : prodMediaIdx(p, i, t + " view")}</button>`).join("")}
+        </div>
+      </div>
+      <div class="pinfo">
+        <span class="cat-ln" style="font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--tx3)">${U.esc(c.name)} · ${pt.name}</span>
+        <h1 style="margin-top:6px">${U.esc(p.name)}</h1>
+        <div class="sub-ln">${U.stars(p.rating)}<b>${p.rating}</b><a href="#tab-reviews" data-tab-link="reviews" style="color:var(--brand2)">${p.reviews} ratings</a><span>·</span><span>${p.sold.toLocaleString("en-IN")}+ sold</span><span>·</span><span class="mono">${p.sku}</span></div>
+        ${CATALOG_MODE ? `<p class="tax-ln" style="margin-top:14px">${U.icon("info", "ic-s")} Pricing shared on request — add to cart to raise a quote enquiry.</p>` : `<div class="p-price">${priceHtml(p)}</div>
+        <p class="tax-ln">Inclusive of all taxes · GST invoice available</p>
+        ${p.off ? `<p style="font-size:12.5px;color:var(--ok);font-weight:600;margin-top:4px">You save ${U.inr(p.mrp - p.price)} vs MRP</p>` : ""}`}
+
+        <div class="compat-box">
+          <h4>${U.icon("spark", "ic-s")} Will it fit my appliance?</h4>
+          <div class="compat-form">
+            <select class="sel" id="cmp-brand" aria-label="Select brand"><option value="">Brand…</option>${p.brandFor.map(b => `<option value="${b}">${BRAND_MAP[b].name}</option>`).join("")}</select>
+            <input class="inp" id="cmp-model" list="cmp-models" placeholder="Model no. e.g. ${p.compat[0] || "BJ-MG550X"}" aria-label="Model number">
+            <datalist id="cmp-models">${p.compat.slice(0, 12).map(m => `<option value="${m}">`).join("")}</datalist>
+            <button class="btn btn-p" id="cmp-check">Verify</button>
+          </div>
+          <div class="compat-res" id="cmp-res" role="status"></div>
+          <p class="mut3" style="font-size:11.5px;margin-top:9px">${p.compat.length} verified models · Can't find yours? <a href="#/finder" style="color:var(--brand2);font-weight:600">Scan your model sticker →</a></p>
+        </div>
+
+        <div class="spread" style="margin:6px 0 2px">${stockHtml(p)}<span class="mut3" style="font-size:12px">Sold & fulfilled by <b style="color:var(--tx2)">G-FLO Certified</b></span></div>
+        <div class="buy-row">
+          <span class="qty" role="group" aria-label="Quantity"><button data-pq="-1" aria-label="Decrease">${U.icon("minus", "ic-s")}</button><b id="pq">1</b><button data-pq="1" aria-label="Increase">${U.icon("plus", "ic-s")}</button></span>
+          <button class="btn btn-p btn-lg" id="p-add" ${p.stock === 0 ? "disabled" : ""}>${U.icon("cart", "ic-s")} Add to cart</button>
+          <button class="btn btn-dk btn-lg" id="p-buy" ${p.stock === 0 ? "disabled" : ""}>${U.icon("bolt", "ic-s")} Buy now</button>
+        </div>
+        <div class="meta-acts">
+          <button class="meta-act ${wished ? "on" : ""}" data-act="wish" data-sku="${p.sku}">${U.icon("heart", "ic-s")} ${wished ? "Wishlisted" : "Wishlist"}</button>
+          <button class="meta-act" data-act="share" data-sku="${p.sku}">${U.icon("share", "ic-s")} Share</button>
+        </div>
+
+        <div class="ship-box">
+          <div class="ship-row">${U.icon("pin")}<div><b>Delivery estimate</b><div class="pin-form" style="margin-top:7px"><input class="inp" id="pin-inp" inputmode="numeric" maxlength="6" placeholder="Pincode" value="${State.pin}" aria-label="Delivery pincode"><button class="btn btn-soft btn-sm" id="pin-check">Check</button></div><p id="pin-res" style="font-size:12.5px;margin-top:7px;color:var(--ok);font-weight:600">Delivery by <b>${eta.label}</b>${CATALOG_MODE ? " · pan-India tracked shipping" : ` · ${p.price >= 4999 ? "FREE" : "₹99"} shipping${p.price < 4999 ? " · FREE above ₹4,999" : ""}`}</p></div></div>
+          <div class="ship-row">${U.icon("rotate")}<div><b>7-day returns</b> — full refund on unused parts</div></div>
+          <div class="ship-row">${U.icon("shield")}<div><b>${p.warranty} warranty</b> — brand-certified genuine part</div></div>
+          <div class="ship-row">${U.icon("wrench")}<div><b>${p.install}</b> — guide & video included${p.install.startsWith("Pro") ? " · Expert install at checkout" : ""}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ptabs" role="tablist" aria-label="Product information">
+      ${[["overview", "Specifications"], ["reviews", `Reviews (${p.reviews})`], ["qa", "Q&A"], ["install", "Install & Manuals"]].map((t, i) => `<button class="ptab ${i === 0 ? "on" : ""}" data-ptab="${t[0]}" role="tab" aria-selected="${i === 0}">${t[1]}</button>`).join("")}
+    </div>
+    <div class="ptab-body" id="tabc-overview" role="tabpanel">
+      <div style="display:grid;gap:26px;grid-template-columns:repeat(auto-fit,minmax(290px,1fr))">
+        <div><h3 style="margin-bottom:12px;font-size:16px">Technical specifications</h3><table class="spec-tbl">${specRows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")}</table></div>
+        <div><h3 style="margin-bottom:12px;font-size:16px">About this part</h3>
+          <p class="mut" style="font-size:14px;line-height:1.75">The ${U.esc(p.short.toLowerCase())} is a brand-certified replacement engineered to OEM tolerances for ${c.name.toLowerCase()}s from ${U.esc(brandNames(p, 3))} and more. Every unit is batch-tested for fit and finish, ships in protective foam packing, and includes the fasteners shown. Pair it with our step-by-step install guide — most customers complete this replacement in under ${10 + (U.hash(p.sku) % 25)} minutes.</p>
+          <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:16px">${["Batch tested", "OEM tolerances", "Foam-packed", "Sealed pack", p.warranty + " warranty"].map(t => `<span class="tag">${U.icon("check", "ic-s")} ${t}</span>`).join("")}</div>
+        </div>
+      </div>
+    </div>
+    <div class="ptab-body hide" id="tabc-reviews" role="tabpanel">
+      <div class="rev-sum">
+        <div style="text-align:center"><div class="rev-big">${p.rating}</div>${U.stars(p.rating)}<div class="mut3" style="font-size:12px;margin-top:5px">${p.reviews} verified ratings</div></div>
+        <div class="rev-bars">${[5, 4, 3, 2, 1].map((s, i) => `<div class="rbar"><span style="width:24px">${s}★</span><div class="tr"><div class="fl" style="width:${revs.length ? distPct(i) : [62, 24, 9, 3, 2][i]}%"></div></div><span style="width:34px">${revs.length ? distPct(i) : [62, 24, 9, 3, 2][i]}%</span></div>`).join("")}</div>
+        <button class="btn btn-ghost" onclick="toast('Review submitted for moderation — thank you!','info')">${U.icon("edit", "ic-s")} Write a review</button>
+      </div>
+      ${revs.map(r => `<article class="rev"><div class="who"><span class="ava" style="width:34px;height:34px;font-size:13px;background:linear-gradient(135deg,hsl(${U.hash(r.who) % 360} 60% 45%),hsl(${(U.hash(r.who) + 60) % 360} 65% 38%))">${r.who[0]}</span><div><b>${r.who}</b> <span class="badge b-ok" style="font-size:9.5px">✓ Verified purchase</span><div class="mut3" style="font-size:11.5px">${r.city} · ${r.days} days ago</div></div><span style="margin-left:auto">${U.stars(r.stars)}</span></div><p>${U.esc(r.txt)}</p><button class="meta-act" style="font-size:12px" onclick="this.textContent='✓ Marked helpful (${r.helpful + 1})'">Helpful (${r.helpful})</button></article>`).join("")}
+    </div>
+    <div class="ptab-body hide" id="tabc-qa" role="tabpanel">
+      ${p.qa.map(i => QA_POOL[i % QA_POOL.length]).map(q => `<div class="qa-item"><div class="q"><span style="color:var(--brand2)">Q.</span> ${U.esc(q[0])}</div><div class="a"><b style="color:var(--brand2)">A.</b> ${U.esc(q[1])}</div></div>`).join("")}
+      <form style="display:flex;gap:9px;margin-top:18px;flex-wrap:wrap" onsubmit="event.preventDefault();toast('Question sent! Our part experts reply within 2 hours.');this.reset()"><input class="inp" required placeholder="Ask a question about this part…" style="flex:1;min-width:220px" aria-label="Your question"><button class="btn btn-p">Ask G-FLO</button></form>
+    </div>
+    <div class="ptab-body hide" id="tabc-install" role="tabpanel">
+      <div style="display:grid;gap:26px;grid-template-columns:repeat(auto-fit,minmax(290px,1fr))">
+        <div><h3 style="margin-bottom:14px;font-size:16px">Installation steps</h3>
+          <div class="step-list">
+            <div class="step"><span class="n"></span><div><b>Power down & unplug</b><p>Disconnect the appliance from mains and let hot parts cool completely.</p></div></div>
+            <div class="step"><span class="n"></span><div><b>Remove the worn ${U.esc(pt.name.replace(/s$/, "").toLowerCase())}</b><p>Open the access panel and photograph connections before removing the old part.</p></div></div>
+            <div class="step"><span class="n"></span><div><b>Fit the replacement</b><p>Align, seat and secure the new part with the supplied fasteners. Don't overtighten.</p></div></div>
+            <div class="step"><span class="n"></span><div><b>Test safely</b><p>Reassemble, restore power and run the appliance at the lowest setting first.</p></div></div>
+          </div>
+          <div class="lock-note" style="margin-top:16px">${U.icon("alert")} Difficulty: ${p.install}. If unsure, choose Expert Install at checkout.</div>
+        </div>
+        <div><h3 style="margin-bottom:14px;font-size:16px">Downloads</h3>
+          ${[["Installation manual (PDF)", "1.2 MB"], ["Fitment / model list", "0.3 MB"], ["Warranty card", "0.2 MB"]].map(d => `<div class="dl-row">${U.icon("doc")}<div><b>${d[0]}</b><small>${d[1]} · English + हिंदी</small></div><button class="btn btn-soft btn-sm" data-dl="${U.esc(d[0])}" data-sku="${p.sku}">${U.icon("download", "ic-s")} Get</button></div>`).join("")}
+          <h3 style="margin:20px 0 12px;font-size:16px">Video walkthrough</h3>
+          <button class="gal-main" style="aspect-ratio:16/9;display:grid;place-items:center;cursor:pointer;border-radius:18px;width:100%" onclick="toast('Video player is stubbed in this demo','info')" aria-label="Play installation video">${U.icon("play", "ic-l")}<span class="mut" style="font-size:13px">Watch: replacing a ${U.esc(pt.name.replace(/s$/, "").toLowerCase())} (${3 + U.hash(p.sku) % 6} min)</span></button>
+        </div>
+      </div>
+    </div>
+
+    ${fbt.length ? `<section class="sec-tight">${sectionHead("Frequently bought together", "Complete the repair kit")}
+      <div class="fbt">
+        <div class="fbt-items">
+          ${[p, ...fbt].map((x, i) => `<label class="fbt-mini"><input type="checkbox" class="fbt-ck" value="${x.sku}" ${i < 2 ? "checked" : ""} ${i === 0 ? "disabled" : ""} aria-label="Include ${U.esc(x.short)}"><div class="art">${prodArt(x)}</div><div class="bd"><b>${U.esc(x.short)}</b>${CATALOG_MODE ? "" : `<div class="price">${U.inr(x.price)}</div>`}</div></label>${i < fbt.length ? `<span class="fbt-plus">+</span>` : ""}`).join("")}
+        </div>
+        <div class="fbt-total"><span class="mut3" style="font-size:12px">${CATALOG_MODE ? "Repair kit" : "Bundle total"}</span><span class="price" style="font-size:22px" id="fbt-total"></span><button class="btn btn-p" id="fbt-add">${U.icon("cart", "ic-s")} Add selected</button></div>
+      </div></section>` : ""}
+
+    <section class="sec-tight">${sectionHead("Related parts", "More for your " + c.name.toLowerCase(), null, "#/c/" + c.id, "Browse " + c.name)}${railOf(rel)}</section>
+  </div>`;
+};
+Mount.product = sku => {
+  const p = DB.prodMap[sku]; if (!p) return;
+  bindSearch("hd-q", "hd-sug");
+  let qty = 1;
+  document.querySelectorAll("[data-pq]").forEach(b => b.addEventListener("click", () => { qty = U.clamp(qty + (+b.getAttribute("data-pq")), 1, 99); document.getElementById("pq").textContent = qty; }));
+  document.getElementById("p-add").addEventListener("click", () => State.addCart(sku, qty));
+  document.getElementById("p-buy").addEventListener("click", () => { State.addCart(sku, qty, true); location.hash = "#/checkout"; });
+  // tabs
+  document.querySelectorAll("[data-ptab]").forEach(t => t.addEventListener("click", () => {
+    document.querySelectorAll("[data-ptab]").forEach(x => { x.classList.toggle("on", x === t); x.setAttribute("aria-selected", x === t); });
+    document.querySelectorAll(".ptab-body").forEach(b => b.classList.add("hide"));
+    document.getElementById("tabc-" + t.getAttribute("data-ptab")).classList.remove("hide");
+  }));
+  document.querySelectorAll("[data-tab-link]").forEach(a => a.addEventListener("click", e => { e.preventDefault(); document.querySelector(`[data-ptab=${a.getAttribute("data-tab-link")}]`).click(); document.querySelector(".ptabs").scrollIntoView({ behavior: "smooth" }); }));
+  // gallery: zoom + thumbs + 360
+  const stage = document.getElementById("gal-stage"), main = document.getElementById("gal-main");
+  let mode = "static";
+  const setThumb = i => { stage.innerHTML = i === 3 ? `<span class="pm">${artFor(p.art, p.hue, p.seed + "|t3", p.name + " schematic")}</span>` : prodMediaIdx(p, i, p.name); document.querySelectorAll(".gth").forEach((g, gi) => { g.classList.toggle("on", gi === i); g.setAttribute("aria-selected", gi === i); }); };
+  document.querySelectorAll(".gth").forEach((g, i) => g.addEventListener("click", () => { mode = "static"; main.classList.remove("v360"); setThumb(i); }));
+  main.addEventListener("mousemove", e => {
+    if (mode !== "static") return;
+    const r = main.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width * 100, y = (e.clientY - r.top) / r.height * 100;
+    const svg = stage.querySelector("svg");
+    if (svg){ svg.style.transformOrigin = `${x}% ${y}%`; svg.style.transform = "scale(2.1)"; }
+  });
+  main.addEventListener("mouseleave", () => { const svg = stage.querySelector("svg"); if (svg){ svg.style.transform = ""; } });
+  // 360 viewer
+  let deg = 0, dragging = false, lastX = 0, auto = null;
+  const render360 = () => {
+    const svg = stage.querySelector("svg");
+    if (!svg) return;
+    const shade = .75 + .25 * Math.abs(Math.cos(deg * Math.PI / 180));
+    svg.style.transform = `perspective(700px) rotateY(${deg}deg)`;
+    svg.style.filter = `brightness(${shade})`;
+  };
+  document.getElementById("btn-360").addEventListener("click", e => {
+    e.stopPropagation();
+    if (mode === "v360"){ mode = "static"; main.classList.remove("v360"); clearInterval(auto); setThumb(0); e.currentTarget.innerHTML = U.icon("rotate", "ic-s") + " 360° view"; return; }
+    mode = "v360"; main.classList.add("v360"); setThumb(0);
+    e.currentTarget.innerHTML = U.icon("x", "ic-s") + " Exit 360°";
+    toast("Drag to spin the part", "info");
+    clearInterval(auto); auto = setInterval(() => { if (!dragging){ deg = (deg + 1.2) % 360; render360(); } }, 40);
+  });
+  const start = x => { if (mode !== "v360") return; dragging = true; lastX = x; };
+  const move = x => { if (!dragging || mode !== "v360") return; deg = (deg + (x - lastX) * .8 + 360) % 360; lastX = x; render360(); };
+  main.addEventListener("mousedown", e => start(e.clientX));
+  window.addEventListener("mousemove", e => move(e.clientX));
+  window.addEventListener("mouseup", () => dragging = false);
+  main.addEventListener("touchstart", e => start(e.touches[0].clientX), { passive: true });
+  main.addEventListener("touchmove", e => move(e.touches[0].clientX), { passive: true });
+  main.addEventListener("touchend", () => dragging = false);
+  // compatibility
+  document.getElementById("cmp-check").addEventListener("click", () => {
+    const res = AI.compatCheck(p, document.getElementById("cmp-brand").value, document.getElementById("cmp-model").value);
+    const el = document.getElementById("cmp-res");
+    el.className = "compat-res " + (res.ok ? "ok" : "no");
+    el.innerHTML = (res.ok ? U.icon("check") : U.icon("alert")) + `<div>${U.esc(res.msg)}${!res.ok && res.near && res.near.length ? `<div style="font-weight:500;margin-top:5px;font-size:12.5px">Close matches in list: ${res.near.map(m => `<b class="mono">${m}</b>`).join(", ")}</div>` : ""}${!res.ok && res.alt ? `<div style="margin-top:7px"><a href="#/p/${res.alt.sku}" class="btn btn-soft btn-sm">View the part that fits ${U.esc(document.getElementById("cmp-model").value.toUpperCase())} →</a></div>` : ""}</div>`;
+  });
+  // pincode
+  document.getElementById("pin-check").addEventListener("click", () => {
+    const v = document.getElementById("pin-inp").value.trim();
+    if (!/^\d{6}$/.test(v)){ toast("Enter a valid 6-digit pincode", "warn"); return; }
+    State.pin = v; State.save();
+    const eta = deliveryEta(v);
+    document.getElementById("pin-res").innerHTML = `Delivery to ${v} by <b>${eta.label}</b>${CATALOG_MODE ? " · pan-India tracked shipping" : ` · ${p.price >= 4999 ? "FREE" : "₹99"} shipping · COD available`}`;
+    toast("Delivery estimate updated");
+  });
+  // downloads
+  document.querySelectorAll("[data-dl]").forEach(b => b.addEventListener("click", () => {
+    const name = b.getAttribute("data-dl");
+    const txt = `GFLO — ${name}\nPart: ${p.name}\nSKU: ${p.sku}\nCompatible models: ${p.compat.join(", ") || "See online listing"}\nWarranty: ${p.warranty}\nSupport: care@g-flo.shop · 1800-419-GFLO\n\n(Deliverable stub — in production this is a brand PDF.)`;
+    try {
+      const url = URL.createObjectURL(new Blob([txt], { type: "text/plain" }));
+      const a = document.createElement("a"); a.href = url; a.download = U.slug(p.sku + "-" + name) + ".txt"; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000); toast("Download started");
+    } catch(e){ modal(`<pre style="white-space:pre-wrap;font-size:12.5px" class="mono">${U.esc(txt)}</pre>`, { title: name }); }
+  }));
+  // FBT
+  const fbtTotal = () => {
+    const skus = [...document.querySelectorAll(".fbt-ck:checked")].map(c => c.value);
+    const t = skus.reduce((s, k) => s + (DB.prodMap[k] ? DB.prodMap[k].price : 0), 0);
+    const el = document.getElementById("fbt-total"); if (el) el.textContent = CATALOG_MODE ? skus.length + " parts" : U.inr(t);
+    return skus;
+  };
+  fbtTotal();
+  document.querySelectorAll(".fbt-ck").forEach(c => c.addEventListener("change", fbtTotal));
+  const fbtBtn = document.getElementById("fbt-add");
+  fbtBtn && fbtBtn.addEventListener("click", () => { const skus = fbtTotal(); skus.forEach(k => State.addCart(k, 1, true)); toast(skus.length + " parts added to cart"); renderCartDrawer(); openDrawer("cart-drawer"); });
+};
+</script>

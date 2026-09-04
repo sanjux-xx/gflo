@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}Products{% endblock %}
+{% block body %}
+{% set qs = '&cat=' ~ f.cat ~ '&stock=' ~ f.stock ~ '&price=' ~ f.price ~ '&vis=' ~ f.vis ~ '&sort=' ~ f.sort ~ '&per_page=' ~ per_page %}
+<div class="ph">
+  <div>
+    <h1>Products</h1>
+    <p class="ph-sub">
+      {{ total }} {{ 'product' if total == 1 else 'products' }} match.
+      Click a price, MRP or stock cell to edit it right here — press <b>Enter</b> to save,
+      <b>Esc</b> to undo, arrow keys to move down the column.
+    </p>
+  </div>
+  <div class="ph-acts">
+    <a class="btn" href="/admin/export.csv">{{ icon('download', 15) }} Export CSV</a>
+    <a class="btn btn-p" href="/admin/products/new">{{ icon('plus', 15) }} New product</a>
+  </div>
+</div>
+
+<div class="card">
+  <form class="toolbar" method="get" action="/admin/products">
+    <div class="grow tb-search">
+      {{ icon('search', 16) }}
+      <input class="inp" name="q" value="{{ f.q }}" placeholder="Search name, SKU, size or price-list section…">
+    </div>
+    <select class="sel sel-cat" name="cat">
+      <option value="">All categories</option>
+      {% for c in cats %}<option value="{{ c.id }}" {{ 'selected' if f.cat == c.id }}>{{ c.name }}</option>{% endfor %}
+    </select>
+    <select class="sel" name="stock">
+      <option value="">Any stock</option>
+      <option value="out" {{ 'selected' if f.stock=='out' }}>Out of stock</option>
+      <option value="low" {{ 'selected' if f.stock=='low' }}>Low (&lt;10)</option>
+    </select>
+    <select class="sel" name="price">
+      <option value="">Any price</option>
+      <option value="set" {{ 'selected' if f.price=='set' }}>Has a price</option>
+      <option value="none" {{ 'selected' if f.price=='none' }}>On request</option>
+    </select>
+    <select class="sel" name="vis">
+      <option value="">Any status</option>
+      <option value="visible" {{ 'selected' if f.vis=='visible' }}>Visible</option>
+      <option value="hidden" {{ 'selected' if f.vis=='hidden' }}>Hidden</option>
+    </select>
+    <select class="sel sel-sort" name="sort">
+      <option value="name" {{ 'selected' if f.sort=='name' }}>Name A–Z</option>
+      <option value="sku" {{ 'selected' if f.sort=='sku' }}>SKU</option>
+      <option value="price_asc" {{ 'selected' if f.sort=='price_asc' }}>Price low → high</option>
+      <option value="price_desc" {{ 'selected' if f.sort=='price_desc' }}>Price high → low</option>
+      <option value="stock" {{ 'selected' if f.sort=='stock' }}>Stock low → high</option>
+      <option value="updated" {{ 'selected' if f.sort=='updated' }}>Recently edited</option>
+      <option value="newest" {{ 'selected' if f.sort=='newest' }}>Newest added</option>
+    </select>
+    <button class="btn btn-p" type="submit">{{ icon('filter', 15) }} Apply</button>
+  </form>
+
+  {% set active = (f.q or f.cat or f.stock or f.price or f.vis) %}
+  {% if active %}
+  <div class="chips">
+    <span class="tiny" style="font-weight:600">Filtered by</span>
+    {% if f.q %}<span class="chip">Search <b>{{ f.q }}</b>
+      <a href="/admin/products?q={{ qs }}" aria-label="Clear search">{{ icon('x', 12) }}</a></span>{% endif %}
+    {% if f.cat %}<span class="chip">Category <b>{{ cats | selectattr('id', 'equalto', f.cat) | map(attribute='name') | first }}</b>
+      <a href="/admin/products?q={{ f.q }}&stock={{ f.stock }}&price={{ f.price }}&vis={{ f.vis }}&sort={{ f.sort }}" aria-label="Clear category">{{ icon('x', 12) }}</a></span>{% endif %}
+    {% if f.stock %}<span class="chip">Stock <b>{{ 'out of stock' if f.stock == 'out' else 'low' }}</b>
+      <a href="/admin/products?q={{ f.q }}&cat={{ f.cat }}&price={{ f.price }}&vis={{ f.vis }}&sort={{ f.sort }}" aria-label="Clear stock filter">{{ icon('x', 12) }}</a></span>{% endif %}
+    {% if f.price %}<span class="chip">Price <b>{{ 'on request' if f.price == 'none' else 'set' }}</b>
+      <a href="/admin/products?q={{ f.q }}&cat={{ f.cat }}&stock={{ f.stock }}&vis={{ f.vis }}&sort={{ f.sort }}" aria-label="Clear price filter">{{ icon('x', 12) }}</a></span>{% endif %}
+    {% if f.vis %}<span class="chip">Status <b>{{ f.vis }}</b>
+      <a href="/admin/products?q={{ f.q }}&cat={{ f.cat }}&stock={{ f.stock }}&price={{ f.price }}&sort={{ f.sort }}" aria-label="Clear status filter">{{ icon('x', 12) }}</a></span>{% endif %}
+    <a class="clear" href="/admin/products">Clear all</a>
+  </div>
+  {% endif %}
+
+  <form method="post" action="/admin/products/bulk" id="bulkform">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
+
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th class="w-ck"><input type="checkbox" class="ck" id="ckall" aria-label="Select all on this page"></th>
+            <th class="w-img">Photo</th>
+            <th class="col-name">Product</th>
+            <th class="col-sku">SKU</th>
+            <th class="col-cat">Category</th>
+            <th class="r">Price</th>
+            <th class="r col-mrp">MRP</th>
+            <th class="r">Stock</th>
+            <th class="c">On store</th>
+            <th class="w-act"></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for p in rows %}
+          <tr>
+            <td><input type="checkbox" class="ck rowck" name="ids" value="{{ p.id }}" aria-label="Select {{ p.name }}"></td>
+            <td>
+              {% if p.image_url %}
+                <img class="thumb" src="{{ p.image_url }}" alt="" loading="lazy"
+                     onerror="this.outerHTML='&lt;div class=\'thumb-none\'&gt;&lt;/div&gt;'">
+              {% else %}
+                <div class="thumb-none" title="No photo yet">{{ icon('image', 16) }}</div>
+              {% endif %}
+            </td>
+            <td class="col-name">
+              <a class="pname" href="/admin/products/{{ p.id }}/edit">{{ p.name }}</a>
+              <div class="pmeta">
+                {%- if p.size %}{{ p.size }}{% endif -%}
+                {%- if p.unit and p.unit != 'piece' %} · per {{ p.unit }}{% endif -%}
+                {%- if p.group_name %} · {{ p.group_name }}{% endif -%}
+              </div>
+            </td>
+            <td class="col-sku"><span class="mono sku">{{ p.sku }}</span></td>
+            <td class="nowrap col-cat">{{ p.category.name if p.category else '—' }}</td>
+            <td class="r">
+              <input class="ce" data-id="{{ p.id }}" data-field="price" data-name="{{ p.name }}"
+                     value="{{ '' if p.price is none else p.price }}" placeholder="on request"
+                     inputmode="decimal" aria-label="Price for {{ p.name }}">
+            </td>
+            <td class="r col-mrp">
+              <input class="ce" data-id="{{ p.id }}" data-field="mrp" data-name="{{ p.name }}"
+                     value="{{ '' if p.mrp is none else p.mrp }}" placeholder="—"
+                     inputmode="decimal" aria-label="MRP for {{ p.name }}">
+            </td>
+            <td class="r">
+              <input class="ce w-sm" data-id="{{ p.id }}" data-field="stock" data-name="{{ p.name }}"
+                     value="{{ p.stock }}" inputmode="numeric" aria-label="Stock for {{ p.name }}">
+            </td>
+            <td class="c">
+              <label class="sw" style="justify-content:center" title="{{ 'Visible on the storefront' if p.visible else 'Hidden from the storefront' }}">
+                <input type="checkbox" class="vis-toggle" data-id="{{ p.id }}" data-name="{{ p.name }}"
+                       {{ 'checked' if p.visible }} aria-label="Show {{ p.name }} on the store">
+                <span class="track"></span>
+              </label>
+            </td>
+            <td>
+              <div class="rowacts">
+                <a class="btn btn-xs" href="/admin/products/{{ p.id }}/edit">{{ icon('edit', 13) }} Edit</a>
+                <button class="btn btn-xs btn-ic" formaction="/admin/products/{{ p.id }}/duplicate"
+                        formnovalidate data-row-action="copy" title="Duplicate">{{ icon('copy', 13) }}</button>
+                <button class="btn btn-xs btn-ic btn-danger" formaction="/admin/products/{{ p.id }}/delete"
+                        formnovalidate data-row-action="delete" data-name="{{ p.name }}"
+                        title="Delete">{{ icon('trash', 13) }}</button>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="10">
+            <div class="empty">
+              <span class="ic">{{ icon('search', 24) }}</span>
+              <h3>No products match those filters</h3>
+              <p>Try a different search, or clear the filters to see the whole catalogue.</p>
+              <a class="btn" href="/admin/products">{{ icon('x', 15) }} Clear filters</a>
+            </div>
+          </td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if total %}
+    <div class="pg">
+      <span class="info">
+        Showing <b>{{ (page - 1) * per_page + 1 }}–{{ [page * per_page, total] | min }}</b> of {{ total }}
+      </span>
+      <div class="nav">
+        <a class="pill {{ 'off' if page <= 1 }}" href="/admin/products?q={{ f.q }}{{ qs }}&page={{ page - 1 }}"
+           aria-label="Previous page">{{ icon('chev-l', 15) }}</a>
+        <span class="pill on">{{ page }} / {{ pages }}</span>
+        <a class="pill {{ 'off' if page >= pages }}" href="/admin/products?q={{ f.q }}{{ qs }}&page={{ page + 1 }}"
+           aria-label="Next page">{{ icon('chev-r', 15) }}</a>
+        <select class="sel" style="width:auto;height:34px;min-width:110px"
+                onchange="location.href='/admin/products?q={{ f.q }}&cat={{ f.cat }}&stock={{ f.stock }}&price={{ f.price }}&vis={{ f.vis }}&sort={{ f.sort }}&per_page=' + this.value">
+          {% for n in [20, 40, 80, 200] %}
+          <option value="{{ n }}" {{ 'selected' if per_page == n }}>{{ n }} / page</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="bulk" id="bulkbar">
+      <span class="n" id="bulkn"><span>0</span> selected</span>
+      <select class="sel" name="action" id="bulkaction">
+        <option value="">Choose an action…</option>
+        <option value="price_pct">Change price by %</option>
+        <option value="price_flat">Change price by ₹</option>
+        <option value="set_stock">Set stock to</option>
+        <option value="clear_price">Set to price on request</option>
+        <option value="show">Make visible</option>
+        <option value="hide">Hide from store</option>
+        <option value="move">Move to category</option>
+        <option value="delete">Delete</option>
+      </select>
+      <input class="inp" name="amount" id="bulkamount" placeholder="Amount" style="display:none" inputmode="decimal">
+      <select class="sel" name="category_id" id="bulkcat" style="display:none">
+        {% for c in cats %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-p" type="submit">{{ icon('check', 15) }} Apply</button>
+      <button class="btn btn-ic x" type="button" id="bulkclear" title="Clear selection">{{ icon('x', 15) }}</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

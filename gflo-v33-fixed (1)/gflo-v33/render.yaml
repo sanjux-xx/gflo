@@ -1,0 +1,25 @@
+# Render blueprint — commit this at the repo root, then New → Blueprint on Render.
+services:
+  - type: web
+    name: gflo-store
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter            # a paid plan is required for a persistent disk
+    healthCheckPath: /healthz
+    disk:
+      name: gflo-data        # keeps gflo.db + uploaded photos across deploys
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /data
+      - key: SITE_DIR
+        value: /site
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_USERNAME
+        value: gflo
+      - key: ADMIN_PASSWORD
+        sync: false          # set this yourself in the Render dashboard
+      - key: SERPAPI_KEY
+        sync: false          # paste your SerpAPI key in the dashboard (paid per request)

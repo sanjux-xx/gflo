@@ -1,0 +1,138 @@
+<script>
+"use strict";
+/* ================= PRODUCT MEDIA =================
+   Priority: (1) the product's own catalog photo, (2) category/part fallback photos
+   sourced from the open web, (3) original parametric SVG illustration.
+   Broken hotlinks self-heal: the <img> removes itself and the SVG shows. */
+const _ph_bearing = [
+  "https://m.media-amazon.com/images/I/61AL23TAa3L._AC_UF1000,1000_QL80_.jpg",
+  "https://m.media-amazon.com/images/I/81B5+lXDmVL.jpg",
+  "https://m.media-amazon.com/images/I/61yVqC1Yb6S._AC_UF1000,1000_QL80_.jpg"
+];
+const _ph_brush = [
+  "https://i5.walmartimages.com/seo/Pair-of-of-Carbon-Motor-Brushes-Spare-Part-Power-Tool-5x10x15mm_ad10a890-d3c5-4978-a81c-fd01f5d0bde3_1.ef89276136026992b149bbc8ed25d700.jpeg",
+  "https://m.media-amazon.com/images/I/617nanIh3kL._AC_UF894,1000_QL80_.jpg",
+  "https://i5.walmartimages.com/asr/ac08db6e-8819-478e-b729-205b421a3ebe_1.0b546c8f11889623a72a94a9b12cc601.jpeg?odnHeight=768&odnWidth=768&odnBg=FFFFFF"
+];
+const _ph_fanCap = [
+  "https://cdn2.zohoecommerce.com/product-images/IMG-SHA198788.png/2470125000000127053/600x600?storefront_domain=www.sha360.com",
+  "https://m.media-amazon.com/images/I/41fEhO03SOL._AC_UF1000,1000_QL80_.jpg",
+  "https://i.ebayimg.com/images/g/t0AAAOSwh1ZoKw0O/s-l400.jpg"
+];
+const _ph_regulator = [
+  "https://m.media-amazon.com/images/I/41czqx6WGgL._AC_UF1000,1000_QL80_.jpg",
+  "https://m.media-amazon.com/images/I/41tLi+n83jL._AC_UF894,1000_QL80_.jpg",
+  "https://m.media-amazon.com/images/I/713dMV0q76L.jpg"
+];
+const _ph_motorInd = [
+  "https://5.imimg.com/data5/SELLER/Default/2022/12/WW/ZT/AC/122085439/18-inch-exhaust-fan-motor-500x500.jpg",
+  "https://5.imimg.com/data5/SELLER/Default/2023/4/298909781/MB/KY/KY/185299493/hot-exhaust-fan-motor-500x500.jpg",
+  "https://images.jdmagicbox.com/quickquotes/images_main/exhaust-fan-single-phase-fan-motor-green-320-w-2220620244-znm2xdmc.jpg"
+];
+const PHOTOS = {
+  "mixer-grinder|motor": [
+    "https://5.imimg.com/data5/SELLER/Default/2022/1/PJ/ZI/OE/107515418/grinder-mixer-motor-500x500.jpg",
+    "https://5.imimg.com/data5/SELLER/Default/2022/1/FQ/ZZ/SU/107515418/grinder-mixer-motor.jpg"
+  ],
+  "mixer-grinder|coupler": [
+    "https://m.media-amazon.com/images/I/51dgR90I8XL._AC_UF894,1000_QL80_.jpg",
+    "https://m.media-amazon.com/images/I/71wLq3R+xRL._AC_UF894,1000_QL80_.jpg",
+    "https://m.media-amazon.com/images/I/41O7kYCU-hL.jpg"
+  ],
+  "mixer-grinder|blade": [
+    "https://m.media-amazon.com/images/I/61FeT8KlX0L._AC_UF894,1000_QL80_.jpg",
+    "https://m.media-amazon.com/images/I/71lrl8ZMmyL._AC_UF894,1000_QL80_.jpg"
+  ],
+  "mixer-grinder|jar-handle": [
+    "https://m.media-amazon.com/images/I/615Rb9FW1yL._AC_UF1000,1000_QL80_.jpg",
+    "https://chefprousa.com/image/cache/catalog/products/CMG617JarHandle1-500x500.jpg",
+    "https://m.media-amazon.com/images/I/41p12Pl0bhL._AC_UF894,1000_QL80_.jpg"
+  ],
+  "mixer-grinder|carbon-brush": _ph_brush,
+  "mixer-grinder|bearing": _ph_bearing,
+  "mixer-grinder|capacitor": _ph_fanCap,
+  "ceiling-fan|capacitor": _ph_fanCap,
+  "ceiling-fan|fan-blade": [
+    "https://images.thdstatic.com/productImages/aa1d9218-3011-4e6c-8278-7abab0bb3171/svn/white-ceiling-fan-blades-082392004798-64_600.jpg",
+    "https://m.media-amazon.com/images/I/61c8Ul1a4FL.jpg"
+  ],
+  "ceiling-fan|regulator": _ph_regulator,
+  "ceiling-fan|bearing": _ph_bearing,
+  "ceiling-fan|motor": _ph_motorInd,
+  "table-fan|capacitor": _ph_fanCap,
+  "table-fan|regulator": _ph_regulator,
+  "table-fan|bearing": _ph_bearing,
+  "table-fan|motor": _ph_motorInd,
+  "air-blower|motor": _ph_motorInd,
+  "air-blower|carbon-brush": _ph_brush,
+  "air-blower|bearing": _ph_bearing,
+  "geyser|heating-element": [
+    "https://m.media-amazon.com/images/I/61VLbi9SYaL.jpg",
+    "https://m.media-amazon.com/images/I/51ENkgrFSpL._AC_UF1000,1000_QL80_.jpg",
+    "https://m.media-amazon.com/images/I/41Mt-WEqHVL._AC_UF894,1000_QL80_.jpg"
+  ],
+  "geyser|thermostat": [
+    "https://image.made-in-china.com/202f0j00QUWfmEursCqK/Water-Heater-Spare-Parts-Capillary-Thermostat-with-Ce-TUV-RoHS.webp",
+    "https://ludhianasparecentre.com/wp-content/uploads/2026/02/Capillary-Thermostat-for-Electric-Water-Heater-Geyser-%E2%80%93-High-Precision-Temperature-Control-3.jpg"
+  ],
+  "geyser|valve": [
+    "https://images.thdstatic.com/productImages/fe364caf-1c95-4698-b4bb-86a5338f956a/svn/rheem-protech-water-heater-accessories-sp12574-64_600.jpg",
+    "https://mobileimages.lowes.com/productimages/c43a795c-a8b7-4d2a-b458-53183c6da7a5/01049229.jpg"
+  ],
+  "air-cooler|pump": [
+    "https://www.havai.in/cdn/shop/products/Img02.jpg?v=1680850121",
+    "https://rukmini1.flixcart.com/image/1500/1500/juu4jgw0/water-pump/j/v/c/18w-submersible-pump-for-desert-air-cooler-aquarium-water-pump-original-imafdqzdvv9uvwwp.jpeg?q=70",
+    "https://m.media-amazon.com/images/I/61lagJtyIpL._AC_UF1000,1000_QL80_.jpg"
+  ],
+  "air-cooler|fan-blade": [
+    "https://m.media-amazon.com/images/I/512J2NkQcBL._AC_UF894,1000_QL80_.jpg",
+    "https://i.ebayimg.com/images/g/W~MAAOSwaihivrcO/s-l400.jpg"
+  ],
+  "air-cooler|motor": _ph_motorInd,
+  "air-cooler|capacitor": _ph_fanCap,
+  "drill-machine|carbon-brush": _ph_brush,
+  "drill-machine|bearing": _ph_bearing,
+  "angle-grinder|carbon-brush": _ph_brush,
+  "angle-grinder|bearing": _ph_bearing,
+  "cutter-machine|carbon-brush": _ph_brush,
+  "cutter-machine|bearing": _ph_bearing,
+  "demolition-hammer|carbon-brush": _ph_brush,
+  "demolition-hammer|bearing": _ph_bearing,
+  "hammer-machine|carbon-brush": _ph_brush,
+  "hammer-machine|bearing": _ph_bearing,
+  "chainsaw|bearing": _ph_bearing,
+  "tools|carbon-brush": _ph_brush,
+  "tools|bearing": _ph_bearing,
+  "water-pump|bearing": _ph_bearing,
+  "water-pump|capacitor": _ph_fanCap,
+  "sewing-machine|bearing": _ph_bearing
+};
+/* G-FLO's own product photography on fan parts — one representative product per part family (no repeats) */
+const USER_PT_IMG = { "capacitor": "capacitor", "bearing": "bearing", "fan-blade": "blades", "body": "canopyset", "shaft": "shaft", "field-coil": "winding", "armature": "winding", "motor": "winding", "screw-kit": "screws", "spring": "spring", "power-cord": "harness", "clip-kit": "hooks", "hinge": "hooks" };
+let __fanRep = null;
+function fanRep(){
+  if (__fanRep) return __fanRep;
+  __fanRep = {};
+  DB.products.forEach(p => {
+    if ((p.cat === "ceiling-fan" || p.cat === "table-fan") && USER_PT_IMG[p.pt]){
+      const k = p.cat + "|" + p.pt;
+      if (!__fanRep[k] || p.rating > DB.prodMap[__fanRep[k]].rating) __fanRep[k] = p.sku;
+    }
+  });
+  return __fanRep;
+}
+function prodMediaIdx(p, idx, label){
+  const svg = artFor(p.art, p.hue, p.seed + (idx ? "|t" + idx : ""), label || p.name);
+  let url = "";
+  if ((p.cat === "ceiling-fan" || p.cat === "table-fan") && USER_PT_IMG[p.pt] && typeof USER_IMGS !== "undefined" && fanRep()[p.cat + "|" + p.pt] === p.sku) url = USER_IMGS[USER_PT_IMG[p.pt]] || "";
+  if (!url) url = p.img || "";
+  if (!url){
+    const list = PHOTOS[p.cat + "|" + p.pt];
+    if (list && list.length) url = list[(U.hash(p.sku) + (idx || 0)) % list.length];
+  }
+  if (!url || idx >= 2) return `<span class="pm">${svg}</span>`;
+  return `<span class="pm${idx === 1 ? " pm-crop" : ""}">${svg}<img src="${U.esc(url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()"></span>`;
+}
+/* Override the base renderer: photo-first with layered SVG fallback */
+prodArt = function(p, label){ return prodMediaIdx(p, 0, label); };
+</script>

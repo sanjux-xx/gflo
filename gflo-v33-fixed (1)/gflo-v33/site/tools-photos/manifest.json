@@ -1,0 +1,272 @@
+{
+ "category": "Tools & Hardware",
+ "dropped_duplicates": {
+  "1000061230": "duplicate of indo-meter-box",
+  "1000061211": "duplicate of eye-bolt-anchor",
+  "1000061221": "duplicate of ph-measuring-tape (3m variant)",
+  "1000061326": "duplicate of kca-tile-blade",
+  "1000061328": "duplicate of spd-drill-12v"
+ },
+ "items": [
+  {
+   "file": "ch2-wire-connector.jpg",
+   "key": "ch2-wire-connector",
+   "name": "G-FLO CH2 2-Pin Spring Quick Wire Connector",
+   "brand": "G-FLO",
+   "src": "1000061228.jpg",
+   "kb": 25.8,
+   "px": [
+    420,
+    560
+   ],
+   "q": 70
+  },
+  {
+   "file": "ch3-safety-plugs.jpg",
+   "key": "ch3-safety-plugs",
+   "name": "G-FLO CH-3 Safety Plugs (Socket Protectors)",
+   "brand": "G-FLO",
+   "src": "1000061199.jpg",
+   "kb": 33.1,
+   "px": [
+    373,
+    560
+   ],
+   "q": 54
+  },
+  {
+   "file": "spd-drill-12v.jpg",
+   "key": "spd-drill-12v",
+   "name": "SPD Power Hunda 12V Cordless Drill Kit (2 Batteries)",
+   "brand": "SPD",
+   "src": "1000061246.jpg",
+   "kb": 33.6,
+   "px": [
+    448,
+    560
+   ],
+   "q": 62
+  },
+  {
+   "file": "spd-cutting-wheel-107.jpg",
+   "key": "spd-cutting-wheel-107",
+   "name": "SPD INOX Fast Cutting Wheel 107mm (50 Pcs Bucket)",
+   "brand": "SPD",
+   "src": "1000061188.jpg",
+   "kb": 40.5,
+   "px": [
+    560,
+    420
+   ],
+   "q": 50
+  },
+  {
+   "file": "indo-meter-box.jpg",
+   "key": "indo-meter-box",
+   "name": "Indo Distribution / Meter Box (S & L)",
+   "brand": "Indo",
+   "src": "1000061209.jpg",
+   "kb": 17.5,
+   "px": [
+    560,
+    347
+   ],
+   "q": 70
+  },
+  {
+   "file": "eye-bolt-anchor.jpg",
+   "key": "eye-bolt-anchor",
+   "name": "Eye Bolt Anchor Fastener (6/8/10/12mm)",
+   "brand": "Generic",
+   "src": "1000061234.jpg",
+   "kb": 33.7,
+   "px": [
+    420,
+    560
+   ],
+   "q": 66
+  },
+  {
+   "file": "ph-diamond-blade-45.jpg",
+   "key": "ph-diamond-blade-45",
+   "name": "Power Honda 4.5\" x 8T Diamond Cutting Blade (20 Pcs Tin)",
+   "brand": "Power Honda",
+   "src": "1000061236.jpg",
+   "kb": 33.7,
+   "px": [
+    560,
+    420
+   ],
+   "q": 50
+  },
+  {
+   "file": "vflex-pipe.jpg",
+   "key": "vflex-pipe",
+   "name": "V-Flex Corrugated Flexible Pipe Coil",
+   "brand": "V-Flex",
+   "src": "1000061226.jpg",
+   "kb": 33.4,
+   "px": [
+    420,
+    560
+   ],
+   "q": 70
+  },
+  {
+   "file": "led-strip-connector.jpg",
+   "key": "led-strip-connector",
+   "name": "LED Strip Wire Connectors (Solderless)",
+   "brand": "Generic",
+   "src": "1000061206.jpg",
+   "kb": 33.0,
+   "px": [
+    398,
+    560
+   ],
+   "q": 66
+  },
+  {
+   "file": "supersteel-drill.jpg",
+   "key": "supersteel-drill",
+   "name": "Super Steel Cordless Impact Drill Kit (2 Batteries)",
+   "brand": "Super Steel",
+   "src": "1000061194.jpg",
+   "kb": 33.1,
+   "px": [
+    560,
+    452
+   ],
+   "q": 58
+  },
+  {
+   "file": "tiger-stone-blade.jpg",
+   "key": "tiger-stone-blade",
+   "name": "Tiger Stone Cutting Blade (20 Pcs Box)",
+   "brand": "Tiger",
+   "src": "1000061191.jpg",
+   "kb": 33.1,
+   "px": [
+    560,
+    486
+   ],
+   "q": 54
+  },
+  {
+   "file": "ph-measuring-tape.jpg",
+   "key": "ph-measuring-tape",
+   "name": "Power Hunda Measuring Tape 3m / 5m (12 Pcs Box)",
+   "brand": "Power Hunda",
+   "src": "1000061215.jpg",
+   "kb": 35.9,
+   "px": [
+    420,
+    560
+   ],
+   "q": 50
+  },
+  {
+   "file": "spartan-plier.jpg",
+   "key": "spartan-plier",
+   "name": "Spartan Elite CRV Combination Plier 8\"",
+   "brand": "Spartan",
+   "src": "1000061220.jpg",
+   "kb": 35.7,
+   "px": [
+    420,
+    560
+   ],
+   "q": 50
+  },
+  {
+   "file": "mansarovar-spanner.jpg",
+   "key": "mansarovar-spanner",
+   "name": "Mansarovar Double Open End Spanner Set (12 Pcs)",
+   "brand": "Mansarovar",
+   "src": "1000061185.jpg",
+   "kb": 32.5,
+   "px": [
+    420,
+    560
+   ],
+   "q": 58
+  },
+  {
+   "file": "kca-tile-blade.jpg",
+   "key": "kca-tile-blade",
+   "name": "KCA Diamond Tile Saw Blade \u2014 Dry Cutting",
+   "brand": "KCA",
+   "src": "1000061243.jpg",
+   "kb": 33.3,
+   "px": [
+    448,
+    560
+   ],
+   "q": 54
+  },
+  {
+   "file": "screwdriver-bit-set.jpg",
+   "key": "screwdriver-bit-set",
+   "name": "10-in-1 Screwdriver Bit Set with Handle",
+   "brand": "Generic",
+   "src": "1000061197.jpg",
+   "kb": 26.3,
+   "px": [
+    560,
+    448
+   ],
+   "q": 70
+  },
+  {
+   "file": "sleeve-anchor-m8.jpg",
+   "key": "sleeve-anchor-m8",
+   "name": "Sleeve Anchor Fastener M8 (Zinc Plated)",
+   "brand": "Generic",
+   "src": "1000061216.jpg",
+   "kb": 33.2,
+   "px": [
+    420,
+    560
+   ],
+   "q": 62
+  },
+  {
+   "file": "street-bracket-zinc.jpg",
+   "key": "street-bracket-zinc",
+   "name": "Street Light Pole Bracket \u2014 Zinc Plated",
+   "brand": "Generic",
+   "src": "1000061340.jpg",
+   "kb": 32.1,
+   "px": [
+    425,
+    560
+   ],
+   "q": 66
+  },
+  {
+   "file": "street-bracket-grey.jpg",
+   "key": "street-bracket-grey",
+   "name": "Street Light Pole Bracket \u2014 Powder Coated",
+   "brand": "Generic",
+   "src": "1000061336.jpg",
+   "kb": 36.7,
+   "px": [
+    425,
+    560
+   ],
+   "q": 50
+  },
+  {
+   "file": "crimp-caps.jpg",
+   "key": "crimp-caps",
+   "name": "Closed-End Wire Crimp Caps (Nylon, Pack)",
+   "brand": "Generic",
+   "src": "1000061338.jpg",
+   "kb": 30.4,
+   "px": [
+    425,
+    560
+   ],
+   "q": 70
+  }
+ ]
+}

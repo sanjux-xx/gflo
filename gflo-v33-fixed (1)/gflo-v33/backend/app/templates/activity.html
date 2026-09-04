@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Activity log{% endblock %}
+{% block body %}
+<div class="ph">
+  <div>
+    <h1>Activity log</h1>
+    <p class="ph-sub">{{ total }} entries — every sign-in (including failed attempts) and every
+       catalogue change, with who did it and when. Times are UTC.</p>
+  </div>
+  <div class="ph-acts"><a class="btn" href="/admin">{{ icon('chev-l', 15) }} Dashboard</a></div>
+</div>
+
+<div class="card">
+  <div class="tblwrap">
+    <table class="tbl">
+      <thead>
+        <tr><th>When</th><th>Who</th><th>Action</th><th>Entity</th><th>ID</th><th>Detail</th></tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td class="nowrap mono">{{ r.ts.strftime('%d %b %Y, %H:%M:%S') }}</td>
+          <td><b>{{ r.username or '—' }}</b></td>
+          <td>
+            {% set danger = 'delete' in r.action or 'failed' in r.action %}
+            <span class="bdg {{ 'bdg-err' if danger else ('bdg-ok' if r.action == 'login' else 'bdg-mute') }}">
+              {{ r.action|replace('_', ' ') }}
+            </span>
+          </td>
+          <td class="mut">{{ r.entity }}</td>
+          <td><span class="mono sku">{{ r.entity_id }}</span></td>
+          <td class="mut">{{ r.detail }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6">
+          <div class="empty">
+            <span class="ic">{{ icon('activity', 24) }}</span>
+            <h3>Nothing logged yet</h3>
+            <p>Sign-ins and catalogue edits will appear here as they happen.</p>
+          </div>
+        </td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <div class="pg">
+    <span class="info">Page <b>{{ page }}</b> of {{ pages }}</span>
+    <div class="nav">
+      <a class="pill {{ 'off' if page <= 1 }}" href="/admin/activity?page={{ page - 1 }}">{{ icon('chev-l', 15) }}</a>
+      <span class="pill on">{{ page }}</span>
+      <a class="pill {{ 'off' if page >= pages }}" href="/admin/activity?page={{ page + 1 }}">{{ icon('chev-r', 15) }}</a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

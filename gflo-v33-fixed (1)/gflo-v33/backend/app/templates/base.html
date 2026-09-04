@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#12151b">
+<title>{% block title %}Admin{% endblock %} · {{ store_name }} Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/admin.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23ec3338'/><text x='16' y='23' font-family='Arial' font-size='18' font-weight='bold' fill='white' text-anchor='middle'>G</text></svg>">
+</head>
+<body>
+{% if username %}
+<div class="app">
+  <aside class="side" id="side">
+    <div class="side-brand">
+      <span class="logo"><b>G</b>-FLO</span>
+      <span class="tag">Console</span>
+    </div>
+    <div class="side-scroll">
+      <div class="nav-lbl">Catalogue</div>
+      <a class="nav-item {{ 'on' if path in ['/admin','/admin/'] }}" href="/admin">{{ icon('grid') }} Dashboard</a>
+      <a class="nav-item {{ 'on' if path.startswith('/admin/products') }}" href="/admin/products">
+        {{ icon('box') }} Products
+        {% if counts.products %}<span class="cnt">{{ counts.products }}</span>{% endif %}
+      </a>
+      <a class="nav-item {{ 'on' if path.startswith('/admin/categories') }}" href="/admin/categories">
+        {{ icon('layers') }} Categories
+        {% if counts.categories %}<span class="cnt">{{ counts.categories }}</span>{% endif %}
+      </a>
+      <a class="nav-item {{ 'on' if path.startswith('/admin/brands') }}" href="/admin/brands">
+        {{ icon('tag') }} Brands
+        {% if counts.brands %}<span class="cnt">{{ counts.brands }}</span>{% endif %}
+      </a>
+
+      <div class="nav-lbl">Needs attention</div>
+      <a class="nav-item" href="/admin/products?price=none">
+        {{ icon('rupee') }} No price yet
+        {% if counts.no_price %}<span class="cnt hot">{{ counts.no_price }}</span>{% endif %}
+      </a>
+      <a class="nav-item" href="/admin/products?stock=out">
+        {{ icon('off') }} Out of stock
+        {% if counts.out_of_stock %}<span class="cnt hot">{{ counts.out_of_stock }}</span>{% endif %}
+      </a>
+      <a class="nav-item" href="/admin/products?vis=hidden">
+        {{ icon('eye-off') }} Hidden
+        {% if counts.hidden %}<span class="cnt">{{ counts.hidden }}</span>{% endif %}
+      </a>
+
+      <div class="nav-lbl">Store</div>
+      <a class="nav-item {{ 'on' if path.startswith('/admin/import') }}" href="/admin/import">{{ icon('upload') }} Import / export</a>
+      <a class="nav-item {{ 'on' if path.startswith('/admin/settings') }}" href="/admin/settings">{{ icon('cog') }} Settings</a>
+      <a class="nav-item {{ 'on' if path.startswith('/admin/activity') }}" href="/admin/activity">{{ icon('activity') }} Activity log</a>
+      <a class="nav-item" href="/" target="_blank" rel="noopener">{{ icon('store') }} View storefront</a>
+    </div>
+    <div class="side-foot">
+      <div class="who">
+        <span class="ava">{{ username[0]|upper }}</span>
+        <span><b>{{ username }}</b><span>Signed in</span></span>
+      </div>
+      <form method="post" action="/admin/logout">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn btn-sm btn-block" style="background:#22262f;border-color:#333947;color:#d6dae1">
+          {{ icon('logout', 14) }} Sign out
+        </button>
+      </form>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="main">
+    <header class="top">
+      <button class="burger" id="burger" aria-label="Open menu">{{ icon('menu', 22) }}</button>
+      <form class="gsearch" method="get" action="/admin/products" role="search">
+        {{ icon('search', 17) }}
+        <input name="q" id="gq" value="{{ request.query_params.get('q','') }}"
+               placeholder="Search products by name, SKU or size…" autocomplete="off" aria-label="Search products">
+        <kbd>/</kbd>
+      </form>
+      <div class="top-acts">
+        <a class="btn btn-sm t-export" href="/admin/export.csv" title="Export catalogue as CSV">
+          {{ icon('download', 15) }}<span class="t-lbl">Export</span></a>
+        <a class="btn btn-sm btn-p" href="/admin/products/new" title="Add a new product">
+          {{ icon('plus', 15) }}<span class="t-lbl">New product</span></a>
+      </div>
+    </header>
+
+    <main class="content">
+      {% if msg %}<div class="alert alert-ok">{{ icon('check') }}<span>{{ msg }}</span></div>{% endif %}
+      {% if err %}<div class="alert alert-err">{{ icon('alert') }}<span>{{ err }}</span></div>{% endif %}
+      {% block body %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% else %}
+  {% block anon %}{% endblock %}
+{% endif %}
+
+<div class="toasts" id="toasts" aria-live="polite" aria-atomic="true"></div>
+<script src="/static/admin.js" defer></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

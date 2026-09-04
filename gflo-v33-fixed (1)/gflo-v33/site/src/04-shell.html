@@ -1,0 +1,371 @@
+<script>
+"use strict";
+/* ================= SHARED COMPONENT HTML ================= */
+function fitsLabel(p){
+  const n = (p.brandFor || []).length;
+  if (!n) return "";
+  if (n === 1){
+    const b = BRAND_MAP[p.brandFor[0]];
+    const name = b ? b.name : p.brandFor[0];
+    return name === "G-FLO" ? "G-FLO original" : "Fits " + U.esc(name);
+  }
+  return "Fits " + n + " brands";
+}
+function priceHtml(p, big){
+  if (CATALOG_MODE) return "";
+  if (p.price === null || p.price === undefined)
+    return `<div class="price-ln"><span class="price price-por">${window.POR_LABEL || "Price on request"}</span></div>`;
+  const unit = p.unit && p.unit !== "piece" ? `<span class="unit-ln">/ ${U.esc(p.unit)}</span>` : "";
+  return `<div class="price-ln"><span class="price">${U.inr(p.price)}</span>${unit}${p.off ? `<span class="mrp">${U.inr(p.mrp)}</span><span class="off">${p.off}% off</span>` : ""}</div>`;
+}
+function stockHtml(p){
+  if (p.stock === 0) return `<span class="stock-ln s-out">Out of stock</span>`;
+  if (p.stock <= 5) return `<span class="stock-ln s-low">Only ${p.stock} left</span>`;
+  return `<span class="stock-ln s-in">In stock</span>`;
+}
+function productCard(p, i){
+  const wished = State.wish.includes(p.sku), inCmp = State.cmp.includes(p.sku);
+  return `<article class="pcard rv ${i != null && i < 4 ? "rv-d" + (i % 4) : ""}">
+    <div class="art">${prodArt(p)}
+      <div class="flags">${p.off >= 25 && !CATALOG_MODE ? `<span class="badge b-deal">${p.off}% off</span>` : ""}${p.isNew ? `<span class="badge b-new">New</span>` : ""}${p.isBest ? `<span class="badge b-best">★ Bestseller</span>` : ""}</div>
+      <div class="acts">
+        <button class="pact ${wished ? "on" : ""}" data-act="wish" data-sku="${p.sku}" aria-label="${wished ? "Remove from" : "Add to"} wishlist" aria-pressed="${wished}">${U.icon("heart", "ic-s")}</button>
+        <button class="pact" data-act="quick" data-sku="${p.sku}" aria-label="Quick view">${U.icon("eye", "ic-s")}</button>
+      </div>
+    </div>
+    <div class="body">
+      <span class="cat-ln">${U.esc(catOf(p).name)} · ${U.esc(ptOf(p).name)}</span>
+      <h3><a href="#/p/${p.sku}">${U.esc(p.short)}</a></h3>
+      <div class="rt-ln">${U.stars(p.rating)}<span>${p.rating} (${p.reviews})</span></div>
+      <div class="rt-ln"><span class="mono mut3">${p.sku}</span></div>
+      ${priceHtml(p)}
+      <div class="spread">${stockHtml(p)}<span class="sku-ln">${fitsLabel(p)}</span></div>
+      <div class="cta"><button class="btn btn-p btn-sm" data-act="add-cart" data-sku="${p.sku}" ${p.stock === 0 ? "disabled" : ""}>${U.icon("cart", "ic-s")} Add</button><button class="btn btn-ghost btn-sm" data-act="buy-now" data-sku="${p.sku}" ${p.stock === 0 ? "disabled" : ""}>Buy</button></div>
+    </div>
+  </article>`;
+}
+function skeletonCards(n){
+  return Array.from({ length: n }, () => `<div class="sk-card"><div class="sk a"></div><div class="b"><div class="sk" style="height:10px;width:55%"></div><div class="sk" style="height:13px"></div><div class="sk" style="height:13px;width:80%"></div><div class="sk" style="height:18px;width:45%"></div><div class="sk" style="height:34px;border-radius:10px"></div></div></div>`).join("");
+}
+function sectionHead(kick, title, sub, moreHref, moreLabel){
+  return `<div class="sec-head rv"><div><span class="kick">${U.esc(kick)}</span><h2>${title}</h2>${sub ? `<p>${U.esc(sub)}</p>` : ""}</div>${moreHref ? `<a class="see-all" href="${moreHref}">${U.esc(moreLabel || "View all")} ${U.icon("arr-r", "ic-s")}</a>` : ""}</div>`;
+}
+function railOf(items){ return `<div class="rail">${items.map((p, i) => productCard(p)).join("")}</div>`; }
+function emptyState(icon, title, sub, ctaHref, ctaLabel){
+  return `<div class="empty"><div class="e-ic">${U.icon(icon)}</div><div><h3 style="margin-bottom:6px">${U.esc(title)}</h3><p class="mut" style="font-size:13.5px">${U.esc(sub)}</p></div>${ctaHref ? `<a class="btn btn-p" href="${ctaHref}">${U.esc(ctaLabel)}</a>` : ""}</div>`;
+}
+function crumb(items){
+  return `<nav class="crumb" aria-label="Breadcrumb"><a href="#/">Home</a>${items.map((it, i) => `<span class="sep">/</span>${it[1] && i < items.length - 1 ? `<a href="${it[1]}">${U.esc(it[0])}</a>` : `<b>${U.esc(it[0])}</b>`}`).join("")}</nav>`;
+}
+function brandMark(b, size){
+  return `<span class="brand-mk" style="width:${size || 52}px;height:${size || 52}px;font-size:${(size || 52) * .38}px;background:linear-gradient(135deg,hsl(${b.hue} 65% 46%),hsl(${(b.hue + 40) % 360} 70% 38%))">${U.esc(b.name[0])}</span>`;
+}
+
+/* ================= SHELL RENDER ================= */
+const NAV = [
+  ["home", "#/", "Home", "home"], ["store", "#/categories", "Store", "store"], ["categories", "#/categories", "Categories", "grid", true],
+  ["brands", "#/brands", "Brands", "store"], ["finder", "#/finder", "Spare Part Finder", "spark"],
+  ["guides", "#/guides", "Repair Guides", "book"], ["deals", "#/deals", "Deals", "percent", false, "hi"],
+  ["support", "#/support", "Support", "headset"], ["track", "#/track", "Track Order", "truck"], ["account", "#/account", "Account", "user"], ["about", "#/about", "About Us", "info"], ["contact", "#/contact", "Contact Us", "mail"]
+];
+function renderShell(){
+  document.getElementById("hdr").innerHTML = `
+  <div class="topbar"><div class="wrap"><div class="tb-l"><span>${U.icon("truck")} ${CATALOG_MODE ? "Pan-India tracked delivery" : "FREE delivery above ₹4,999"}</span><span class="hide-sm">${U.icon("rotate")} 7-day easy returns</span></div><div class="row" style="gap:16px"><span>${U.icon("phone")} Order status: ${CONTACT.phone}</span></div></div></div>
+  <div class="hd-main"><div class="wrap hd-row">
+    <button class="btn-icon btn" data-act="open-mnav" aria-label="Open menu" id="mnav-btn">${U.icon("menu")}</button>
+    <a class="logo" href="#/" aria-label="G-FLO home"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
+    <div class="hd-search" id="hd-search">
+      <div class="sbox">${U.icon("search")}<input id="hd-q" type="search" placeholder="Search parts, brands or model numbers…" autocomplete="off" aria-label="Search parts" aria-expanded="false" role="combobox" aria-controls="hd-sug">
+        <button class="btn-icon btn" data-mic="hd-q" aria-label="Voice search" style="width:34px;height:34px">${U.icon("mic", "ic-s")}</button>
+        <span class="s-ai">${U.icon("spark", "ic-s")} AI</span></div>
+      <div class="sug" id="hd-sug" role="listbox" aria-label="Search suggestions"></div>
+    </div>
+    <div class="hd-acts">
+      <a class="hd-act" href="#/wishlist" aria-label="Wishlist" title="Wishlist">${U.icon("heart")}<span class="bub" data-badge="wish"></span></a>
+      <a class="hd-act" href="#/account" aria-label="Account" title="Account" data-auth-ava>${U.icon("user")}</a>
+      <button class="hd-act hd-cart m-keep" data-act="open-cart" aria-label="Open cart" title="Cart">${U.icon("cart")}<span class="cart-total" data-cart-total></span><span class="bub" data-badge="cart"></span></button>
+    </div>
+  </div></div>
+  <div class="navbar"><div class="wrap"><nav class="nav-row" aria-label="Primary">
+    ${NAV.map(n => n[4]
+      ? `<div class="mega-wr"><button class="nav-lnk" data-act="mega" data-nav="${n[0]}" aria-haspopup="true" aria-expanded="false">${U.icon(n[3], "ic-s")} ${n[2]} ${U.icon("chev-d", "ic-s")}</button><div class="mega" id="mega" role="menu" aria-label="Categories mega menu"><div class="mega-cats" id="mega-cats"></div><div class="mega-body" id="mega-body"></div></div></div>`
+      : `<a class="nav-lnk ${n[5] || ""}" data-nav="${n[0]}" href="${n[1]}">${U.icon(n[3], "ic-s")} ${n[2]}</a>`).join("")}
+  </nav></div></div>`;
+
+  window.__ftrFull = () => `
+  <footer class="foot"><div class="wrap">
+    <div class="foot-top">
+      <div><a class="logo" href="#/"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
+        <p class="about">India's premium marketplace for genuine home-appliance spare parts. ${CATS.length} appliance categories, ${DB.products.length}+ certified parts, AI-verified compatibility — delivered to 19,000+ pincodes.</p>
+        <div class="foot-pay"><span class="tag">UPI</span><span class="tag">CARDS</span><span class="tag">NETBANKING</span><span class="tag">COD</span><span class="tag">EMI</span></div></div>
+      <div><h5>Shop</h5><div class="foot-lnks"><a href="#/categories">All categories</a><a href="#/brands">Brands</a><a href="#/deals">Deals & offers</a><a href="#/finder">AI part finder</a><a href="#/wishlist">Wishlist</a><a href="#/track">Track order</a></div></div>
+      <div><h5>Help</h5><div class="foot-lnks"><a href="#/support">Help centre & FAQs</a><a href="#/track">Track order</a><a href="#/policy/return">Return policy</a><a href="#/policy/refund">Refund policy</a><a href="#/policy/shipping">Shipping policy</a><a href="#/guides">Repair guides</a></div></div>
+      <div><h5>Company</h5><div class="foot-lnks"><a href="#/about">About G-FLO</a><a href="#/contact">Contact us</a><a href="#/seller">Sell on G-FLO</a><a href="#/policy/privacy">Privacy policy</a><a href="#/policy/terms">Terms & conditions</a></div></div>
+      <div><h5>Get in touch</h5><div class="foot-lnks"><a href="#/support">${U.icon("phone", "ic-s")} ${CONTACT.phone}</a><a href="#/support">${U.icon("mail", "ic-s")} ${CONTACT.email}</a><a href="#/support">${U.icon("pin", "ic-s")} ${CONTACT.address}</a><a href="#/support">${U.icon("clock", "ic-s")} Mon–Sat, 9 AM – 8 PM IST</a></div>
+        <div class="soc" style="margin-top:14px"><a href="#/" aria-label="Chat">${U.icon("chat", "ic-s")}</a><a href="#/" aria-label="Mail">${U.icon("mail", "ic-s")}</a><a href="#/" aria-label="Phone">${U.icon("phone", "ic-s")}</a><a href="#/" aria-label="Share">${U.icon("share", "ic-s")}</a></div></div>
+    </div>
+    <div class="foot-bot"><span>© ${new Date().getFullYear()} G-FLO Commerce Pvt Ltd — demo experience. Catalog data & product photos referenced from sparepartwala.in for this commissioned replica; illustrations are original.</span><span class="row" style="gap:7px">${U.icon("shield", "ic-s")} 100% genuine, brand-certified spares</span></div>
+  </div></footer>`;
+  renderFooter(Router.parse().page);
+
+  document.getElementById("ovl").innerHTML = `
+  <div class="ovl-bg" id="ovl-bg"></div>
+  <aside class="drawer" id="cart-drawer" aria-hidden="true" role="dialog" aria-label="Shopping cart">
+    <div class="dr-hd"><h3>Your cart</h3><button class="btn btn-icon" data-act="close" aria-label="Close cart">${U.icon("x")}</button></div>
+    <div class="dr-body" id="cart-body"></div>
+    <div class="dr-ft" id="cart-foot"></div>
+  </aside>
+  <aside class="drawer left" id="mnav" aria-hidden="true" role="dialog" aria-label="Menu">
+    <div class="dr-hd"><a class="logo" href="#/"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions" style="height:32px"></a><button class="btn btn-icon" data-act="close" aria-label="Close menu">${U.icon("x")}</button></div>
+    <div class="dr-body">
+      ${NAV.map(n => `<a class="acc-lnk" href="${n[1]}" style="margin-bottom:2px">${U.icon(n[3], "ic-s")} ${n[2]}</a>`).join("")}
+    </div>
+  </aside>
+  <div class="modal-wr" id="modal-wr" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="m-bg" data-act="close"></div>
+    <div class="modal"><div class="modal-hd"><h3></h3><button class="btn btn-icon" data-act="close" aria-label="Close dialog">${U.icon("x")}</button></div><div class="modal-bd"></div></div>
+  </div>
+  <button id="ai-fab" data-act="chat" aria-label="Open G-FLO AI assistant">${U.icon("spark", "ic-l")}</button>
+  <div class="chat" id="chat" aria-hidden="true" role="dialog" aria-label="G-FLO AI assistant">
+    <div class="chat-hd"><span class="lg-mark" style="width:34px;height:34px;background:rgba(255,255,255,.2)">${U.icon("spark", "ic-s")}</span><div><b>G-FLO Assistant</b><div class="st">Online · answers in seconds</div></div><button class="btn btn-icon" data-act="close" aria-label="Close chat" style="margin-left:auto;background:rgba(255,255,255,.15);color:#fff">${U.icon("x")}</button></div>
+    <div class="chat-bd" id="chat-bd"></div>
+    <div class="chat-sugs" id="chat-sugs"></div>
+    <form class="chat-in" id="chat-form"><input class="inp" id="chat-q" placeholder="Ask about parts, fitment, orders…" autocomplete="off" aria-label="Message the assistant"><button class="btn btn-p btn-icon" aria-label="Send" style="background:var(--g)">${U.icon("send", "ic-s")}</button></form>
+  </div>
+  <nav class="bnav" aria-label="Mobile navigation">
+    <a href="#/" data-nav="home">${U.icon("home")}Home</a>
+    <a href="#/categories" data-nav="categories">${U.icon("store")}Store</a>
+    <a href="#/finder" data-nav="finder">${U.icon("scan")}Finder</a>
+    <a href="#/cart" data-nav="cart">${U.icon("cart")}<span class="bub" data-badge="cart"></span>Cart</a>
+    <a href="#/account" data-nav="account">${U.icon("user")}Account</a>
+  </nav>`;
+  buildMega(); renderCartDrawer(); chatInit(); syncBadges();
+  if (typeof syncAuth === "function") syncAuth();
+}
+
+/* ================= FOOTER SWITCHING ================= */
+function footerMin(){
+  return `<footer class="foot foot-min"><div class="wrap" style="display:flex;flex-direction:column;align-items:center;gap:9px;padding:26px 0;text-align:center">
+    <a class="logo" href="#/" aria-label="G-FLO home"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
+    <span style="display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--tx2)">${U.icon("shield", "ic-s")} 100% genuine, brand-certified spares</span>
+    <span class="mut3" style="font-size:12px">© ${new Date().getFullYear()} G-FLO — genuine appliance & tool spares</span>
+  </div></footer>`;
+}
+function renderFooter(page){
+  const f = document.getElementById("ftr"); if (!f) return;
+  f.innerHTML = ["home", "about", "contact"].includes(page) ? footerMin() : (window.__ftrFull ? window.__ftrFull() : "");
+}
+
+
+/* ================= MEGA MENU ================= */
+let megaCat = CATS[0].id;
+function buildMega(){
+  document.getElementById("mega-cats").innerHTML = CATS.map(c => `<button class="mega-cat ${c.id === megaCat ? "on" : ""}" data-mega-cat="${c.id}" role="menuitem"><span class="ci">${U.icon("c-" + c.id, "ic-s")}</span>${U.esc(c.name)}</button>`).join("");
+  megaBody(megaCat);
+}
+function megaBody(cid){
+  const c = CAT_MAP[cid];
+  document.getElementById("mega-body").innerHTML = `
+    <h4>${U.esc(c.name)} spare parts</h4><span class="mut3">${U.esc(c.desc)} · ${c.pts.length} part families</span>
+    <div class="mega-pts">${c.pts.map(pt => `<a class="mega-pt" href="#/c/${c.id}?pt=${pt}"><span class="dot"></span>${PT_MAP[pt].name}</a>`).join("")}</div>
+    <div class="mega-foot"><a class="btn btn-p btn-sm" href="#/c/${c.id}">Browse all ${U.esc(c.name)} parts ${U.icon("arr-r", "ic-s")}</a><a class="btn btn-ghost btn-sm" href="#/finder">${U.icon("spark", "ic-s")} Not sure? Use AI finder</a></div>`;
+}
+
+/* ================= CART DRAWER ================= */
+function renderCartDrawer(){
+  const body = document.getElementById("cart-body"), foot = document.getElementById("cart-foot");
+  if (!body) return;
+  if (!State.cart.length){
+    body.innerHTML = emptyState("cart", "Your cart is empty", "Find the exact part your appliance needs.", "#/categories", "Browse categories");
+    foot.innerHTML = "";
+    return;
+  }
+  const t = State.cartTotals();
+  body.innerHTML = `
+    ${CATALOG_MODE ? "" : `<div class="free-bar">${t.freeGap > 0 ? `Add <b>${U.inr(t.freeGap)}</b> more for <b>FREE delivery</b>` : `🎉 You've unlocked <b>FREE delivery</b>`}<div class="tr"><div class="fl" style="width:${Math.min(100, (t.sub - t.disc) / 4999 * 100)}%"></div></div></div>`}
+    ${State.cart.map(i => { const p = DB.prodMap[i.sku]; if (!p) return ""; return `
+      <div class="citem"><a class="art" href="#/p/${p.sku}">${prodArt(p)}</a>
+        <div class="inf"><b><a href="#/p/${p.sku}">${U.esc(p.short)}</a></b><span class="mono mut3" style="font-size:10.5px">${p.sku}</span>
+          <div class="spread"><div class="qty"><button data-act="qty" data-sku="${p.sku}" data-d="-1" aria-label="Decrease quantity">${U.icon("minus", "ic-s")}</button><b>${i.qty}</b><button data-act="qty" data-sku="${p.sku}" data-d="1" aria-label="Increase quantity">${U.icon("plus", "ic-s")}</button></div>
+          ${CATALOG_MODE ? "" : `<span class="price" style="font-size:14.5px">${U.inr(p.price * i.qty)}</span>`}</div></div>
+        <button class="btn btn-icon" data-act="rm-cart" data-sku="${p.sku}" aria-label="Remove item" style="width:32px;height:32px">${U.icon("trash", "ic-s")}</button></div>`; }).join("")}`;
+  foot.innerHTML = `
+    ${CATALOG_MODE ? `<div class="tot-row big"><span>Items in cart</span><span>${t.count}</span></div><p class="mut3" style="font-size:12px;margin:0">Pricing is shared on the final quote — demo checkout collects no payment.</p>` : `<div class="tot-row"><span>Subtotal (${t.count} items)</span><span class="price">${U.inr(t.sub)}</span></div>
+    ${t.disc ? `<div class="tot-row" style="color:var(--ok)"><span>Coupon ${State.coupon.code}</span><span>−${U.inr(t.disc)}</span></div>` : ""}
+    <div class="tot-row"><span>Delivery</span><span>${t.ship ? U.inr(t.ship) : "FREE"}</span></div>
+    <div class="tot-row big"><span>Total</span><span class="price">${U.inr(t.total)}</span></div>`}
+    <a class="btn btn-p btn-lg btn-block" href="#/checkout">Checkout securely ${U.icon("arr-r", "ic-s")}</a>
+    <a class="btn btn-soft btn-block" href="#/cart">View full cart</a>`;
+  syncBadges();
+}
+
+/* ================= SEARCH UI ================= */
+function bindSearch(inputId, sugId){
+  const inp = document.getElementById(inputId), sug = document.getElementById(sugId);
+  if (!inp || !sug || inp.dataset.bound) return;
+  inp.dataset.bound = "1";
+  let selIdx = -1;
+  const close = () => { sug.classList.remove("open"); inp.setAttribute("aria-expanded", "false"); selIdx = -1; };
+  const go = q => { if (!q.trim()) return; close(); location.hash = "#/search/" + encodeURIComponent(q.trim()); };
+  const render = () => {
+    const q = inp.value;
+    if (q.trim().length < 2){ close(); return; }
+    const { products, cats, brands, pts, intent } = Search.suggest(q);
+    const il = AI.intentLabel(intent);
+    let html = "";
+    if (il) html += `<div class="sug-intent">${U.icon("spark", "ic-s")} <span><b>AI understood:</b> ${U.esc(il)}</span></div>`;
+    if (cats.length || brands.length || pts.length){
+      html += `<div class="sug-gr"><div class="sug-tt">Collections</div>${cats.map(c => `<a class="sug-it" href="#/c/${c.id}"><span class="si-ic">${U.icon("c-" + c.id, "ic-s")}</span><span><b>${U.esc(c.name)}</b><small>${c.pts.length} part families</small></span></a>`).join("")}${brands.map(b => `<a class="sug-it" href="#/b/${b.id}"><span class="si-ic">${U.icon("store", "ic-s")}</span><span><b>${U.esc(b.name)}</b><small>Brand store</small></span></a>`).join("")}${pts.map(t => `<a class="sug-it" href="#/search/${encodeURIComponent(t.name)}"><span class="si-ic">${U.icon("cog", "ic-s")}</span><span><b>${U.esc(t.name)}</b><small>Across all appliances</small></span></a>`).join("")}</div>`;
+    }
+    if (products.length){
+      html += `<div class="sug-gr"><div class="sug-tt">Parts</div>${products.map(p => `<a class="sug-it" href="#/p/${p.sku}"><span class="si-art">${prodArt(p)}</span><span style="min-width:0"><b>${U.esc(p.short)}</b><small>${catOf(p).name} · ★ ${p.rating}</small></span>${CATALOG_MODE ? "" : `<span class="price">${U.inr(p.price)}</span>`}</a>`).join("")}</div>`;
+    }
+    html += `<div class="sug-gr"><button class="sug-it" data-go-search="${U.esc(q)}"><span class="si-ic">${U.icon("search", "ic-s")}</span><span><b>Search “${U.esc(q)}”</b><small>See all matching parts</small></span></button></div>`;
+    sug.innerHTML = html; sug.classList.add("open"); inp.setAttribute("aria-expanded", "true");
+  };
+  inp.addEventListener("input", U.debounce(render, 160));
+  inp.addEventListener("focus", render);
+  inp.addEventListener("keydown", e => {
+    const items = [...sug.querySelectorAll(".sug-it")];
+    if (e.key === "Enter"){ e.preventDefault(); if (selIdx >= 0 && items[selIdx]){ items[selIdx].click(); } else go(inp.value); }
+    if (e.key === "Escape") close();
+    if (e.key === "ArrowDown" || e.key === "ArrowUp"){
+      e.preventDefault();
+      selIdx = U.clamp(selIdx + (e.key === "ArrowDown" ? 1 : -1), 0, items.length - 1);
+      items.forEach((it, i) => it.classList.toggle("sel", i === selIdx));
+      if (items[selIdx]) items[selIdx].scrollIntoView({ block: "nearest" });
+    }
+  });
+  document.addEventListener("click", e => { if (!inp.closest(".hd-search,.hero-search")?.contains(e.target)) close(); });
+  sug.addEventListener("click", e => { const b = e.target.closest("[data-go-search]"); if (b) go(b.getAttribute("data-go-search")); const a = e.target.closest("a"); if (a) close(); });
+}
+
+/* ================= VOICE SEARCH ================= */
+function startVoice(targetId, btn){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const inp = document.getElementById(targetId);
+  if (!SR){
+    toast("Voice input isn't available in this preview — try the demo phrase", "info");
+    if (inp){ typeInto(inp, "Bajaj mixer grinder coupler under 300"); }
+    return;
+  }
+  try {
+    const rec = new SR(); rec.lang = "en-IN"; rec.interimResults = false;
+    btn && btn.classList.add("rec");
+    toast("Listening… speak your part or model number", "info");
+    rec.onresult = e => { const t = e.results[0][0].transcript; if (inp){ inp.value = t; inp.dispatchEvent(new Event("input")); inp.focus(); } };
+    rec.onend = () => btn && btn.classList.remove("rec");
+    rec.onerror = () => { btn && btn.classList.remove("rec"); toast("Mic unavailable here — typed a demo query instead", "warn"); if (inp) typeInto(inp, "demolition hammer piston"); };
+    rec.start();
+  } catch(err){ if (inp) typeInto(inp, "ceiling fan capacitor"); }
+}
+function typeInto(inp, text){
+  let i = 0; inp.value = ""; inp.focus();
+  const t = setInterval(() => { inp.value = text.slice(0, ++i); inp.dispatchEvent(new Event("input")); if (i >= text.length) clearInterval(t); }, 28);
+}
+
+/* ================= ASSISTANT CHAT ================= */
+const CHAT_SUGS = ["Find a mixer motor", "Track my order", "Is COD available?", "Fan is running slow", "Return policy"];
+function chatInit(){
+  const bd = document.getElementById("chat-bd");
+  bd.innerHTML = "";
+  chatBot("Namaste! I'm the G-FLO assistant 🔧 Tell me your appliance + problem, or paste a model number — I'll find the exact part.");
+  document.getElementById("chat-sugs").innerHTML = CHAT_SUGS.map(s => `<button class="chip" data-chat-sug="${U.esc(s)}">${U.esc(s)}</button>`).join("");
+  document.getElementById("chat-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const q = document.getElementById("chat-q");
+    if (!q.value.trim()) return;
+    chatMe(q.value); chatRespond(q.value); q.value = "";
+  });
+  document.getElementById("chat-sugs").addEventListener("click", e => {
+    const b = e.target.closest("[data-chat-sug]"); if (!b) return;
+    chatMe(b.getAttribute("data-chat-sug")); chatRespond(b.getAttribute("data-chat-sug"));
+  });
+}
+function chatMe(t){ const bd = document.getElementById("chat-bd"); bd.insertAdjacentHTML("beforeend", `<div class="msg me">${U.esc(t)}</div>`); bd.scrollTop = bd.scrollHeight; }
+function chatBot(html){ const bd = document.getElementById("chat-bd"); bd.insertAdjacentHTML("beforeend", `<div class="msg bot">${html}</div>`); bd.scrollTop = bd.scrollHeight; }
+function chatRespond(q){
+  const bd = document.getElementById("chat-bd");
+  bd.insertAdjacentHTML("beforeend", `<div class="msg bot typing" id="chat-typing"><i></i><i></i><i></i></div>`); bd.scrollTop = bd.scrollHeight;
+  setTimeout(() => {
+    document.getElementById("chat-typing")?.remove();
+    const ql = q.toLowerCase();
+    if (/track|order status|where is/.test(ql)){
+      chatBot(`I can pull that up. ${State.orders.length ? `Your latest order <b class="mono">${State.orders[0].id}</b> is <b>${["", "confirmed", "packed", "shipped", "out for delivery", "delivered"][State.orders[0].status] || "confirmed"}</b>.` : "You don't have any orders in this demo session yet."} <a href="#/track" style="color:var(--brand2);font-weight:600">Open order tracking →</a>`);
+    } else if (/cod|cash on delivery/.test(ql)){
+      chatBot(CATALOG_MODE ? "Yes! <b>Cash on Delivery</b> is available in most pincodes — it's confirmed along with your quote. UPI, cards, netbanking and EMI are also supported (demo mode — no real payment)." : "Yes! <b>Cash on Delivery</b> is available on orders up to ₹5,000 in most pincodes. UPI, cards, netbanking and EMI are also supported at checkout (demo mode — no real payment).");
+    } else if (/return|refund/.test(ql)){
+      chatBot("G-FLO has <b>7-day easy returns</b>: unused parts in original packing get a full refund within 48 hours of pickup. Electrical parts installed incorrectly aren't eligible — check the install guide first, or ask me!");
+    } else if (/slow|not working|broken|repair|fix|problem|noise|leak/.test(ql)){
+      const res = Search.query(q, 2);
+      const g = GUIDES.find(g => ql.includes(g.cat.split("-")[0])) || GUIDES[4];
+      chatBot(`Sounds fixable 💪 Here's a matching repair guide: <a href="#/g/${g.id}" style="color:var(--brand2);font-weight:600">${g.title} →</a>${res.items.length ? "<br><br>Parts you'll likely need:" + res.items.map(p => chatCard(p)).join("") : ""}`);
+    } else {
+      const res = Search.query(q, 3);
+      if (res.items.length){
+        const il = AI.intentLabel(res.intent);
+        chatBot(`${il ? `Got it — <b>${U.esc(il)}</b>.` : "Here's what matches:"}${res.items.map(p => chatCard(p)).join("")}<br><a href="#/search/${encodeURIComponent(q)}" style="color:var(--brand2);font-weight:600">See all results →</a>`);
+      } else {
+        chatBot(`I couldn't match that directly. Try the <a href="#/finder" style="color:var(--brand2);font-weight:600">AI Part Finder</a> — you can upload a photo of the part or your appliance's model sticker, and I'll identify it.`);
+      }
+    }
+  }, 700 + Math.random() * 500);
+}
+function chatCard(p){
+  return `<a class="mini-p" href="#/p/${p.sku}"><span class="art">${prodArt(p)}</span><span style="min-width:0"><b>${U.esc(p.short)}</b>${CATALOG_MODE ? "" : `<span class="price">${U.inr(p.price)}</span>`} <small style="color:var(--tx3)">★ ${p.rating}</small></span></a>`;
+}
+
+/* ================= GLOBAL EVENTS ================= */
+function bindGlobal(){
+  document.addEventListener("click", e => {
+    const act = e.target.closest("[data-act]");
+    const mic = e.target.closest("[data-mic]");
+    const mcat = e.target.closest("[data-mega-cat]");
+    if (mic){ startVoice(mic.getAttribute("data-mic"), mic); return; }
+    if (mcat){ megaCat = mcat.getAttribute("data-mega-cat"); buildMega(); return; }
+    if (!act){
+      if (!e.target.closest(".mega-wr") && !e.target.closest("#mega")) document.querySelectorAll(".mega.open").forEach(m => { m.classList.remove("open"); });
+      return;
+    }
+    const a = act.getAttribute("data-act"), sku = act.getAttribute("data-sku");
+    if (a === "close" || e.target.id === "ovl-bg") closeOverlays();
+    if (a === "open-cart"){ renderCartDrawer(); openDrawer("cart-drawer"); }
+    if (a === "open-mnav") openDrawer("mnav");
+    if (a === "mega"){ if (window.matchMedia("(max-width:767px)").matches){ location.hash = "#/categories"; return; } const m = document.getElementById("mega"); const open = m.classList.toggle("open"); act.setAttribute("aria-expanded", open); }
+    if (a === "chat"){ const c = document.getElementById("chat"); c.classList.add("open"); c.setAttribute("aria-hidden", "false"); document.getElementById("ovl-bg").classList.add("open"); document.getElementById("chat-q").focus(); }
+    if (a === "add-cart") State.addCart(sku, 1);
+    if (a === "buy-now"){ State.addCart(sku, 1, true); location.hash = "#/checkout"; }
+    if (a === "wish"){ State.toggleWish(sku); refreshActionStates(); if (Router.parse().page === "wishlist") Router.go(); }
+    if (a === "cmp"){ State.toggleCmp(sku); refreshActionStates(); }
+    if (a === "qty"){ const it = State.inCart(sku); State.setQty(sku, (it ? it.qty : 1) + (+act.getAttribute("data-d"))); renderCartDrawer(); if (["cart", "checkout"].includes(Router.parse().page)) Router.go(); }
+    if (a === "rm-cart"){ State.rmCart(sku); renderCartDrawer(); toast("Removed from cart", "info"); if (["cart", "checkout"].includes(Router.parse().page)) Router.go(); }
+    if (a === "quick") quickView(sku);
+    if (a === "share"){
+      const p = DB.prodMap[sku]; const txt = `${p.short} — ${U.inr(p.price)} on G-FLO`;
+      if (navigator.share){ navigator.share({ title: txt, text: txt }).catch(() => {}); }
+      else if (navigator.clipboard){ navigator.clipboard.writeText(txt + " " + location.href).then(() => toast("Link copied to clipboard")); }
+      else toast("Sharing isn't available in this preview", "info");
+    }
+  });
+  document.getElementById("ovl-bg").addEventListener("click", closeOverlays);
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeOverlays(); if (e.key === "/" && !/input|textarea|select/i.test(document.activeElement.tagName)){ e.preventDefault(); document.getElementById("hd-q").focus(); } });
+  window.addEventListener("hashchange", () => Router.go());
+}
+function refreshActionStates(){
+  document.querySelectorAll("[data-act=wish][data-sku]").forEach(b => { const on = State.wish.includes(b.getAttribute("data-sku")); b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
+  document.querySelectorAll("[data-act=cmp][data-sku]").forEach(b => { const on = State.cmp.includes(b.getAttribute("data-sku")); b.classList.toggle("on2", on); b.setAttribute("aria-pressed", on); });
+}
+function quickView(sku){
+  const p = DB.prodMap[sku]; if (!p) return;
+  modal(`<div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+    <div style="border-radius:18px;overflow:hidden;background:linear-gradient(150deg,var(--art-bg1),var(--art-bg2))">${prodArt(p)}</div>
+    <div><span class="cat-ln" style="font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--tx3)">${catOf(p).name} · ${ptOf(p).name}</span>
+    <h3 style="margin:8px 0 10px;font-family:var(--ff);font-weight:700">${U.esc(p.short)}</h3>
+    <div class="rt-ln">${U.stars(p.rating)}<span>${p.rating} · ${p.reviews} reviews</span></div>
+    <div style="margin:12px 0">${priceHtml(p)}</div>
+    ${stockHtml(p)}
+    <p class="mut" style="font-size:13px;margin:12px 0">Fits: ${U.esc(brandNames(p, 4))}. ${p.compat.length} verified models. ${p.warranty} warranty.</p>
+    <div class="row"><button class="btn btn-p" data-act="add-cart" data-sku="${p.sku}" ${p.stock === 0 ? "disabled" : ""}>${U.icon("cart", "ic-s")} Add to cart</button><a class="btn btn-ghost" href="#/p/${p.sku}" onclick="closeOverlays()">Full details</a></div></div>
+  </div>`, { title: "Quick view", wide: true });
+}
+</script>

@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block body %}
+<div class="ph">
+  <div>
+    <h1>Settings</h1>
+    <p class="ph-sub">Store details shown across the storefront, how prices behave, and who can sign in here.</p>
+  </div>
+</div>
+
+<form method="post" action="/admin/settings" data-guard data-busy>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="card" style="margin:0">
+    <div class="card-h">{{ icon('store', 17) }}<h2>Store &amp; contact</h2></div>
+    <div class="card-b">
+      <p class="mut" style="font-size:13.5px;margin-bottom:16px">
+        These appear in the top bar, footer, Contact page and enquiry messages on the storefront.
+      </p>
+      <div class="fg">
+        <div class="field">
+          <label class="lbl" for="store_name">Store name</label>
+          <input class="inp" id="store_name" name="store_name" value="{{ values.store_name }}">
+        </div>
+        <div class="field">
+          <label class="lbl" for="contact_email">Email</label>
+          <input class="inp" id="contact_email" name="contact_email" type="email" value="{{ values.contact_email }}">
+        </div>
+        <div class="field">
+          <label class="lbl" for="contact_phone">Phone</label>
+          <input class="inp" id="contact_phone" name="contact_phone" value="{{ values.contact_phone }}">
+        </div>
+        <div class="field">
+          <label class="lbl" for="contact_phone2">Second phone</label>
+          <input class="inp" id="contact_phone2" name="contact_phone2" value="{{ values.contact_phone2 }}">
+        </div>
+        <div class="field">
+          <label class="lbl" for="whatsapp">WhatsApp number</label>
+          <input class="inp" id="whatsapp" name="whatsapp" value="{{ values.whatsapp }}">
+        </div>
+        <div class="field span2">
+          <label class="lbl" for="contact_address">Address</label>
+          <input class="inp" id="contact_address" name="contact_address" value="{{ values.contact_address }}">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h">{{ icon('rupee', 17) }}<h2>Pricing</h2></div>
+    <div class="card-b">
+      <label class="sw" style="margin-bottom:14px">
+        <input type="checkbox" name="show_prices" {{ 'checked' if values.show_prices == 'true' }}>
+        <span class="track"></span>
+        <span class="sw-txt">Show prices on the storefront
+          <small>Off = catalogue / enquiry mode: every price, cart total and discount is hidden and
+                 visitors send an enquiry instead</small></span>
+      </label>
+      <div class="alert alert-info" style="margin-bottom:16px">
+        {{ icon('info') }}
+        <span>This replaces the old <code>CATALOG_MODE</code> switch that used to live in the site's code.
+              It takes effect on the storefront's next page load.</span>
+      </div>
+      <div class="fg">
+        <div class="field span2">
+          <label class="lbl" for="price_note">Note shown near prices</label>
+          <input class="inp" id="price_note" name="price_note" value="{{ values.price_note }}">
+        </div>
+        <div class="field">
+          <label class="lbl" for="por_label">Label for products with no price</label>
+          <input class="inp" id="por_label" name="por_label" value="{{ values.por_label }}">
+          <span class="help">{{ counts.no_price or 0 }} product(s) currently use it.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="savebar">
+    <span class="st" data-dirty-note>All changes saved</span>
+    <div class="acts">
+      <button class="btn btn-p" type="submit">{{ icon('save', 15) }} Save settings</button>
+    </div>
+  </div>
+</form>
+
+<div class="grid-2" style="margin-top:22px">
+  <div class="card" style="margin:0">
+    <div class="card-h">{{ icon('users', 17) }}<h2>Admin accounts</h2></div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>User</th><th>Role</th><th>Last signed in</th><th class="w-act"></th></tr></thead>
+        <tbody>
+        {% for u in users %}
+          <tr>
+            <td>
+              <span style="display:inline-flex;align-items:center;gap:10px">
+                <span style="width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;
+                             background:linear-gradient(135deg,var(--brand),#8d1f22);color:#fff;
+                             font-weight:700;font-size:13px">{{ u.username[0]|upper }}</span>
+                <span><b>{{ u.username }}</b>
+                  {% if u.name %}<div class="pmeta">{{ u.name }}</div>{% endif %}
+                </span>
+              </span>
+            </td>
+            <td>
+              {% if u.is_owner %}<span class="bdg bdg-ok">{{ icon('shield', 11) }} Owner</span>
+              {% elif u.role == 'admin' %}<span class="bdg bdg-mute">Admin</span>
+              {% else %}<span class="bdg bdg-mute">Editor</span>{% endif %}
+            </td>
+            <td class="mut">{{ u.last_login.strftime('%d %b %Y, %H:%M') if u.last_login else 'never' }}</td>
+            <td>
+              <div class="rowacts">
+                {% if not u.is_owner %}
+                <form method="post" action="/admin/settings/users/{{ u.id }}/delete"
+                      onsubmit="return confirm('Remove admin “{{ u.username }}”?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button class="btn btn-xs btn-danger">{{ icon('trash', 13) }} Remove</button>
+                </form>
+                {% else %}<span class="tiny">can't be removed</span>{% endif %}
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <form class="card-f" method="post" action="/admin/settings/users" data-busy style="display:block">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <h3 style="margin-bottom:13px">Add another admin</h3>
+      <div class="fg">
+        <div class="field">
+          <label class="lbl" for="nu">Username</label>
+          <input class="inp" id="nu" name="username" required autocapitalize="none" spellcheck="false">
+        </div>
+        <div class="field">
+          <label class="lbl" for="nn">Display name</label>
+          <input class="inp" id="nn" name="name">
+        </div>
+        <div class="field">
+          <label class="lbl" for="np">Password</label>
+          <div class="pwd-wrap">
+            <input class="inp" id="np" name="password" type="password" required autocomplete="new-password">
+            <button class="pwd-eye" type="button" data-pwd-toggle="np" aria-label="Show password">
+              {{ icon('eye', 17) }}{{ icon('eye-off', 17) }}
+            </button>
+          </div>
+          <span class="help">At least 10 characters.</span>
+        </div>
+        <div class="field">
+          <label class="lbl" for="nr">Role</label>
+          <select class="inp" id="nr" name="role">
+            <option value="editor" selected>Editor — catalogue only</option>
+            <option value="admin">Admin — also settings, accounts, import/export</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn" type="submit" style="margin-top:14px">{{ icon('plus', 15) }} Add admin</button>
+    </form>
+  </div>
+
+  <div class="card" style="margin:0">
+    <div class="card-h">{{ icon('lock', 17) }}<h2>Your password</h2></div>
+    <form class="card-b" method="post" action="/admin/settings/password" data-busy>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div style="display:flex;flex-direction:column;gap:15px">
+        <div class="field">
+          <label class="lbl" for="cur">Current password</label>
+          <div class="pwd-wrap">
+            <input class="inp" id="cur" name="current" type="password" required autocomplete="current-password">
+            <button class="pwd-eye" type="button" data-pwd-toggle="cur" aria-label="Show password">
+              {{ icon('eye', 17) }}{{ icon('eye-off', 17) }}
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label class="lbl" for="new">New password</label>
+          <div class="pwd-wrap">
+            <input class="inp" id="new" name="new" type="password" required autocomplete="new-password"
+                   minlength="10" data-caps="caps2">
+            <button class="pwd-eye" type="button" data-pwd-toggle="new" aria-label="Show password">
+              {{ icon('eye', 17) }}{{ icon('eye-off', 17) }}
+            </button>
+          </div>
+          <span class="capslock" id="caps2">Caps Lock is on</span>
+          <span class="help">At least 10 characters. Stored as a scrypt hash — never in plain text.</span>
+        </div>
+        <div class="field">
+          <label class="lbl" for="conf">Repeat new password</label>
+          <input class="inp" id="conf" name="confirm" type="password" required autocomplete="new-password">
+        </div>
+      </div>
+      <button class="btn btn-p" type="submit" style="margin-top:18px">{{ icon('lock', 15) }} Change password</button>
+    </form>
+  </div>
+  <div class="card" style="margin:0">
+    <div class="card-h">{{ icon('search', 17) }}<h2>SerpAPI</h2></div>
+    <div class="card-b">
+      {% if serp_status and serp_status.configured %}
+        <p class="mut" style="margin:0 0 10px">
+          <span class="bdg bdg-ok">{{ icon('check', 11) }} Connected</span>
+          Google lookups for catalogue research are available.
+        </p>
+        <dl class="kv">
+          <dt>Key</dt><dd><code>{{ serp_status.key_hint }}</code> <span class="tiny">(from SERPAPI_KEY)</span></dd>
+          <dt>Region</dt><dd>{{ serp_status.country | upper }} · {{ serp_status.locale }}</dd>
+          <dt>Timeout</dt><dd>{{ serp_status.timeout }}s</dd>
+        </dl>
+      {% else %}
+        <p class="mut" style="margin:0 0 8px">
+          <span class="bdg bdg-mute">Not configured</span>
+        </p>
+        <p class="help" style="margin:0">
+          Set the <code>SERPAPI_KEY</code> environment variable on your host to switch this on.
+          It is read from the environment only — never stored in the database.
+        </p>
+      {% endif %}
+      <p class="help" style="margin:10px 0 0">
+        Requests are billed by SerpAPI, so lookups are restricted to owner/admin accounts.
+      </p>
+    </div>
+  </div>
+</div>
+<style>.pwd-eye svg:nth-of-type(2){display:none}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0;font-size:13.5px}
+.kv dt{color:var(--tx3, #6b7280);font-weight:600}
+.kv dd{margin:0}</style>
+{% endblock %}

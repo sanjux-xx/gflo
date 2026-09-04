@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Brands{% endblock %}
+{% block body %}
+<div class="ph">
+  <div>
+    <h1>Brands</h1>
+    <p class="ph-sub">Listed on the storefront's Brands page and used to link a product to its maker.
+       Products carry brand names in their own field — these entries control the browse page.</p>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card" style="margin:0">
+    <div class="card-h">{{ icon('tag', 17) }}<h2>{{ rows|length }} brands</h2></div>
+    <div class="tblwrap">
+      <table class="tbl">
+        <thead><tr><th>Name</th><th>ID</th><th class="r">Hue</th><th class="r">Order</th><th class="w-act"></th></tr></thead>
+        <tbody>
+        {% for b in rows %}
+          <tr>
+            <td>
+              <span style="display:inline-flex;align-items:center;gap:9px">
+                <span style="width:22px;height:22px;border-radius:6px;flex:none;
+                             background:hsl({{ b.hue }} 62% 46%)"></span>
+                <b>{{ b.name }}</b>
+              </span>
+            </td>
+            <td><span class="mono sku">{{ b.id }}</span></td>
+            <td class="r mut">{{ b.hue }}</td>
+            <td class="r mut">{{ b.sort_order }}</td>
+            <td>
+              <div class="rowacts">
+                <button class="btn btn-xs" type="button" data-edit-brand
+                        data-id="{{ b.id }}" data-name="{{ b.name }}" data-hue="{{ b.hue }}"
+                        data-order="{{ b.sort_order }}">{{ icon('edit', 13) }} Edit</button>
+                <form method="post" action="/admin/brands/{{ b.id }}/delete" style="display:inline"
+                      onsubmit="return confirm('Delete brand “{{ b.name }}”?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button class="btn btn-xs btn-ic btn-danger" title="Delete">{{ icon('trash', 13) }}</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin:0">
+    <div class="card-h">{{ icon('plus', 17) }}<h2 id="brandformtitle">Add a brand</h2></div>
+    <form class="card-b" method="post" action="/admin/brands/save" id="brandform" data-busy>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div style="display:flex;flex-direction:column;gap:15px">
+        <div class="field">
+          <label class="lbl" for="b-name">Name <span class="req">*</span></label>
+          <input class="inp" id="b-name" name="name" required placeholder="e.g. Power Hunda">
+        </div>
+        <div class="field">
+          <label class="lbl" for="b-id">ID / slug</label>
+          <input class="inp mono" id="b-id" name="id" placeholder="power-hunda">
+          <span class="help">Blank = generated. An existing ID updates that brand.</span>
+        </div>
+        <div class="fg">
+          <div class="field">
+            <label class="lbl" for="b-hue">Hue (0–360)</label>
+            <input class="inp" id="b-hue" name="hue" value="210" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label class="lbl" for="b-order">Sort order</label>
+            <input class="inp" id="b-order" name="sort_order" value="100" inputmode="numeric">
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:18px">
+        <button class="btn btn-p" type="submit">{{ icon('save', 15) }} Save brand</button>
+        <button class="btn" type="reset" id="brandreset">Clear</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll("[data-edit-brand]").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var d = btn.dataset;
+    document.getElementById("brandformtitle").textContent = "Update “" + d.name + "”";
+    document.getElementById("b-name").value = d.name;
+    document.getElementById("b-id").value = d.id;
+    document.getElementById("b-hue").value = d.hue;
+    document.getElementById("b-order").value = d.order;
+    document.getElementById("brandform").scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+});
+document.getElementById("brandreset").addEventListener("click", function () {
+  document.getElementById("brandformtitle").textContent = "Add a brand";
+});
+</script>
+{% endblock %}

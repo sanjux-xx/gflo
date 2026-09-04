@@ -1,0 +1,115 @@
+<script>
+"use strict";
+/* ================= LIVE CATALOGUE (backend API) =================
+   The catalogue, categories, prices, stock, contact details and the
+   show-prices switch all come from the Python backend at /api/catalog,
+   where the admin panel writes them.
+
+   If the API can't be reached (file:// preview, backend restarting,
+   network blip) the page silently falls back to the catalogue baked
+   into this file, so the store never renders empty.
+
+   Hosting the HTML on a different domain to the API? Set
+   window.GFLO_API_BASE = "https://your-api.example.com" before this
+   script runs.                                                     */
+
+const GFLO = {
+  base: (typeof window !== "undefined" && window.GFLO_API_BASE) || "",
+  live: false,           // true once the API answered
+  rows: [],              // catalogue rows in the shape buildDB() ingests
+  settings: {},
+};
+
+/* the catalogue compiled into this file, mapped to the API's shape */
+function bakedRows(){
+  return REAL.map(r => ({
+    name: r[0], cat: REAL_CAT_IDS[r[1]], pt: r[8],
+    price: r[2], mrp: r[3], por: false,
+    stock: r[7] ? 25 : 0, unit: "piece",
+    size: "", pack: "", colours: "", material: "", note: "", group: "",
+    warranty: "", weight: "", brands: [],
+    rating: r[5], reviews: r[6],
+    isNew: false, isBest: false, isFeat: false,
+    img: r[4] ? (r[4][0] === "@" ? r[4].slice(1) : REAL_IMG_PREFIX + r[4]) : "",
+    sku: ""
+  }));
+}
+
+/* merge categories coming from the backend into CATS / CAT_MAP */
+function mergeCategories(list){
+  if (!Array.isArray(list) || !list.length) return;
+  list.forEach(c => {
+    const existing = CAT_MAP[c.id];
+    if (existing){
+      existing.name = c.name || existing.name;
+      existing.desc = c.desc || existing.desc;
+      existing.popular = !!c.popular;
+      if (c.img) CAT_IMG[c.id] = c.img;
+      return;
+    }
+    const cat = { id: c.id, name: c.name, code: c.code || "GN", hue: c.hue || 210,
+                  desc: c.desc || "", pts: [], brands: [], popular: !!c.popular,
+                  icon: c.icon || "c-tools" };
+    CATS.push(cat); CAT_MAP[cat.id] = cat;
+    if (c.img) CAT_IMG[c.id] = c.img;
+  });
+}
+
+function mergeBrands(list){
+  if (!Array.isArray(list)) return;
+  list.forEach(b => {
+    if (BRAND_MAP[b.id]) return;
+    const brand = { id: b.id, name: b.name, hue: b.hue || 210 };
+    BRANDS.push(brand); BRAND_MAP[brand.id] = brand;
+  });
+}
+
+function applySettings(s, showPrices){
+  GFLO.settings = s || {};
+  if (typeof showPrices === "boolean") CATALOG_MODE = !showPrices;
+  if (s && typeof CONTACT === "object" && CONTACT){
+    if (s.contact_email) CONTACT.email = s.contact_email;
+    if (s.contact_phone) CONTACT.phone = s.contact_phone;
+    if (s.contact_phone2) CONTACT.phone2 = s.contact_phone2;
+    if (s.contact_address) CONTACT.address = s.contact_address;
+    if (s.whatsapp) CONTACT.whatsapp = s.whatsapp;
+    if (s.por_label) window.POR_LABEL = s.por_label;
+    if (s.price_note) window.PRICE_NOTE = s.price_note;
+  }
+}
+
+async function loadCatalog(){
+  let data = null;
+  // Snapshot mode: instead of fetching, a catalogue can be embedded in the page —
+  // set window.GFLO_PRELOAD to the same JSON that /api/catalog returns. Handy for
+  // static hosting and offline previews. The admin panel still needs the backend.
+  if (typeof window !== "undefined" && window.GFLO_PRELOAD){
+    data = window.GFLO_PRELOAD;
+    console.info("[G-FLO] snapshot catalogue embedded in the page");
+  } else try {
+    const ctrl = typeof AbortController === "function" ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), 12000) : null;
+    const res = await fetch(GFLO.base + "/api/catalog",
+                            { headers: { "Accept": "application/json" }, signal: ctrl && ctrl.signal });
+    if (timer) clearTimeout(timer);
+    if (!res.ok) throw new Error("API returned " + res.status);
+    data = await res.json();
+    if (!data || !Array.isArray(data.products) || !data.products.length)
+      throw new Error("API returned an empty catalogue");
+  } catch (err){
+    GFLO.rows = bakedRows();
+    GFLO.live = false;
+    console.warn("[G-FLO] using the built-in catalogue —", err.message);
+    return GFLO.rows;
+  }
+  // the catalogue is good — apply the rest defensively so one bad field
+  // can never cost us the live product list
+  try { mergeCategories(data.categories); } catch (e){ console.warn("[G-FLO] categories:", e.message); }
+  try { mergeBrands(data.brands); } catch (e){ console.warn("[G-FLO] brands:", e.message); }
+  try { applySettings(data.settings, data.showPrices); } catch (e){ console.warn("[G-FLO] settings:", e.message); }
+  GFLO.rows = data.products.filter(p => p && CAT_MAP[p.cat]);
+  GFLO.live = true;
+  console.info("[G-FLO] live catalogue loaded — " + GFLO.rows.length + " products");
+  return GFLO.rows;
+}
+</script>

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block body %}
+<div class="ph">
+  <div>
+    <h1>Good to see you, {{ username }}</h1>
+    <p class="ph-sub">{{ stats.total }} products in the catalogue. Edits here appear on the storefront
+       the next time a visitor loads a page — nothing to rebuild or re-upload.</p>
+  </div>
+  <div class="ph-acts">
+    <a class="btn" href="/admin/products?sort=updated">{{ icon('clock', 15) }} Recently edited</a>
+    <a class="btn" href="/admin/import">{{ icon('upload', 15) }} Import / export</a>
+  </div>
+</div>
+
+<div class="stats">
+  <a class="stat" href="/admin/products">
+    <span class="ic blue">{{ icon('box', 18) }}</span>
+    <span class="val">{{ stats.total }}</span>
+    <span class="lbl">Products in catalogue</span>
+    <span class="go">{{ icon('chev-r', 16) }}</span>
+  </a>
+  <a class="stat" href="/admin/products?vis=visible">
+    <span class="ic green">{{ icon('check-circle', 18) }}</span>
+    <span class="val">{{ stats.visible }}</span>
+    <span class="lbl">Live on the store</span>
+    <span class="go">{{ icon('chev-r', 16) }}</span>
+  </a>
+  <a class="stat" href="/admin/products?stock=out">
+    <span class="ic amber">{{ icon('off', 18) }}</span>
+    <span class="val">{{ stats.out_of_stock }}</span>
+    <span class="lbl">Out of stock</span>
+    <span class="go">{{ icon('chev-r', 16) }}</span>
+  </a>
+  <a class="stat" href="/admin/products?price=none">
+    <span class="ic">{{ icon('rupee', 18) }}</span>
+    <span class="val">{{ stats.no_price }}</span>
+    <span class="lbl">Price on request</span>
+    <span class="go">{{ icon('chev-r', 16) }}</span>
+  </a>
+  <a class="stat" href="/admin/products?vis=hidden">
+    <span class="ic">{{ icon('eye-off', 18) }}</span>
+    <span class="val">{{ stats.hidden }}</span>
+    <span class="lbl">Hidden from store</span>
+    <span class="go">{{ icon('chev-r', 16) }}</span>
+  </a>
+  <a class="stat" href="/admin/products">
+    <span class="ic">{{ icon('image', 18) }}</span>
+    <span class="val">{{ stats.no_photo }}</span>
+    <span class="lbl">Without a photo</span>
+    <span class="go">{{ icon('chev-r', 16) }}</span>
+  </a>
+</div>
+
+{% if stats.no_price or stats.out_of_stock or stats.no_photo %}
+<div class="card" style="margin-top:16px">
+  <div class="card-h"><h2>Worth a look</h2></div>
+  <div class="feed">
+    {% if stats.no_price %}
+    <div class="feed-row">
+      <span class="feed-ic">{{ icon('rupee', 16) }}</span>
+      <div class="feed-b">
+        <b>{{ stats.no_price }} products show “price on request”</b>
+        <p>Mostly rows the printed price list left blank — cable ties, nail clips, flexible pipe, wall plugs.
+           Add a rate and they sell normally.</p>
+      </div>
+      <a class="btn btn-xs" href="/admin/products?price=none">Fix now</a>
+    </div>
+    {% endif %}
+    {% if stats.out_of_stock %}
+    <div class="feed-row">
+      <span class="feed-ic err">{{ icon('off', 16) }}</span>
+      <div class="feed-b">
+        <b>{{ stats.out_of_stock }} products are out of stock</b>
+        <p>Shoppers can see them but can't add them to the cart. Set a quantity, or hide them.</p>
+      </div>
+      <a class="btn btn-xs" href="/admin/products?stock=out">Review</a>
+    </div>
+    {% endif %}
+    {% if stats.no_photo %}
+    <div class="feed-row">
+      <span class="feed-ic info">{{ icon('image', 16) }}</span>
+      <div class="feed-b">
+        <b>{{ stats.no_photo }} products have no photo</b>
+        <p>They fall back to generated artwork on the storefront. Drag one in on the edit screen.</p>
+      </div>
+      <a class="btn btn-xs" href="/admin/products">Open list</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="grid-2" style="margin-top:16px">
+  <div class="card" style="margin:0">
+    <div class="card-h">
+      <h2>Catalogue by category</h2>
+      <div class="card-acts"><a class="btn btn-sm" href="/admin/categories">{{ icon('layers', 14) }} Manage</a></div>
+    </div>
+    <div style="padding:8px 0 12px">
+      {% set top = per_cat[0][1] if per_cat and per_cat[0][1] else 1 %}
+      {% for name, n, cid in per_cat %}
+        {% if n %}
+        <div class="barrow">
+          <span class="nm" title="{{ name }}">{{ name }}</span>
+          <span class="track"><span class="fill" style="width:{{ (n / top * 100)|round(1) }}%"></span></span>
+          <a class="n" href="/admin/products?cat={{ cid }}">{{ n }}</a>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card" style="margin:0">
+    <div class="card-h">
+      <h2>Recent activity</h2>
+      <div class="card-acts"><a class="btn btn-sm" href="/admin/activity">All</a></div>
+    </div>
+    <div class="feed">
+      {% for r in recent %}
+      <div class="feed-row">
+        <span class="feed-ic {{ 'err' if 'delete' in r.action or 'failed' in r.action else ('ok' if r.action == 'login' else 'info') }}">
+          {% if 'delete' in r.action %}{{ icon('trash', 15) }}
+          {% elif 'login' in r.action %}{{ icon('lock', 15) }}
+          {% elif 'upload' in r.action %}{{ icon('image', 15) }}
+          {% else %}{{ icon('edit', 15) }}{% endif %}
+        </span>
+        <div class="feed-b">
+          <b>{{ r.action|replace('_', ' ')|capitalize }}</b>
+          <p>{{ r.detail or r.entity }}{% if r.username %} · {{ r.username }}{% endif %}</p>
+        </div>
+        <span class="feed-t">{{ r.ts.strftime('%d %b %H:%M') }}</span>
+      </div>
+      {% else %}
+      <div class="empty" style="padding:34px 20px">
+        <span class="ic">{{ icon('activity', 22) }}</span>
+        <h3>No activity yet</h3>
+        <p>Sign-ins and catalogue changes show up here.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
