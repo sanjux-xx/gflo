@@ -259,7 +259,11 @@ svg{flex:none}
 .tbl th{
   text-align:left;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
   color:var(--ink-3);background:var(--card-2);padding:10px 12px;white-space:nowrap;
-  border-bottom:1px solid var(--line);position:sticky;top:var(--top-h);z-index:6;
+  border-bottom:1px solid var(--line);position:sticky;top:0;z-index:6;
+  /* top:0, NOT var(--top-h): .tblwrap has overflow-x:auto, which makes it the
+     scroll container for sticky. A 60px offset was therefore applied inside the
+     table box — pushing the header 60px down (an empty band under the card
+     header) and parking it on top of the first row, hiding it. */
 }
 .tbl td{padding:11px 12px;border-bottom:1px solid var(--line-2);vertical-align:middle;font-size:13.5px}
 .tbl tbody tr:hover{background:#fbfcfd}
