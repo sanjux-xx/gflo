@@ -155,6 +155,10 @@ def storefront_alias():
 def healthz():
     return {"ok": True}
 
+@app.get("/sentry-debug")
+async def trigger_error():
+ division_by_zero = 1 / 0
+
 
 @app.get("/{asset_path:path}")
 def site_assets(asset_path: str):
@@ -169,6 +173,3 @@ def site_assets(asset_path: str):
         return FileResponse(full, headers={"Cache-Control": "public, max-age=86400"})
     return JSONResponse({"detail": "Not found"}, 404)
 
-@app.get("/sentry-debug")
-async def trigger_error():
-    division_by_zero = 1 / 0
