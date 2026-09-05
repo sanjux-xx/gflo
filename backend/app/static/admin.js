@@ -285,4 +285,78 @@ function csrfToken() {
   /* --------------------------------- surface server flash messages as toasts */
   const params = new URLSearchParams(location.search);
   if (params.get("toast")) toast(params.get("toast"), params.get("toastkind") || "ok");
+
+  /* ------------------------------------------------------------------ CSP-safe
+     These behaviours used to live in inline <script> blocks and inline on*
+     attributes. The admin sends a strict Content-Security-Policy
+     (script-src 'self'), which blocks inline JS outright — so they run from
+     here instead. Do NOT move them back into the templates.                 */
+
+  /* confirm-before-submit: <form data-confirm="Are you sure?"> */
+  document.querySelectorAll("form[data-confirm]").forEach(function (form) {
+    form.addEventListener("submit", function (e) {
+      if (!window.confirm(form.getAttribute("data-confirm"))) e.preventDefault();
+    });
+  });
+
+  /* rows-per-page selector: <select data-perpage-base="/admin/products?..."> */
+  document.querySelectorAll("[data-perpage-base]").forEach(function (sel) {
+    sel.addEventListener("change", function () {
+      location.href = sel.getAttribute("data-perpage-base") + sel.value;
+    });
+  });
+
+  /* broken product thumbnail -> grey placeholder: <img data-thumb-fallback> */
+  document.querySelectorAll("img[data-thumb-fallback]").forEach(function (img) {
+    img.addEventListener("error", function () {
+      var ph = document.createElement("div");
+      ph.className = "thumb-none";
+      if (img.parentNode) img.parentNode.replaceChild(ph, img);
+    });
+  });
+
+  /* Categories page: "Edit" loads the row into the add/update form */
+  document.querySelectorAll("[data-edit-cat]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var d = btn.dataset, set = function (id, v) {
+        var el = document.getElementById(id); if (el) el.value = v == null ? "" : v;
+      };
+      var title = document.getElementById("catformtitle");
+      if (title) title.textContent = "Update “" + d.name + "”";
+      set("c-name", d.name); set("c-id", d.id); set("c-desc", d.desc);
+      set("c-img", d.img); set("c-code", d.code); set("c-order", d.order);
+      set("c-hue", d.hue);
+      var pop = document.getElementById("c-popular");
+      if (pop) pop.checked = d.popular === "1";
+      var form = document.getElementById("catform");
+      if (form) form.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (window.gfloToast) window.gfloToast("Editing " + d.name + " — change what you need and save", "info");
+    });
+  });
+  var catReset = document.getElementById("catreset");
+  if (catReset) catReset.addEventListener("click", function () {
+    var t = document.getElementById("catformtitle");
+    if (t) t.textContent = "Add a category";
+  });
+
+  /* Brands page: same pattern */
+  document.querySelectorAll("[data-edit-brand]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var d = btn.dataset, set = function (id, v) {
+        var el = document.getElementById(id); if (el) el.value = v == null ? "" : v;
+      };
+      var title = document.getElementById("brandformtitle");
+      if (title) title.textContent = "Update “" + d.name + "”";
+      set("b-name", d.name); set("b-id", d.id); set("b-hue", d.hue); set("b-order", d.order);
+      var form = document.getElementById("brandform");
+      if (form) form.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (window.gfloToast) window.gfloToast("Editing " + d.name, "info");
+    });
+  });
+  var brandReset = document.getElementById("brandreset");
+  if (brandReset) brandReset.addEventListener("click", function () {
+    var t = document.getElementById("brandformtitle");
+    if (t) t.textContent = "Add a brand";
+  });
+
 })();

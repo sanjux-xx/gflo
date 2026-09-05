@@ -28,7 +28,7 @@
         <button class="btn">{{ icon('copy', 15) }} Duplicate</button>
       </form>
       <form method="post" action="/admin/products/{{ p.id }}/delete" style="display:inline"
-            onsubmit="return confirm('Delete “{{ p.name }}” permanently? This can\'t be undone.')">
+            data-confirm="Delete “{{ p.name }}” permanently? This can’t be undone.">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button class="btn btn-danger">{{ icon('trash', 15) }} Delete</button>
       </form>
@@ -255,7 +255,7 @@
           </form>
           {% endif %}
           <form method="post" action="/admin/products/{{ p.id }}/images/{{ img.id }}/delete"
-                onsubmit="return confirm('Remove this photo?')">
+                data-confirm="Remove this photo?">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button class="btn btn-xs btn-danger btn-ic" title="Remove photo">{{ icon('trash', 12) }}</button>
           </form>

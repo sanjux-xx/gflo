@@ -34,7 +34,7 @@
                         data-id="{{ b.id }}" data-name="{{ b.name }}" data-hue="{{ b.hue }}"
                         data-order="{{ b.sort_order }}">{{ icon('edit', 13) }} Edit</button>
                 <form method="post" action="/admin/brands/{{ b.id }}/delete" style="display:inline"
-                      onsubmit="return confirm('Delete brand “{{ b.name }}”?')">
+                      data-confirm="Delete brand “{{ b.name }}”?">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <button class="btn btn-xs btn-ic btn-danger" title="Delete">{{ icon('trash', 13) }}</button>
                 </form>
@@ -82,20 +82,4 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-document.querySelectorAll("[data-edit-brand]").forEach(function (btn) {
-  btn.addEventListener("click", function () {
-    var d = btn.dataset;
-    document.getElementById("brandformtitle").textContent = "Update “" + d.name + "”";
-    document.getElementById("b-name").value = d.name;
-    document.getElementById("b-id").value = d.id;
-    document.getElementById("b-hue").value = d.hue;
-    document.getElementById("b-order").value = d.order;
-    document.getElementById("brandform").scrollIntoView({ behavior: "smooth", block: "center" });
-  });
-});
-document.getElementById("brandreset").addEventListener("click", function () {
-  document.getElementById("brandformtitle").textContent = "Add a brand";
-});
-</script>
 {% endblock %}

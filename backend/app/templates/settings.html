@@ -111,7 +111,7 @@
               <div class="rowacts">
                 {% if not u.is_owner %}
                 <form method="post" action="/admin/settings/users/{{ u.id }}/delete"
-                      onsubmit="return confirm('Remove admin “{{ u.username }}”?')">
+                      data-confirm="Remove admin “{{ u.username }}”?">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <button class="btn btn-xs btn-danger">{{ icon('trash', 13) }} Remove</button>
                 </form>

@@ -98,8 +98,7 @@
             <td><input type="checkbox" class="ck rowck" name="ids" value="{{ p.id }}" aria-label="Select {{ p.name }}"></td>
             <td>
               {% if p.image_url %}
-                <img class="thumb" src="{{ p.image_url }}" alt="" loading="lazy"
-                     onerror="this.outerHTML='&lt;div class=\'thumb-none\'&gt;&lt;/div&gt;'">
+                <img class="thumb" src="{{ p.image_url }}" alt="" loading="lazy" data-thumb-fallback>
               {% else %}
                 <div class="thumb-none" title="No photo yet">{{ icon('image', 16) }}</div>
               {% endif %}
@@ -172,7 +171,7 @@
         <a class="pill {{ 'off' if page >= pages }}" href="/admin/products?q={{ f.q }}{{ qs }}&page={{ page + 1 }}"
            aria-label="Next page">{{ icon('chev-r', 15) }}</a>
         <select class="sel" style="width:auto;height:34px;min-width:110px"
-                onchange="location.href='/admin/products?q={{ f.q }}&cat={{ f.cat }}&stock={{ f.stock }}&price={{ f.price }}&vis={{ f.vis }}&sort={{ f.sort }}&per_page=' + this.value">
+                data-perpage-base="/admin/products?q={{ f.q }}&cat={{ f.cat }}&stock={{ f.stock }}&price={{ f.price }}&vis={{ f.vis }}&sort={{ f.sort }}&per_page=">
           {% for n in [20, 40, 80, 200] %}
           <option value="{{ n }}" {{ 'selected' if per_page == n }}>{{ n }} / page</option>
           {% endfor %}

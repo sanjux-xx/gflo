@@ -55,7 +55,7 @@
                         data-order="{{ c.sort_order }}" data-hue="{{ c.hue }}"
                         data-popular="{{ 1 if c.popular else 0 }}">{{ icon('edit', 13) }} Edit</button>
                 <form method="post" action="/admin/categories/{{ c.id }}/delete" style="display:inline"
-                      onsubmit="return confirm('Delete category “{{ c.name }}”?')">
+                      data-confirm="Delete category “{{ c.name }}”?">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                   <button class="btn btn-xs btn-ic btn-danger" {{ 'disabled' if counts_map.get(c.id, 0) }}
                           title="{{ 'Move its products first' if counts_map.get(c.id, 0) else 'Delete' }}">
@@ -124,25 +124,4 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-document.querySelectorAll("[data-edit-cat]").forEach(function (btn) {
-  btn.addEventListener("click", function () {
-    var d = btn.dataset;
-    document.getElementById("catformtitle").textContent = "Update “" + d.name + "”";
-    document.getElementById("c-name").value = d.name;
-    document.getElementById("c-id").value = d.id;
-    document.getElementById("c-desc").value = d.desc;
-    document.getElementById("c-img").value = d.img;
-    document.getElementById("c-code").value = d.code;
-    document.getElementById("c-order").value = d.order;
-    document.getElementById("c-hue").value = d.hue;
-    document.getElementById("c-popular").checked = d.popular === "1";
-    document.getElementById("catform").scrollIntoView({ behavior: "smooth", block: "center" });
-    if (window.gfloToast) window.gfloToast("Editing " + d.name + " — change what you need and save", "info");
-  });
-});
-document.getElementById("catreset").addEventListener("click", function () {
-  document.getElementById("catformtitle").textContent = "Add a category";
-});
-</script>
 {% endblock %}
