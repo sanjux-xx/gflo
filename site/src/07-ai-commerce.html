@@ -276,82 +276,13 @@ Pages.order = id => {
     <div class="empty" style="padding:40px 10px 20px"><div class="e-ic" style="background:rgba(16,185,129,.14);color:var(--ok)">${U.icon("check")}</div>
       <h2 style="font-size:clamp(21px,3vw,28px)">Order placed! 🎉</h2>
       <p class="mut">Order <b class="mono">${o.id}</b> · ${o.items.length} item(s)${CATALOG_MODE ? " · quote enquiry received" : ` · <b>${U.inr(o.totals.total + (o.shipExtra || 0))}</b> ${o.pay === "cod" ? "payable on delivery" : "paid (demo)"}`}</p>
-      <div class="row"><a class="btn btn-p" href="#/track/${o.id}">${U.icon("truck", "ic-s")} Track order</a>${CATALOG_MODE ? "" : `<button class="btn btn-ghost" data-invoice="${o.id}">${U.icon("doc", "ic-s")} GST invoice</button>`}<a class="btn btn-soft" href="#/categories">Continue shopping</a></div>
+      <div class="row">${CATALOG_MODE ? "" : `<button class="btn btn-ghost" data-invoice="${o.id}">${U.icon("doc", "ic-s")} GST invoice</button>`}<a class="btn btn-soft" href="#/categories">Continue shopping</a></div>
     </div>
     <div class="co-sec"><h3>What happens next</h3>${orderTimeline(o)}</div>
   </div>`;
 };
 Mount.order = () => { bindSearch("hd-q", "hd-sug"); bindInvoiceButtons(); };
 
-Pages.track = id => {
-  const o = id ? State.orders.find(x => x.id === id) : null;
-  return `<div class="wrap" style="max-width:860px">
-    ${crumb([["Track order"]])}
-    <div class="sec-head" style="margin-top:12px"><div><span class="kick">Self-serve tracking</span><h2>Track your order</h2><p>Live status for every shipment — no phone calls needed.</p></div></div>
-    <div class="co-sec"><div class="row" style="flex-wrap:wrap">
-      <input class="inp" id="trk-inp" placeholder="Order ID e.g. GFLO123456" style="max-width:280px" value="${id || (State.orders[0] ? State.orders[0].id : "")}">
-      <button class="btn btn-p" id="trk-go">Track</button>
-      ${State.orders.length ? `<span class="mut3" style="font-size:12.5px">Recent: ${State.orders.slice(0, 3).map(x => `<a href="#/track/${x.id}" class="mono" style="color:var(--brand2)">${x.id}</a>`).join(" · ")}</span>` : `<span class="mut3" style="font-size:12.5px">Place a demo order to see live tracking.</span>`}
-    </div></div>
-    ${o ? `<div class="co-grid" style="grid-template-columns:1fr;max-width:640px">
-      <div class="co-sec"><div class="spread" style="margin-bottom:10px"><h3 style="margin:0">Order <span class="mono">${o.id}</span></h3><span class="st-chip b-info" style="background:var(--g-soft);color:var(--brand2)">${ORDER_STEPS[Math.min(o.status, 4)]}</span></div>
-      ${orderTimeline(o)}
-      <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px"><button class="btn btn-soft btn-sm" data-adv-order="${o.id}">${U.icon("bolt", "ic-s")} Simulate next scan</button>${CATALOG_MODE ? "" : `<button class="btn btn-ghost btn-sm" data-invoice="${o.id}">${U.icon("doc", "ic-s")} Invoice</button>`}<a class="btn btn-ghost btn-sm" href="#/support">${U.icon("headset", "ic-s")} Need help?</a></div></div>
-      <div class="co-sec"><h3>Items in this shipment</h3>${o.items.map(i => { const p = DB.prodMap[i.sku]; return p ? `<div class="citem"><span class="art">${prodArt(p)}</span><div class="inf"><b>${U.esc(p.short)}</b><span class="mut3" style="font-size:11.5px">Qty ${i.qty} · <span class="mono">${p.sku}</span></span></div>${CATALOG_MODE ? "" : `<span class="price" style="font-size:14px">${U.inr(p.price * i.qty)}</span>`}</div>` : ""; }).join("")}</div>
-    </div>` : id ? emptyState("alert", "Order " + id + " not found", "Orders live in your browser for this demo — place one to try tracking.", "#/categories", "Shop parts") : ""}
-  </div>`;
-};
-Mount.track = () => {
-  bindSearch("hd-q", "hd-sug");
-  document.getElementById("trk-go").addEventListener("click", () => { const v = document.getElementById("trk-inp").value.trim().toUpperCase(); if (v) location.hash = "#/track/" + v; });
-  document.querySelectorAll("[data-adv-order]").forEach(b => b.addEventListener("click", () => {
-    const o = State.orders.find(x => x.id === b.getAttribute("data-adv-order"));
-    if (o && o.status < 5){ o.status += 1; State.save(); toast("Courier scan received 📦"); Router.go(); }
-    else toast("Delivered! Enjoy the repair 🎉");
-  }));
-  bindInvoiceButtons();
-};
-
-/* ================= GST INVOICE ================= */
-function invoiceHtml(o){
-  const rows = o.items.map(i => { const p = DB.prodMap[i.sku]; const base = p.price * i.qty / 1.18; return { p, i, base, gst: p.price * i.qty - base }; });
-  const baseT = rows.reduce((s, r) => s + r.base, 0), gstT = rows.reduce((s, r) => s + r.gst, 0);
-  return `<div class="inv"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><h2 style="font-family:var(--fd)">G-FLO</h2><div style="font-size:11px;color:#555">G-FLO Electrical Solutions<br>${CONTACT.address}</div></div><div style="text-align:right"><b>TAX INVOICE</b><div style="font-size:11px;color:#555">No: INV-${o.id}<br>Date: ${new Date(o.ts).toLocaleDateString("en-IN")}</div></div></div>
-  <div style="margin-top:12px;font-size:12px"><b>Bill to:</b> ${U.esc(o.name || "Demo Customer")} · ${U.esc(o.phone || "")}<br>${U.esc(o.addr || "")}${o.gstin ? `<br>GSTIN: ${U.esc(o.gstin)}` : ""}</div>
-  <table><tr><th>#</th><th>Item</th><th>HSN</th><th>Qty</th><th>Taxable ₹</th><th>CGST 9%</th><th>SGST 9%</th><th>Total ₹</th></tr>
-  ${rows.map((r, i) => `<tr><td>${i + 1}</td><td>${U.esc(r.p.short)}<br><span style="font-size:10px;color:#666">${r.p.sku}</span></td><td>8509</td><td>${r.i.qty}</td><td>${r.base.toFixed(2)}</td><td>${(r.gst / 2).toFixed(2)}</td><td>${(r.gst / 2).toFixed(2)}</td><td>${(r.p.price * r.i.qty).toFixed(2)}</td></tr>`).join("")}
-  <tr class="tot"><td colspan="4">Totals</td><td>${baseT.toFixed(2)}</td><td>${(gstT / 2).toFixed(2)}</td><td>${(gstT / 2).toFixed(2)}</td><td>${(baseT + gstT).toFixed(2)}</td></tr>
-  ${o.totals.disc ? `<tr><td colspan="7">Coupon discount</td><td>−${o.totals.disc.toFixed(2)}</td></tr>` : ""}
-  <tr><td colspan="7">Delivery${o.shipExtra ? " + services" : ""}</td><td>${(o.totals.ship + (o.shipExtra || 0)).toFixed(2)}</td></tr>
-  <tr class="tot"><td colspan="7">Grand total</td><td>₹${(o.totals.total + (o.shipExtra || 0)).toFixed(2)}</td></tr></table>
-  <div style="font-size:10.5px;color:#666">Payment: ${(o.pay || "demo").toUpperCase()} · This is a computer-generated demo invoice.</div></div>`;
-}
-function bindInvoiceButtons(){
-  document.querySelectorAll("[data-invoice]").forEach(b => b.addEventListener("click", () => {
-    const o = State.orders.find(x => x.id === b.getAttribute("data-invoice")); if (!o) return;
-    modal(invoiceHtml(o) + `<div class="row" style="margin-top:14px;justify-content:flex-end"><button class="btn btn-p" onclick="printInvoice('${o.id}')">${U.icon("download", "ic-s")} Print / save PDF</button></div>`, { title: "GST invoice", wide: true });
-  }));
-}
-window.printInvoice = id => {
-  const o = State.orders.find(x => x.id === id); if (!o) return;
-  const z = document.getElementById("print-zone"); z.innerHTML = invoiceHtml(o);
-  try { window.print(); } catch(e){ toast("Printing is blocked in this preview", "warn"); }
-};
-
-/* ================= ACCOUNT ACCESS =================
-   The fake "Continue with Google" / on-screen OTP sign-in that shipped with
-   v32 is gone, along with the Firebase build that replaced it. Shoppers browse
-   and raise enquiries without an account; the only real login on this site is
-   the staff one at /admin, served by the Python backend.                    */
-function syncAuth(){
-  document.querySelectorAll("[data-auth-ava]").forEach(el => {
-    el.innerHTML = U.icon("user");
-    el.setAttribute("title", "Your orders & wishlist");
-  });
-}
-function wireAuth(){ /* nothing to wire — no customer sign-in */ }
-
-/* ================= ACCOUNT ================= */
 Pages.account = tab => {
   const U0 = State.user || { name: "Guest", email: "", via: "guest", hue: 358 };
   const t = tab || "overview";
@@ -360,7 +291,7 @@ Pages.account = tab => {
   if (t === "orders" || t === "overview"){
     body = `<h3 style="margin-bottom:14px">${t === "overview" ? "Welcome back, " + U.esc(U0.name.split(" ")[0]) + " 👋" : "Your orders"}</h3>
     ${t === "overview" ? `<div class="kpis" style="margin-bottom:18px"><div class="kpi"><span class="k-ic">${U.icon("package")}</span><b>${State.orders.length}</b><span>Orders placed</span></div><div class="kpi"><span class="k-ic">${U.icon("heart")}</span><b>${State.wish.length}</b><span>Wishlisted parts</span></div>${CATALOG_MODE ? `<div class="kpi"><span class="k-ic">${U.icon("eye")}</span><b>${State.recent.length}</b><span>Recently viewed</span></div>` : `<div class="kpi"><span class="k-ic">${U.icon("bolt")}</span><b>${U.inr(State.orders.reduce((s, o) => s + o.totals.total, 0))}</b><span>Lifetime spend</span></div>`}<div class="kpi"><span class="k-ic">${U.icon("shield")}</span><b>Gold</b><span>G-FLO Circle tier</span></div></div>` : ""}
-    ${State.orders.length ? State.orders.map(o => `<div class="order-card"><div class="spread" style="flex-wrap:wrap;gap:10px"><div><b class="mono">${o.id}</b><div class="mut3" style="font-size:12px">${new Date(o.ts).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} · ${o.items.length} item(s)${CATALOG_MODE ? "" : " · " + U.inr(o.totals.total + (o.shipExtra || 0))}</div></div><div class="row"><span class="st-chip b-info" style="background:var(--g-soft);color:var(--brand2)">${ORDER_STEPS[Math.min(o.status, 4)]}</span><a class="btn btn-soft btn-sm" href="#/track/${o.id}">Track</a>${CATALOG_MODE ? "" : `<button class="btn btn-ghost btn-sm" data-invoice="${o.id}">Invoice</button>`}<button class="btn btn-ghost btn-sm" data-return="${o.id}">Return</button></div></div>
+    ${State.orders.length ? State.orders.map(o => `<div class="order-card"><div class="spread" style="flex-wrap:wrap;gap:10px"><div><b class="mono">${o.id}</b><div class="mut3" style="font-size:12px">${new Date(o.ts).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} · ${o.items.length} item(s)${CATALOG_MODE ? "" : " · " + U.inr(o.totals.total + (o.shipExtra || 0))}</div></div><div class="row"><span class="st-chip b-info" style="background:var(--g-soft);color:var(--brand2)">${ORDER_STEPS[Math.min(o.status, 4)]}</span>${CATALOG_MODE ? "" : `<button class="btn btn-ghost btn-sm" data-invoice="${o.id}">Invoice</button>`}<button class="btn btn-ghost btn-sm" data-return="${o.id}">Return</button></div></div>
       <div class="row" style="margin-top:11px;gap:7px">${o.items.slice(0, 5).map(i => { const p = DB.prodMap[i.sku]; return p ? `<a href="#/p/${p.sku}" style="width:44px;height:44px;border-radius:10px;overflow:hidden;background:var(--art-bg1);border:1px solid var(--line)" title="${U.esc(p.short)}">${prodArt(p)}</a>` : ""; }).join("")}</div></div>`).join("") : emptyState("package", "No orders yet", "Your demo orders will appear here.", "#/categories", "Shop parts")}`;
   } else if (t === "addresses"){
     body = `<h3 style="margin-bottom:14px">Saved addresses</h3>
@@ -379,7 +310,7 @@ Pages.account = tab => {
     <div class="sec-head" style="margin-top:12px"><div><span class="kick">My G-FLO</span><h2>Account</h2></div></div>
     <div class="acc-user"><span class="ava" style="background:linear-gradient(135deg,hsl(358 62% 46%),hsl(48 66% 40%))">${U.icon("package", "ic-s")}</span><div><b style="font-family:var(--fd);font-size:16px">Your orders &amp; enquiries</b><div class="mut3" style="font-size:12.5px">Saved in this browser — no account needed</div></div></div>
     <div class="acc-grid">
-      <nav class="acc-nav" aria-label="Account sections">${lnk("overview", "dash", "Overview")}${lnk("orders", "package", "Orders")}${lnk("addresses", "pin", "Addresses")}${lnk("returns", "rotate", "Returns")}${lnk("settings", "cog", "Settings")}<a class="acc-lnk" href="#/wishlist">${U.icon("heart", "ic-s")} Wishlist</a><a class="acc-lnk" href="#/seller">${U.icon("store", "ic-s")} Seller studio</a></nav>
+      <nav class="acc-nav" aria-label="Account sections">${lnk("overview", "dash", "Overview")}${lnk("orders", "package", "Orders")}${lnk("addresses", "pin", "Addresses")}${lnk("returns", "rotate", "Returns")}${lnk("settings", "cog", "Settings")}<a class="acc-lnk" href="#/wishlist">${U.icon("heart", "ic-s")} Wishlist</a><a class="acc-lnk" href="/admin/login">${U.icon("lock", "ic-s")} Admin login</a></nav>
       <div>${body}</div>
     </div>
   </div>`;
@@ -452,7 +383,7 @@ Pages.support = () => `<div class="wrap">${crumb([["Support"]])}
   <div class="sec-head" style="margin-top:12px"><div><span class="kick">We're here to help</span><h2>Help & support</h2><p>Most questions are answered instantly by the assistant. Humans take over Mon–Sat, 9 AM – 8 PM IST.</p></div></div>
   <div class="sup-grid" style="margin-bottom:30px">
     <button class="sup-tile" data-act="chat" style="text-align:left">${U.icon("spark")}<b>Chat with G-FLO AI</b><span class="mut3" style="font-size:12.5px">Parts, fitment, orders — instant answers</span></button>
-    <a class="sup-tile" href="#/track">${U.icon("truck")}<b>Track an order</b><span class="mut3" style="font-size:12.5px">Live courier scans, self-serve</span></a>
+    
     <a class="sup-tile" href="#/account/returns">${U.icon("rotate")}<b>Returns & refunds</b><span class="mut3" style="font-size:12.5px">7-day easy returns, 48-hr refunds</span></a>
     <a class="sup-tile" href="#/guides">${U.icon("book")}<b>Repair guides</b><span class="mut3" style="font-size:12.5px">DIY with engineer-written steps</span></a>
     <a class="sup-tile" href="tel:${CONTACT.phone}">${U.icon("phone")}<b>${CONTACT.phone}</b><span class="mut3" style="font-size:12.5px">Order status & complaints · Mon–Sat 9–8</span></a>
@@ -475,19 +406,10 @@ Pages.about = () => `<div class="wrap" style="max-width:980px">${crumb([["About 
       <span class="kick" style="display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--brand2)">G-FLO Electrical Solutions</span>
       <h1 style="font-size:clamp(26px,4vw,42px);margin:12px 0 14px;letter-spacing:-.02em">We don't just sell spare parts.<br><span class="grad-tx">We make them.</span></h1>
       <p class="mut" style="font-size:15.5px;line-height:1.8">Open a G-FLO fan and you'll find our answer to every rattle, wobble and burnt winding in the market: double ball bearings, 100% copper windings, precision-balanced blades and batch-tested capacitors — engineered in Ahmedabad, and sold right here as spares. When the maker of the part is the seller of the part, "will it fit?" stops being a gamble.</p>
-      <div class="row" style="margin-top:20px;flex-wrap:wrap"><a class="btn btn-p" href="#/c/ceiling-fan">Shop G-FLO fan parts ${U.icon("arr-r","ic-s")}</a><a class="btn btn-ghost" href="#/categories">Browse all ${CATS.length} categories</a></div>
     </div>
     <div class="ah-img"><img src="${typeof USER_IMGS !== "undefined" ? USER_IMGS.poster : ""}" alt="G-FLO ceiling fan, engineered component by component" loading="lazy"></div>
   </div>
-  <div class="kpis" style="margin:26px 0"><div class="kpi"><span class="k-ic">${U.icon("cog")}</span><b>In-house</b><span>Windings, blades & canopies</span></div><div class="kpi"><span class="k-ic">${U.icon("box")}</span><b>${DB.products.length}+</b><span>Genuine spares live</span></div><div class="kpi"><span class="k-ic">${U.icon("grid")}</span><b>${CATS.length}</b><span>Appliance & tool categories</span></div><div class="kpi"><span class="k-ic">${U.icon("pin")}</span><b>19,000+</b><span>Pincodes served</span></div></div>
-  <h2 style="font-size:clamp(19px,2.6vw,26px);margin:6px 0 4px">Straight from our line — not a stock library</h2>
-  <p class="mut" style="font-size:14px">Every photo below was shot on our own bench. What you see is exactly what ships.</p>
-  <div class="ab-gallery">
-    ${[["winding","100% copper winding"],["bearing","Double ball bearings"],["blades","Precision-balanced blades"],["capacitor","Batch-tested capacitors"],["canopyset","Canopy sets"],["shaft","Ground shafts"],["hooks","Safety clamps & hooks"],["spring","Music-grade springs"],["screws","Zinc-passivated fasteners"],["harness","Pre-terminated wiring"],["canopy","Powder-coated covers"],["varnish_s","Insulating varnish"]].map(g => `
-    <figure><img src="${typeof USER_IMGS !== "undefined" ? USER_IMGS[g[0]] : ""}" alt="${U.esc(g[1])}" loading="lazy"><figcaption>${U.esc(g[1])}</figcaption></figure>`).join("")}
-  </div>
-  <p class="mut" style="font-size:14.5px;line-height:1.8">Beyond our own fan components, G-FLO curates ${DB.products.length}+ genuine spares across ${CATS.length} categories — mixers, grinders, geysers, pumps, power tools and more — each verified for fitment, foam-packed, and backed by 7-day easy returns with humans on the phone when you need them. Technicians and service centres: the Seller Studio and bulk ordering were built for you.</p>
-  <div class="row" style="margin:22px 0 44px;flex-wrap:wrap"><a class="btn btn-p" href="#/categories">Browse the catalogue ${U.icon("arr-r","ic-s")}</a><a class="btn btn-soft" href="#/contact">Talk to us</a></div>
+  <p class="mut" style="font-size:14.5px;line-height:1.8;margin:22px 0 44px">Beyond our own fan components, G-FLO supplies genuine spares for mixers, grinders, geysers, pumps, power tools and more — every one of them the part the appliance was built with, not a lookalike. We have supplied repair shops, service engineers and households across India from our base in Ahmedabad, Gujarat.</p>
 </div>`;
 Mount.about = () => bindSearch("hd-q", "hd-sug");
 
@@ -497,7 +419,7 @@ Pages.contact = () => `<div class="wrap" style="max-width:860px">${crumb([["Cont
     <a class="sup-tile" href="tel:${CONTACT.phone}">${U.icon("phone")}<b>${CONTACT.phone}</b><span class="mut3" style="font-size:12.5px">Order status & complaints · Mon–Sat, 9 AM–8 PM</span></a>
     <a class="sup-tile" href="mailto:${CONTACT.email}">${U.icon("mail")}<b>${CONTACT.email}</b><span class="mut3" style="font-size:12.5px">Replies within 4 business hours</span></a>
     <button class="sup-tile" data-act="chat" style="text-align:left">${U.icon("spark")}<b>G-FLO AI assistant</b><span class="mut3" style="font-size:12.5px">Instant answers, 24×7</span></button>
-    <a class="sup-tile" href="#/track">${U.icon("truck")}<b>Track an order</b><span class="mut3" style="font-size:12.5px">Live courier scans</span></a>
+    
   </div>
   <div class="co-sec"><h3>Send us a message</h3>
     <form id="contact-form" class="form-grid" novalidate>

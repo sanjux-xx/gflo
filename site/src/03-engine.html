@@ -281,16 +281,16 @@ const Router = {
   parse(){
     const h = location.hash.replace(/^#\/?/, "");
     const seg = h.split("/").map(decodeURIComponent);
-    const map = { "": ["home"], categories: ["categories"], c: ["category", seg[1]], brands: ["brands"], b: ["brand", seg[1]], deals: ["deals"], search: ["search", seg.slice(1).join("/")], p: ["product", seg[1]], finder: ["finder", seg[1]], guides: ["guides"], g: ["guide", seg[1]], support: ["support"], track: ["track", seg[1]], account: ["account", seg[1]], cart: ["cart"], checkout: ["checkout"], order: ["order", seg[1]], wishlist: ["wishlist"], seller: ["seller", seg[1]], admin: ["admin", seg[1]], about: ["about"], contact: ["contact"], policy: ["policy", seg[1]], login: ["account", "overview"] };  /* no customer sign-in — #/login lands on the account page */
+    const map = { "": ["home"], categories: ["categories"], c: ["category", seg[1]], brands: ["brands"], b: ["brand", seg[1]], deals: ["deals"], search: ["search", seg.slice(1).join("/")], p: ["product", seg[1]], finder: ["finder", seg[1]], guides: ["guides"], g: ["guide", seg[1]], support: ["support"], account: ["account", seg[1]], cart: ["cart"], checkout: ["checkout"], order: ["order", seg[1]], wishlist: ["wishlist"], seller: ["seller", seg[1]], admin: ["admin", seg[1]], about: ["about"], contact: ["contact"], policy: ["policy", seg[1]], login: ["account", "overview"] };  /* no customer sign-in — #/login lands on the account page */
     const m = map[seg[0]] || ["notfound"];
     return { page: m[0], param: m[1] };
   },
   titles: {
     home: "G-FLO — Genuine Appliance Spare Parts", categories: "All Categories — G-FLO", brands: "Shop by Brand — G-FLO",
     deals: "Deals & Offers — G-FLO", finder: "AI Spare Part Finder — G-FLO", guides: "Repair Guides — G-FLO",
-    support: "Help & Support — G-FLO", track: "Track Order — G-FLO", account: "My Account — G-FLO",
+    support: "Help & Support — G-FLO", account: "My Account — G-FLO",
     cart: "Cart — G-FLO", checkout: "Checkout — G-FLO", wishlist: "Wishlist — G-FLO",
-    seller: "Seller Studio — G-FLO", admin: "Staff sign-in — G-FLO", about: "About Us — G-FLO", contact: "Contact — G-FLO", policy: "Store Policies — G-FLO"
+    seller: "Sell on G-FLO — G-FLO", admin: "Staff sign-in — G-FLO", about: "About Us — G-FLO", contact: "Contact — G-FLO", policy: "Store Policies — G-FLO"
   },
   go(){
     closeOverlays();

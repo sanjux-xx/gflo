@@ -157,16 +157,6 @@ Pages.categories = () => `
   <div class="wrap">
     ${crumb([["Categories"]])}
     <div class="sec-head" style="margin-top:14px"><div><span class="kick">Browse everything</span><h2>All appliance categories</h2><p>${CATS.length} appliances · ${PT.length} part families · ${DB.products.length} genuine parts. Every category carries the complete spare-part catalogue.</p></div></div>
-    <div class="fan-banner rv in">
-      <div class="fb-img"><img src="${typeof USER_IMGS !== "undefined" ? USER_IMGS.poster : ""}" alt="G-FLO ceiling fan — engineered component by component" loading="lazy"></div>
-      <div>
-        <span class="badge" style="background:rgba(236,51,56,.2);color:#ff9d95">G-FLO Originals</span>
-        <h3 style="margin-top:10px">Tranquillity in every rotation — built from parts we make ourselves</h3>
-        <p>From double ball bearings and 100% copper windings to precision-balanced blades, every G-FLO fan component on this store comes straight from our own line — the same parts inside our fans.</p>
-        <div class="fb-tags"><span class="tag">Copper windings</span><span class="tag">Ball bearings</span><span class="tag">Balanced blades</span><span class="tag">Batch-tested capacitors</span></div>
-        <div class="row" style="flex-wrap:wrap"><a class="btn btn-p" href="#/c/ceiling-fan">Shop Ceiling Fan parts ${U.icon("arr-r", "ic-s")}</a><a class="btn" style="background:rgba(255,255,255,.12);color:#fff" href="#/about">Our story</a></div>
-      </div>
-    </div>
     <div class="cat-grid" style="padding-bottom:50px">${CATS.map((c, i) => `
       <a class="cat-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" style="--i:${i}" href="#/c/${c.id}"><span class="cat-img"><span class="ct-ic">${U.icon("c-" + c.id)}</span>${CAT_IMG[c.id] ? `<img src="${CAT_IMG[c.id]}" alt="${U.esc(c.name)} spare parts" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</span>
         <div><b>${U.esc(c.name)}</b><br><span>${DB.products.filter(p => p.cat === c.id).length} parts · ${c.pts.length} families</span></div>

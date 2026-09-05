@@ -66,7 +66,7 @@ const NAV = [
   ["home", "#/", "Home", "home"], ["store", "#/categories", "Store", "store"], ["categories", "#/categories", "Categories", "grid", true],
   ["brands", "#/brands", "Brands", "store"], ["finder", "#/finder", "Spare Part Finder", "spark"],
   ["guides", "#/guides", "Repair Guides", "book"], ["deals", "#/deals", "Deals", "percent", false, "hi"],
-  ["support", "#/support", "Support", "headset"], ["track", "#/track", "Track Order", "truck"], ["account", "#/account", "Account", "user"], ["about", "#/about", "About Us", "info"], ["contact", "#/contact", "Contact Us", "mail"]
+  ["support", "#/support", "Support", "headset"], ["account", "#/account", "Account", "user"], ["about", "#/about", "About Us", "info"], ["contact", "#/contact", "Contact Us", "mail"]
 ];
 function renderShell(){
   document.getElementById("hdr").innerHTML = `
@@ -98,9 +98,9 @@ function renderShell(){
       <div><a class="logo" href="#/"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
         <p class="about">India's premium marketplace for genuine home-appliance spare parts. ${CATS.length} appliance categories, ${DB.products.length}+ certified parts, AI-verified compatibility — delivered to 19,000+ pincodes.</p>
         <div class="foot-pay"><span class="tag">UPI</span><span class="tag">CARDS</span><span class="tag">NETBANKING</span><span class="tag">COD</span><span class="tag">EMI</span></div></div>
-      <div><h5>Shop</h5><div class="foot-lnks"><a href="#/categories">All categories</a><a href="#/brands">Brands</a><a href="#/deals">Deals & offers</a><a href="#/finder">AI part finder</a><a href="#/wishlist">Wishlist</a><a href="#/track">Track order</a></div></div>
-      <div><h5>Help</h5><div class="foot-lnks"><a href="#/support">Help centre & FAQs</a><a href="#/track">Track order</a><a href="#/policy/return">Return policy</a><a href="#/policy/refund">Refund policy</a><a href="#/policy/shipping">Shipping policy</a><a href="#/guides">Repair guides</a></div></div>
-      <div><h5>Company</h5><div class="foot-lnks"><a href="#/about">About G-FLO</a><a href="#/contact">Contact us</a><a href="#/seller">Sell on G-FLO</a><a href="#/policy/privacy">Privacy policy</a><a href="#/policy/terms">Terms & conditions</a></div></div>
+      <div><h5>Shop</h5><div class="foot-lnks"><a href="#/categories">All categories</a><a href="#/brands">Brands</a><a href="#/deals">Deals & offers</a><a href="#/finder">AI part finder</a><a href="#/wishlist">Wishlist</a></div></div>
+      <div><h5>Help</h5><div class="foot-lnks"><a href="#/support">Help centre & FAQs</a><a href="#/policy/return">Return policy</a><a href="#/policy/refund">Refund policy</a><a href="#/policy/shipping">Shipping policy</a><a href="#/guides">Repair guides</a></div></div>
+      <div><h5>Company</h5><div class="foot-lnks"><a href="#/about">About G-FLO</a><a href="#/contact">Contact us</a><a href="#/contact">Sell on G-FLO</a><a href="#/policy/privacy">Privacy policy</a><a href="#/policy/terms">Terms & conditions</a></div></div>
       <div><h5>Get in touch</h5><div class="foot-lnks"><a href="#/support">${U.icon("phone", "ic-s")} ${CONTACT.phone}</a><a href="#/support">${U.icon("mail", "ic-s")} ${CONTACT.email}</a><a href="#/support">${U.icon("pin", "ic-s")} ${CONTACT.address}</a><a href="#/support">${U.icon("clock", "ic-s")} Mon–Sat, 9 AM – 8 PM IST</a></div>
         <div class="soc" style="margin-top:14px"><a href="#/" aria-label="Chat">${U.icon("chat", "ic-s")}</a><a href="#/" aria-label="Mail">${U.icon("mail", "ic-s")}</a><a href="#/" aria-label="Phone">${U.icon("phone", "ic-s")}</a><a href="#/" aria-label="Share">${U.icon("share", "ic-s")}</a></div></div>
     </div>
@@ -291,7 +291,7 @@ function chatRespond(q){
     document.getElementById("chat-typing")?.remove();
     const ql = q.toLowerCase();
     if (/track|order status|where is/.test(ql)){
-      chatBot(`I can pull that up. ${State.orders.length ? `Your latest order <b class="mono">${State.orders[0].id}</b> is <b>${["", "confirmed", "packed", "shipped", "out for delivery", "delivered"][State.orders[0].status] || "confirmed"}</b>.` : "You don't have any orders in this demo session yet."} <a href="#/track" style="color:var(--brand2);font-weight:600">Open order tracking →</a>`);
+      chatBot(`I can pull that up. ${State.orders.length ? `Your latest order <b class="mono">${State.orders[0].id}</b> is <b>${["", "confirmed", "packed", "shipped", "out for delivery", "delivered"][State.orders[0].status] || "confirmed"}</b>.` : "You don't have any orders in this demo session yet."}`);
     } else if (/cod|cash on delivery/.test(ql)){
       chatBot(CATALOG_MODE ? "Yes! <b>Cash on Delivery</b> is available in most pincodes — it's confirmed along with your quote. UPI, cards, netbanking and EMI are also supported (demo mode — no real payment)." : "Yes! <b>Cash on Delivery</b> is available on orders up to ₹5,000 in most pincodes. UPI, cards, netbanking and EMI are also supported at checkout (demo mode — no real payment).");
     } else if (/return|refund/.test(ql)){

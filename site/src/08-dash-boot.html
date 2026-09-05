@@ -37,180 +37,18 @@ function stChip(s){
   return `<span class="st-chip ${M[s] || "b-info"}">${s}</span>`;
 }
 
-/* ================= DASH DEMO DATA ================= */
-/* Built lazily: the product database now loads from the API after boot, so this
-   demo data can't be computed while the file is still parsing. */
-let _DASH = null;
-function buildDash(){
-  const r = U.rng("dash-2026");
-  const names = ["Asha Sharma", "Vikram Patil", "Meena Iyer", "Rahul Jain", "Farhan Ali", "Priya Nair", "Deepak Verma", "Kavita Rao", "Manpreet Singh", "Ananya Bose", "Gopal Reddy", "Sunita Devi"];
-  const cities = ["Bengaluru", "Mumbai", "Delhi", "Pune", "Hyderabad", "Chennai", "Jaipur", "Kolkata", "Indore", "Kochi"];
-  const sts = ["New", "Packed", "Shipped", "Delivered", "Delivered", "Delivered", "Returned", "Cancelled"];
-  const orders = Array.from({ length: 26 }, (_, i) => {
-    const p = DB.products[Math.floor(r() * DB.products.length)]
-      || { sku: "GF-0000", short: "Sample part", name: "Sample part", price: 0, mrp: 0, cat: CATS[0].id, pt: "spares", art: "spares", hue: 210, seed: "x" };
-    const qty = 1 + Math.floor(r() * 3);
-    return { id: "GFLO" + (982150 - i * 7), who: U.pick(names, r), city: U.pick(cities, r), p, qty, amt: (p.price || 0) * qty, st: sts[Math.floor(r() * sts.length)], date: new Date(Date.now() - i * 864e5 * .7), pay: U.pick(["UPI", "Card", "COD", "NB"], r) };
-  });
-  const rev14 = Array.from({ length: 14 }, () => Math.round(38000 + r() * 92000));
-  const ord14 = rev14.map(v => Math.round(v / 1450));
-  const coupons = [
-    { code: "GFLO10", type: "10% off above ₹999", used: 1240, cap: 5000, st: "Active" },
-    { code: "FLAT100", type: "₹100 off above ₹599", used: 3480, cap: 10000, st: "Active" },
-    { code: "FREESHIP", type: "Free delivery", used: 8921, cap: 0, st: "Active" },
-    { code: "MONSOON25", type: "25% off pumps & seals", used: 4970, cap: 5000, st: "Paused" }
-  ];
-  const tickets = [
-    { id: "TKT-4312", who: "Rahul Jain", sub: "Wrong coupler size received", pr: "High", st: "Open", age: "2h" },
-    { id: "TKT-4309", who: "Meena Iyer", sub: "Need GST invoice re-issued", pr: "Low", st: "Pending", age: "6h" },
-    { id: "TKT-4301", who: "Farhan Ali", sub: "Refund not credited yet", pr: "High", st: "Open", age: "1d" },
-    { id: "TKT-4287", who: "Priya Nair", sub: "Install engineer rescheduling", pr: "Med", st: "Resolved", age: "2d" },
-    { id: "TKT-4275", who: "Vikram Patil", sub: "Bulk pricing for 40 capacitors", pr: "Med", st: "Pending", age: "3d" }
-  ];
-  const returns = orders.filter(o => o.st === "Returned").map((o, i) => ({ ...o, reason: U.pick(["Doesn't fit model", "Damaged in transit", "Ordered wrong part"], r), stage: U.pick(["Pickup scheduled", "In QC", "Refunded"], r) }));
-  const sellers = [
-    { name: "G-FLO Certified", sku: 412, rating: 4.8, fulfil: "99.1%", gmv: "₹42.6L" },
-    { name: "VoltEdge Spares", sku: 187, rating: 4.6, fulfil: "97.4%", gmv: "₹18.2L" },
-    { name: "Coil & Core Co.", sku: 121, rating: 4.5, fulfil: "96.8%", gmv: "₹11.9L" },
-    { name: "Meru Parts Hub", sku: 86, rating: 4.3, fulfil: "94.2%", gmv: "₹6.4L" }
-  ];
-  return { orders, rev14, ord14, coupons, tickets, returns, sellers, names, cities };
-}
-Object.defineProperty(globalThis, "DASH", {
-  get(){ if (!_DASH) _DASH = buildDash(); return _DASH; }
-});
-
-/* ================= ROLE-BASED ACCESS ================= */
-const ROLES = { admin: { label: "Admin", can: ["overview", "orders", "inventory", "coupons", "shipping", "invoices", "support", "returns", "reports", "sellers", "customers", "roles"] }, manager: { label: "Ops Manager", can: ["overview", "orders", "inventory", "coupons", "shipping", "returns", "support"] }, support: { label: "Support Agent", can: ["overview", "orders", "support", "returns"] } };
-function roleCan(tab){ return (ROLES[State.role] || ROLES.admin).can.includes(tab); }
-function rolePill(){
-  return `<div class="role-pill" role="group" aria-label="Simulate role">${Object.keys(ROLES).map(k => `<button data-role="${k}" class="${State.role === k ? "on" : ""}">${ROLES[k].label}</button>`).join("")}</div>`;
-}
-function lockedPanel(need){
-  return `<div class="panel"><div class="lock-note">${U.icon("shield")} Your simulated role (<b>${ROLES[State.role].label}</b>) can't access <b>${need}</b>. Switch to Admin to view — this demonstrates role-based access control.</div></div>`;
-}
-
-/* ================= SELLER STUDIO ================= */
-Pages.seller = tab => dashPage("seller", tab || "overview");
-Mount.seller = tab => dashMount("seller", tab || "overview");
+/* The demo Seller Studio and the demo admin console are BOTH gone. They rendered
+   invented marketplace data (fake revenue, orders, sellers) client-side with no
+   sign-in, which is misleading on a live shop. The real console is the
+   password-protected Python admin site at /admin.                            */
 /* The demo admin console is gone — the real one is the password-protected
    Python admin site at /admin. Anyone hitting #/admin is sent there.   */
 Pages.admin = () => `<div class="wrap" style="padding:60px 0;text-align:center"><h2>Staff sign-in</h2><p class="mut" style="margin:10px 0 18px">Opening the admin console…</p><a class="btn btn-p" href="/admin/login">Go to admin sign-in</a></div>`;
 Mount.admin = () => { setTimeout(() => { location.href = "/admin/login"; }, 400); };
 
-function dashPage(kind, tab){
-  const isAdmin = kind === "admin";
-  const tabs = isAdmin
-    ? [["overview", "dash", "Overview"], ["orders", "package", "Orders"], ["sellers", "store", "Sellers"], ["customers", "user", "Customers"], ["coupons", "percent", "Coupons"], ["invoices", "doc", "GST Invoices"], ["support", "headset", "Support"], ["returns", "rotate", "Returns"], ["reports", "chart", "Reports"], ["roles", "shield", "Roles & access"]]
-    : [["overview", "dash", "Overview"], ["inventory", "box", "Inventory"], ["orders", "package", "Orders"], ["coupons", "percent", "Coupons"], ["shipping", "truck", "Shipping"], ["returns", "rotate", "Returns"], ["reports", "chart", "Reports"]];
-  return `<div class="wrap">
-    ${crumb([[isAdmin ? "Admin console" : "Seller studio"]])}
-    <div class="sec-head" style="margin-top:12px"><div><span class="kick">${isAdmin ? "Platform control" : "Sell on G-FLO"}</span><h2>${isAdmin ? "Admin console" : "Seller studio"}</h2><p>${isAdmin ? "Marketplace health, catalogue and compliance — demo data, fully client-side." : "Manage your inventory, orders and payouts — demo data, fully client-side."}</p></div>${rolePill()}</div>
-    <div class="dash">
-      <nav class="dash-side" aria-label="Dashboard sections">${tabs.map(t => `<a class="acc-lnk ${tab === t[0] ? "on" : ""}" href="#/${kind}/${t[0]}">${U.icon(t[1], "ic-s")} ${t[2]} ${!roleCan(t[0]) ? "🔒" : ""}</a>`).join("")}</nav>
-      <div class="dash-main" id="dash-main">${dashBody(kind, tab)}</div>
-    </div></div>`;
-}
-function dashBody(kind, tab){
-  if (!roleCan(tab)) return lockedPanel(tab);
-  const isAdmin = kind === "admin";
-  if (tab === "overview"){
-    const t7 = DASH.rev14.slice(-7).reduce((a, b) => a + b, 0);
-    return `
-    <div class="kpis">
-      <div class="kpi"><span class="k-ic">${U.icon("chart")}</span><b>${U.inr(t7)}</b><span>Revenue · 7 days</span><span class="delta up">▲ 12.4% WoW</span></div>
-      <div class="kpi"><span class="k-ic">${U.icon("package")}</span><b>${DASH.ord14.slice(-7).reduce((a, b) => a + b, 0)}</b><span>Orders · 7 days</span><span class="delta up">▲ 8.1%</span></div>
-      <div class="kpi"><span class="k-ic">${U.icon("box")}</span><b>${isAdmin ? DB.products.length : 412}</b><span>Live SKUs</span><span class="delta up">▲ 26 new</span></div>
-      <div class="kpi"><span class="k-ic">${U.icon("rotate")}</span><b>1.8%</b><span>Return rate</span><span class="delta up">▼ 0.3 pts</span></div>
-      ${isAdmin ? `<div class="kpi"><span class="k-ic">${U.icon("store")}</span><b>${DASH.sellers.length}</b><span>Active sellers</span><span class="delta up">▲ 1</span></div>` : `<div class="kpi"><span class="k-ic">${U.icon("bolt")}</span><b>₹1.2L</b><span>Next payout · Fri</span><span class="delta up">on time</span></div>`}
-    </div>
-    <div class="panel"><div class="spread" style="margin-bottom:8px"><h3 style="margin:0">Revenue — last 14 days</h3><span class="tag">auto-refreshed</span></div><div class="chart-wr">${svgArea(DASH.rev14)}</div>
-      <div class="legend"><span><i style="background:#ec3338"></i>Revenue</span><span><i style="background:#f59e0b"></i>Orders: ${DASH.ord14.reduce((a, b) => a + b, 0)} total</span></div></div>
-    <div style="display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(290px,1fr))">
-      <div class="panel"><h3>Top categories by live SKUs</h3><div class="chart-wr">${svgBars(CATS.map(c => [c.name.split(" ")[0], DB.products.filter(p => p.cat === c.id).length]).sort((a, b) => b[1] - a[1]).slice(0, 6))}</div></div>
-      <div class="panel"><h3>Order mix</h3><div class="row" style="gap:20px;flex-wrap:wrap">${svgDonut([["Prepaid", 612, "#ec3338"], ["COD", 318, "#f59e0b"], ["B2B", 96, "#334155"]])}<div class="legend" style="flex-direction:column;align-items:flex-start"><span><i style="background:#ec3338"></i>Prepaid · 612</span><span><i style="background:#f59e0b"></i>COD · 318</span><span><i style="background:#334155"></i>B2B / GST · 96</span></div></div></div>
-    </div>
-    <div class="panel"><h3>Latest orders</h3>${ordersTable(DASH.orders.slice(0, 6))}</div>`;
-  }
-  if (tab === "orders") return `<div class="panel"><div class="spread" style="margin-bottom:12px;flex-wrap:wrap;gap:10px"><h3 style="margin:0">All orders</h3><div class="row"><input class="inp" placeholder="Search order / customer…" style="max-width:220px;padding-block:8px" id="ord-q"><select class="sel" style="width:auto;padding-block:8px" id="ord-st"><option value="">All statuses</option>${["New", "Packed", "Shipped", "Delivered", "Returned", "Cancelled"].map(s => `<option>${s}</option>`).join("")}</select></div></div><div id="ord-tbl">${ordersTable(DASH.orders)}</div></div>`;
-  if (tab === "inventory"){
-    const inv = DB.products.slice(0, 40);
-    return `<div class="panel"><div class="spread" style="margin-bottom:12px;flex-wrap:wrap;gap:10px"><h3 style="margin:0">Inventory <span class="mut3" style="font-size:12px;font-weight:500">· first 40 of ${DB.products.length} SKUs</span></h3><div class="row"><button class="btn btn-p btn-sm" onclick="toast('New SKU wizard is stubbed in the demo','info')">${U.icon("plus", "ic-s")} Add SKU</button><button class="btn btn-ghost btn-sm" data-export="inventory">${U.icon("download", "ic-s")} Export CSV</button></div></div>
-    <div class="tbl-wr"><table class="tbl"><tr><th>Part</th><th>SKU</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr>
-    ${inv.map(p => `<tr><td><div class="row" style="gap:9px;min-width:210px"><span style="width:36px;height:36px;border-radius:9px;overflow:hidden;flex:none;background:var(--art-bg1)">${prodArt(p)}</span><b style="font-size:12.5px">${U.esc(p.short)}</b></div></td><td class="mono" style="font-size:11px">${p.sku}</td><td>${catOf(p).name}</td><td><b>${U.inr(p.price)}</b></td><td><input class="inp" type="number" value="${p.stock}" min="0" data-stock="${p.sku}" style="width:76px;padding:6px 9px;font-size:12.5px" aria-label="Stock for ${p.sku}"></td><td>${p.stock === 0 ? stChip("Paused") : p.stock <= 5 ? stChip("Low") : stChip("Active")}</td><td><button class="btn btn-soft btn-sm" onclick="location.hash='#/p/${p.sku}'">View</button></td></tr>`).join("")}</table></div></div>`;
-  }
-  if (tab === "coupons") return `<div class="panel"><div class="spread" style="margin-bottom:12px"><h3 style="margin:0">Coupons</h3><button class="btn btn-p btn-sm" id="new-coupon">${U.icon("plus", "ic-s")} New coupon</button></div>
-    <div class="tbl-wr"><table class="tbl"><tr><th>Code</th><th>Offer</th><th>Redemptions</th><th>Status</th><th></th></tr>
-    ${DASH.coupons.map(c => `<tr><td><b class="mono">${c.code}</b></td><td>${c.type}</td><td>${c.used.toLocaleString("en-IN")}${c.cap ? " / " + c.cap.toLocaleString("en-IN") : ""}</td><td>${stChip(c.st)}</td><td><button class="btn btn-soft btn-sm" data-coupon-toggle="${c.code}">${c.st === "Active" ? "Pause" : "Activate"}</button></td></tr>`).join("")}</table></div></div>`;
-  if (tab === "shipping") return `
-    <div class="kpis"><div class="kpi"><span class="k-ic">${U.icon("truck")}</span><b>96.4%</b><span>On-time dispatch</span><span class="delta up">▲ 1.1 pts</span></div><div class="kpi"><span class="k-ic">${U.icon("clock")}</span><b>2.6 days</b><span>Avg delivery time</span><span class="delta up">▼ 0.2</span></div><div class="kpi"><span class="k-ic">${U.icon("pin")}</span><b>19,212</b><span>Serviceable pincodes</span><span class="delta up">▲ 214</span></div></div>
-    <div class="panel"><h3>Courier partners</h3><div class="tbl-wr"><table class="tbl"><tr><th>Partner</th><th>Zone</th><th>Share</th><th>On-time</th><th>RTO</th><th>Status</th></tr>
-    ${[["BlueDart Surface", "National", "38%", "97.1%", "1.1%", "Active"], ["Delhivery", "National", "31%", "95.8%", "1.6%", "Active"], ["DTDC", "South + West", "18%", "94.9%", "2.0%", "Active"], ["India Post", "ODA pincodes", "13%", "91.2%", "2.8%", "Active"]].map(rw => `<tr><td><b>${rw[0]}</b></td><td>${rw[1]}</td><td>${rw[2]}</td><td>${rw[3]}</td><td>${rw[4]}</td><td>${stChip(rw[5])}</td></tr>`).join("")}</table></div>
-    <p class="mut3" style="font-size:12px;margin-top:10px">Rate cards: ₹49 base under ₹499 · free above · express ₹99 · Expert Install ₹249 in 60+ cities.</p></div>`;
-  if (tab === "invoices") return `<div class="panel"><div class="spread" style="margin-bottom:12px"><h3 style="margin:0">GST invoices</h3><button class="btn btn-ghost btn-sm" data-export="invoices">${U.icon("download", "ic-s")} Export GSTR-1 CSV</button></div>
-    ${State.orders.length ? `<div class="tbl-wr"><table class="tbl"><tr><th>Invoice</th><th>Order</th><th>Customer</th><th>Taxable</th><th>CGST+SGST</th><th>Total</th><th></th></tr>
-    ${State.orders.map(o => { const base = o.totals.total / 1.18; return `<tr><td class="mono" style="font-size:11px">INV-${o.id}</td><td class="mono" style="font-size:11px">${o.id}</td><td>${U.esc(o.name || "Demo Customer")}</td><td>${U.inr(base)}</td><td>${U.inr(o.totals.total - base)}</td><td><b>${U.inr(o.totals.total + (o.shipExtra || 0))}</b></td><td><button class="btn btn-soft btn-sm" data-invoice="${o.id}">View</button></td></tr>`; }).join("")}</table></div>` : emptyState("doc", "No invoices yet", "Invoices generate automatically when demo orders are placed.", "#/categories", "Place a demo order")}
-    <p class="mut3" style="font-size:12px;margin-top:10px">Invoices carry CGST/SGST split at 18%, HSN 8509, and are numbered INV-{order}. B2B orders capture buyer GSTIN at checkout.</p></div>`;
-  if (tab === "support") return `<div class="panel"><h3>Support tickets</h3><div class="tbl-wr"><table class="tbl"><tr><th>Ticket</th><th>Customer</th><th>Subject</th><th>Priority</th><th>Age</th><th>Status</th><th></th></tr>
-    ${DASH.tickets.map(t => `<tr><td class="mono" style="font-size:11px">${t.id}</td><td>${t.who}</td><td>${t.sub}</td><td>${stChip(t.pr === "High" ? "Open" : t.pr === "Med" ? "Pending" : "Resolved").replace(/>.*</, ">" + t.pr + "<")}</td><td>${t.age}</td><td>${stChip(t.st)}</td><td><button class="btn btn-soft btn-sm" data-ticket="${t.id}">Open</button></td></tr>`).join("")}</table></div></div>`;
-  if (tab === "returns") return `<div class="panel"><h3>Returns queue</h3>${DASH.returns.length ? `<div class="tbl-wr"><table class="tbl"><tr><th>Order</th><th>Customer</th><th>Part</th><th>Reason</th><th>Stage</th><th></th></tr>
-    ${DASH.returns.map(o => `<tr><td class="mono" style="font-size:11px">${o.id}</td><td>${o.who}</td><td>${U.esc(o.p.short)}</td><td>${o.reason}</td><td>${stChip(o.stage === "Refunded" ? "Refunded" : "Pending")}</td><td><button class="btn btn-soft btn-sm" onclick="toast('Refund approved — credited in 48h (demo)')">Approve refund</button></td></tr>`).join("")}</table></div>` : emptyState("rotate", "Queue is clear", "Returns land here for QC and refund approval.")}</div>`;
-  if (tab === "reports") return `<div class="panel"><h3>Reports</h3><div class="sup-grid">
-    ${[["Sales register", "Order-level sales with taxes", "sales"], ["GSTR-1 summary", "Outward supplies for filing", "gstr1"], ["Inventory valuation", "Stock on hand at cost", "inventory"], ["Returns analysis", "Reasons & rates by category", "returns"], ["Customer cohorts", "Repeat behaviour by month", "cohorts"], ["Search gaps", "Queries with zero results", "gaps"]].map(rp => `<div class="sup-tile">${U.icon("chart")}<b>${rp[0]}</b><span class="mut3" style="font-size:12px">${rp[1]}</span><button class="btn btn-soft btn-sm" data-export="${rp[2]}" style="margin-top:4px">${U.icon("download", "ic-s")} CSV</button></div>`).join("")}</div></div>`;
-  if (tab === "sellers") return `<div class="panel"><h3>Marketplace sellers</h3><div class="tbl-wr"><table class="tbl"><tr><th>Seller</th><th>Live SKUs</th><th>Rating</th><th>Fulfilment</th><th>GMV (90d)</th><th></th></tr>
-    ${DASH.sellers.map(s => `<tr><td><b>${s.name}</b></td><td>${s.sku}</td><td>★ ${s.rating}</td><td>${s.fulfil}</td><td>${s.gmv}</td><td><button class="btn btn-soft btn-sm" onclick="toast('Seller detail view is stubbed','info')">Manage</button></td></tr>`).join("")}</table></div></div>`;
-  if (tab === "customers") return `<div class="panel"><h3>Customers</h3><div class="tbl-wr"><table class="tbl"><tr><th>Customer</th><th>City</th><th>Orders</th><th>LTV</th><th>Last seen</th></tr>
-    ${DASH.names.slice(0, 9).map((n, i) => `<tr><td><div class="row"><span class="ava" style="width:30px;height:30px;font-size:12px;background:linear-gradient(135deg,hsl(${(i * 41) % 360} 60% 45%),hsl(${(i * 41 + 60) % 360} 65% 38%))">${n[0]}</span><b>${n}</b></div></td><td>${DASH.cities[i % DASH.cities.length]}</td><td>${2 + (i * 3) % 11}</td><td>${U.inr(1800 + i * 1240)}</td><td>${1 + i}d ago</td></tr>`).join("")}</table></div></div>`;
-  if (tab === "roles") return `<div class="panel"><h3>Roles & access control</h3>
-    <p class="mut" style="font-size:13.5px;margin-bottom:14px">Switch the simulated role (top right) and watch locked sections update across both dashboards.</p>
-    <div class="tbl-wr"><table class="tbl"><tr><th>Capability</th>${Object.values(ROLES).map(r => `<th>${r.label}</th>`).join("")}</tr>
-    ${["overview", "orders", "inventory", "coupons", "invoices", "support", "returns", "reports", "sellers", "customers", "roles"].map(cp => `<tr><td style="text-transform:capitalize">${cp}</td>${Object.keys(ROLES).map(k => `<td>${ROLES[k].can.includes(cp) ? `<span class="st-chip b-ok">Yes</span>` : `<span class="st-chip b-off">No</span>`}</td>`).join("")}</tr>`).join("")}</table></div></div>`;
-  return lockedPanel(tab);
-}
-function ordersTable(list){
-  return `<div class="tbl-wr"><table class="tbl"><tr><th>Order</th><th>Customer</th><th>Item</th><th>Amount</th><th>Payment</th><th>Status</th><th>Date</th></tr>
-  ${list.map(o => `<tr><td class="mono" style="font-size:11px">${o.id}</td><td><b>${o.who}</b><div class="mut3" style="font-size:11px">${o.city}</div></td><td style="max-width:220px"><div class="row" style="gap:8px"><span style="width:32px;height:32px;border-radius:8px;overflow:hidden;flex:none;background:var(--art-bg1)">${prodArt(o.p)}</span><span style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${U.esc(o.p.short)} × ${o.qty}</span></div></td><td><b>${U.inr(o.amt)}</b></td><td>${o.pay}</td><td>${stChip(o.st)}</td><td class="mut3" style="font-size:11.5px">${o.date.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</td></tr>`).join("")}</table></div>`;
-}
-function dashMount(kind, tab){
-  bindSearch("hd-q", "hd-sug");
-  document.querySelectorAll("[data-role]").forEach(b => b.addEventListener("click", () => { State.role = b.getAttribute("data-role"); State.save(); toast("Viewing as " + ROLES[State.role].label, "info"); Router.go(); }));
-  bindInvoiceButtons();
-  document.querySelectorAll("[data-stock]").forEach(i => i.addEventListener("change", () => {
-    const p = DB.prodMap[i.getAttribute("data-stock")]; if (!p) return;
-    p.stock = Math.max(0, +i.value || 0); toast(`Stock updated — ${p.sku} → ${p.stock}`);
-    const row = i.closest("tr"); const st = row.querySelector("td:nth-child(6)"); if (st) st.innerHTML = p.stock === 0 ? stChip("Paused") : p.stock <= 5 ? stChip("Low") : stChip("Active");
-  }));
-  document.querySelectorAll("[data-export]").forEach(b => b.addEventListener("click", () => {
-    const kindE = b.getAttribute("data-export");
-    let csv = "";
-    if (kindE === "inventory") csv = "sku,name,category,price,stock\n" + DB.products.slice(0, 200).map(p => `${p.sku},"${p.short}",${p.cat},${p.price},${p.stock}`).join("\n");
-    else csv = "order,customer,city,amount,status,date\n" + DASH.orders.map(o => `${o.id},"${o.who}",${o.city},${o.amt},${o.st},${o.date.toISOString().slice(0, 10)}`).join("\n");
-    try {
-      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-      const a = document.createElement("a"); a.href = url; a.download = "gflo-" + kindE + ".csv"; document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 4000); toast("CSV export started");
-    } catch(e){ modal(`<pre class="mono" style="white-space:pre-wrap;font-size:11.5px">${U.esc(csv.slice(0, 1800))}</pre>`, { title: "Export preview" }); }
-  }));
-  document.querySelectorAll("[data-ticket]").forEach(b => b.addEventListener("click", () => {
-    const t = DASH.tickets.find(x => x.id === b.getAttribute("data-ticket"));
-    modal(`<div class="row" style="margin-bottom:12px"><b class="mono">${t.id}</b>${stChip(t.st)}</div><p style="font-size:14px"><b>${t.who}:</b> “${t.sub}. Please help — order was for my service shop.”</p>
-    <textarea class="inp" rows="3" style="margin-top:14px" placeholder="Type a reply…"></textarea>
-    <div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn btn-ghost btn-sm" onclick="closeOverlays();toast('Marked resolved ✅')">Resolve</button><button class="btn btn-p btn-sm" onclick="closeOverlays();toast('Reply sent to customer 📨')">Send reply</button></div>`, { title: "Ticket " + t.id });
-  }));
-  const oq = document.getElementById("ord-q"), os = document.getElementById("ord-st");
-  const filt = () => {
-    const q = (oq.value || "").toLowerCase(), s = os.value;
-    document.getElementById("ord-tbl").innerHTML = ordersTable(DASH.orders.filter(o => (!q || (o.id + o.who + o.p.short).toLowerCase().includes(q)) && (!s || o.st === s)));
-  };
-  oq && oq.addEventListener("input", U.debounce(filt, 200)); os && os.addEventListener("change", filt);
-  const nc = document.getElementById("new-coupon");
-  nc && nc.addEventListener("click", () => modal(`<div class="form-grid"><div class="fld"><label>Code</label><input class="inp" placeholder="DIWALI20" id="nc-code"></div><div class="fld"><label>Discount %</label><input class="inp" type="number" value="20"></div><div class="fld"><label>Min order (₹)</label><input class="inp" type="number" value="999"></div><div class="fld"><label>Usage cap</label><input class="inp" type="number" value="5000"></div></div><button class="btn btn-p btn-block" style="margin-top:14px" onclick="closeOverlays();toast('Coupon created (demo) 🎟️')">Create coupon</button>`, { title: "New coupon" }));
-  document.querySelectorAll("[data-coupon-toggle]").forEach(b => b.addEventListener("click", () => {
-    const c = DASH.coupons.find(x => x.code === b.getAttribute("data-coupon-toggle"));
-    c.st = c.st === "Active" ? "Paused" : "Active"; toast(`${c.code} ${c.st.toLowerCase()}`); Router.go();
-  }));
-}
-
+/* Old #/seller links land on the contact page — seller onboarding is handled there. */
+Pages.seller = () => `<div class="wrap" style="padding:60px 0;text-align:center"><h2>Sell on G-FLO</h2><p class="mut" style="margin:10px 0 18px">Taking you to our contact page…</p><a class="btn btn-p" href="#/contact">Contact G-FLO</a></div>`;
+Mount.seller = () => { setTimeout(() => { location.hash = "#/contact"; }, 300); };
 /* ================= BOOT ================= */
 (async function init(){
   document.documentElement.dataset.theme = "light";
