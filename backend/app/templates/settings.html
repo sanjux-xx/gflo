@@ -8,7 +8,7 @@
   </div>
 </div>
 
-<form method="post" action="/admin/settings" data-guard data-busy>
+<form id="settings-form" method="post" action="/admin/settings" data-guard data-busy>
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <div class="card" style="margin:0">
     <div class="card-h">{{ icon('store', 17) }}<h2>Store &amp; contact</h2></div>
@@ -74,12 +74,6 @@
     </div>
   </div>
 
-  <div class="savebar">
-    <span class="st" data-dirty-note>All changes saved</span>
-    <div class="acts">
-      <button class="btn btn-p" type="submit">{{ icon('save', 15) }} Save settings</button>
-    </div>
-  </div>
 </form>
 
 <div class="grid-2" style="margin-top:22px">
@@ -223,4 +217,14 @@
 .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0;font-size:13.5px}
 .kv dt{color:var(--tx3, #6b7280);font-weight:600}
 .kv dd{margin:0}</style>
+{# The sticky save bar lives at the END of the page, not inside the form.
+   Inside the form it reserved 92px of layout space where the form ended
+   (mid-page), which showed up as an empty band above the next heading.
+   The HTML5 `form` attribute keeps it wired to the settings form.        #}
+<div class="savebar">
+  <span class="st" data-dirty-note>All changes saved</span>
+  <div class="acts">
+    <button class="btn btn-p" type="submit" form="settings-form">{{ icon('save', 15) }} Save settings</button>
+  </div>
+</div>
 {% endblock %}

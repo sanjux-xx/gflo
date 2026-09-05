@@ -36,7 +36,7 @@
   </div>
 </div>
 
-<form method="post" action="{{ '/admin/products/new' if new else '/admin/products/' ~ p.id ~ '/edit' }}"
+<form id="product-form" method="post" action="{{ '/admin/products/new' if new else '/admin/products/' ~ p.id ~ '/edit' }}"
       data-guard data-busy>
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <div class="grid-2">
@@ -224,14 +224,6 @@
     </div>
   </div>
 
-  <div class="savebar">
-    <span class="st" data-dirty-note>All changes saved</span>
-    <span class="tiny">Tip: {{ 'Ctrl' }}+S saves</span>
-    <div class="acts">
-      <a class="btn" href="/admin/products">Cancel</a>
-      <button class="btn btn-p" type="submit">{{ icon('save', 15) }} {{ 'Create product' if new else 'Save changes' }}</button>
-    </div>
-  </div>
 </form>
 
 {% if not new %}
@@ -279,4 +271,14 @@
   </div>
 </div>
 {% endif %}
+{# Sticky save bar moved out of the form and to the end of the page — see the
+   note in settings.html. `form="product-form"` keeps the submit wired up.  #}
+<div class="savebar">
+  <span class="st" data-dirty-note>All changes saved</span>
+  <span class="tiny">Tip: {{ 'Ctrl' }}+S saves</span>
+  <div class="acts">
+    <a class="btn" href="/admin/products">Cancel</a>
+    <button class="btn btn-p" type="submit" form="product-form">{{ icon('save', 15) }} {{ 'Create product' if new else 'Save changes' }}</button>
+  </div>
+</div>
 {% endblock %}

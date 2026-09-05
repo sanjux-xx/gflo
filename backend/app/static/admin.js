@@ -12,6 +12,25 @@ function csrfToken() {
 (function () {
   "use strict";
 
+  /* The sticky save bar sits OUTSIDE its form (its button uses the HTML5
+     `form=` attribute), so form.querySelector() can't see it. Look it up by
+     that association instead. */
+  function formControls(form, selector) {
+    const inside = form.querySelectorAll(selector);
+    if (inside.length) return Array.prototype.slice.call(inside);
+    if (!form.id) return [];
+    const owned = document.querySelectorAll('[form="' + form.id + '"]');
+    const out = [];
+    Array.prototype.forEach.call(owned, function (el) {
+      if (el.matches && el.matches(selector)) out.push(el);
+      const bar = el.closest ? el.closest('.savebar') : null;
+      if (bar) Array.prototype.forEach.call(bar.querySelectorAll(selector), function (n) {
+        if (out.indexOf(n) === -1) out.push(n);
+      });
+    });
+    return out;
+  }
+
   /* ------------------------------------------------------------------ icons */
   const ICON = {
     ok: '<path d="M20 6L9 17l-5-5"/>',
@@ -90,7 +109,7 @@ function csrfToken() {
   /* ------------------------------------------ submit buttons show a spinner */
   document.querySelectorAll("form[data-busy]").forEach(function (form) {
     form.addEventListener("submit", function () {
-      const btn = form.querySelector('[type="submit"]');
+      const btn = formControls(form, '[type="submit"]')[0];
       if (btn && !btn.classList.contains("loading")) {
         btn.classList.add("loading");
         setTimeout(function () { btn.classList.remove("loading"); }, 8000);
@@ -233,7 +252,7 @@ function csrfToken() {
 
   /* ------------------------------------------- unsaved changes guard (forms) */
   document.querySelectorAll("form[data-guard]").forEach(function (form) {
-    const status = form.querySelector("[data-dirty-note]");
+    const status = formControls(form, "[data-dirty-note]")[0] || null;
     let dirty = false;
     const mark = function () {
       if (dirty) return;
