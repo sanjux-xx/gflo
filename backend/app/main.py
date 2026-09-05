@@ -155,11 +155,6 @@ def storefront_alias():
 def healthz():
     return {"ok": True}
 
-@app.get("/sentry-debug")
-async def trigger_error():
- division_by_zero = 1 / 0
-
-
 @app.get("/{asset_path:path}")
 def site_assets(asset_path: str):
     """Serve the storefront's own folders (brand-photos/, tools-photos/, assets/)."""
