@@ -185,34 +185,6 @@
       <button class="btn btn-p" type="submit" style="margin-top:18px">{{ icon('lock', 15) }} Change password</button>
     </form>
   </div>
-  <div class="card" style="margin:0">
-    <div class="card-h">{{ icon('search', 17) }}<h2>SerpAPI</h2></div>
-    <div class="card-b">
-      {% if serp_status and serp_status.configured %}
-        <p class="mut" style="margin:0 0 10px">
-          <span class="bdg bdg-ok">{{ icon('check', 11) }} Connected</span>
-          Google lookups for catalogue research are available.
-        </p>
-        <dl class="kv">
-          <dt>Key</dt><dd><code>{{ serp_status.key_hint }}</code> <span class="tiny">(from SERPAPI_KEY)</span></dd>
-          <dt>Region</dt><dd>{{ serp_status.country | upper }} · {{ serp_status.locale }}</dd>
-          <dt>Timeout</dt><dd>{{ serp_status.timeout }}s</dd>
-        </dl>
-      {% else %}
-        <p class="mut" style="margin:0 0 8px">
-          <span class="bdg bdg-mute">Not configured</span>
-        </p>
-        <p class="help" style="margin:0">
-          Set the <code>SERPAPI_KEY</code> environment variable on your host to switch this on.
-          It is read from the environment only — never stored in the database.
-        </p>
-      {% endif %}
-      <p class="help" style="margin:10px 0 0">
-        Requests are billed by SerpAPI, so lookups are restricted to owner/admin accounts.
-      </p>
-    </div>
-  </div>
-</div>
 <style>.pwd-eye svg:nth-of-type(2){display:none}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0;font-size:13.5px}
 .kv dt{color:var(--tx3, #6b7280);font-weight:600}

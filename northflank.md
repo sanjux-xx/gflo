@@ -15,11 +15,11 @@
    ADMIN_USERNAME=gflo
    ADMIN_PASSWORD=<your long admin password>
    COOKIE_SECURE=true
-   SERPAPI_KEY=<your SerpAPI key — optional>
+   SENTRY_DSN=<your Sentry DSN — optional>
+   SENTRY_ENVIRONMENT=production
    ```
-   Store `SECRET_KEY`, `ADMIN_PASSWORD` and `SERPAPI_KEY` as **secrets**, not plain
-   variables. `SERPAPI_KEY` is optional: leave it out and the SerpAPI features stay
-   switched off. Every SerpAPI request is billed, so treat it like a password.
+   Store `SECRET_KEY`, `ADMIN_PASSWORD` and `SENTRY_DSN` as **secrets**, not plain
+   variables. `SENTRY_DSN` is optional: leave it out and error monitoring stays off.
 5. **Deploy.** On first boot the container creates the database, loads the 896-product
    catalogue and creates your admin user. Watch the logs for
    `[bootstrap] created admin 'gflo'`.

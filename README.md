@@ -130,21 +130,33 @@ host. A snapshot is frozen, so re-run it after catalogue edits.
 * The admin site sends `noindex, nofollow` and is not linked from the storefront.
 * Set a long random `SECRET_KEY` in production so sessions survive restarts predictably.
 
-## SerpAPI (optional)
+## Error monitoring with Sentry (optional)
 
-Set `SERPAPI_KEY` in the environment to switch on Google-backed catalogue research
-from the admin panel (competitor rates, candidate product photos). It is read from
-the environment only — never stored in the database, never rendered into a page and
-never logged. Leave it unset and the features stay off.
+Set `SENTRY_DSN` and every unhandled 500 — with its stack trace, the URL and the
+signed-in admin username — lands in your Sentry project instead of scrolling past
+in the Render logs. Leave it unset and monitoring stays off; nothing else changes.
 
 ```sh
-SERPAPI_KEY=your-key ./run.sh
+SENTRY_DSN='https://...@o0.ingest.sentry.io/0' SENTRY_ENVIRONMENT=production ./run.sh
 ```
 
-Every request is billed by SerpAPI, so the endpoints are admin-only and
-CSRF-protected: an unauthenticated search route would let a stranger spend your
-quota. Optional tuning: `SERPAPI_COUNTRY` (default `in`), `SERPAPI_LOCALE`
-(default `en`), `SERPAPI_TIMEOUT` (default 12s).
+Look for `[gflo] Sentry monitoring on (environment=production)` in the boot log.
+
+**Nothing sensitive is sent.** `send_default_pii` is off, and `app/monitoring.py`
+scrubs every event before it leaves the process: passwords (including the
+change-password fields), the `gflo_admin` session cookie, the `gflo_csrf` token,
+`Authorization` headers and any `api_key`/`token` extras are replaced with
+`[redacted]`. Only the username is attached, never an email or IP.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `SENTRY_DSN` | *(unset)* | Enables monitoring. Treat as a secret. |
+| `SENTRY_ENVIRONMENT` | `development` | Tag shown in Sentry. Use `production` live. |
+| `SENTRY_TRACES_SAMPLE_RATE` | `0` | Performance tracing (billed). `0.1` = 10% of requests. |
+| `SENTRY_RELEASE` | *(unset)* | Version/commit tag for events. |
+
+Healthy traffic sends nothing — only actual errors, so a free Sentry plan is
+plenty for a shop this size.
 
 ## Backups
 

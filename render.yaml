@@ -21,5 +21,7 @@ services:
         value: gflo
       - key: ADMIN_PASSWORD
         sync: false          # set this yourself in the Render dashboard
-      - key: SERPAPI_KEY
-        sync: false          # paste your SerpAPI key in the dashboard (paid per request)
+      - key: SENTRY_DSN
+        sync: false          # paste your Sentry DSN in the dashboard (leave blank to disable)
+      - key: SENTRY_ENVIRONMENT
+        value: production

@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 from .db import get_db
 from .models import Product, ProductImage, Category, Brand, AdminUser, AuditLog
 from . import security as sec
-from . import serp
 from .store import (get_setting, set_setting, log, save_upload, delete_media,
                     unique_sku, slugify, DEFAULT_SETTINGS, parse_money, parse_qty,
                     clamp_money, csv_safe)
@@ -843,7 +842,6 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
     values = {k: get_setting(db, k) for k in DEFAULT_SETTINGS}
     users = db.query(AdminUser).order_by(AdminUser.id).all()
     return render(request, "settings.html", db=db, values=values, users=users,
-                  serp_status=serp.status(),
                   msg=request.query_params.get("msg", ""), err=request.query_params.get("err", ""))
 
 
@@ -934,36 +932,6 @@ def delete_user(request: Request, uid: int, db: Session = Depends(get_db)):
     log(db, me, "delete", "admin_user", uid, user.username)
     db.commit()
     return flash("/admin/settings", msg="Admin user removed.")
-
-
-# ----------------------------------------------------------------- serpapi
-@router.post("/serp/search")
-async def serp_search(request: Request):
-    """Google lookups for catalogue research. Admin-only and CSRF-protected:
-    every call is billed by SerpAPI, so this must never be publicly reachable."""
-    if not _user(request):
-        return JSONResponse({"ok": False, "error": "Signed out — reload and sign in again."}, 401)
-    if not _elevated(request):
-        return JSONResponse({"ok": False, "error": "Your account doesn't have permission for that."}, 403)
-    if not serp.configured():
-        return JSONResponse({"ok": False, "error": "SerpAPI isn't configured. "
-                                                   "Set SERPAPI_KEY in the environment."}, 503)
-    try:
-        data = await request.json()
-    except Exception:
-        return JSONResponse({"ok": False, "error": "Expected a JSON body."}, 400)
-    mode = (data.get("mode") or "shopping").strip()
-    query = data.get("q") or ""
-    fn = {"shopping": serp.shopping, "images": serp.images, "web": serp.web}.get(mode)
-    if fn is None:
-        return JSONResponse({"ok": False, "error": f"Unknown mode '{mode}'."}, 400)
-    if not str(query).strip():
-        return JSONResponse({"ok": False, "error": "Enter something to search for."}, 400)
-    try:
-        results = fn(query)
-    except serp.SerpError as exc:
-        return JSONResponse({"ok": False, "error": str(exc)}, 502)
-    return {"ok": True, "mode": mode, "count": len(results), "results": results}
 
 
 @router.get("/activity", response_class=HTMLResponse)

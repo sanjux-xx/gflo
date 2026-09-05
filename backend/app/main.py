@@ -11,6 +11,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from . import monitoring
+monitoring.init()          # no-op unless SENTRY_DSN is set
+
 from .db import Base, engine, SessionLocal, MEDIA_DIR, ensure_schema
 from . import models  # noqa: F401  (registers tables)
 from . import security as sec
@@ -96,6 +99,12 @@ async def security_middleware(request: Request, call_next):
             and not request.cookies.get(sec.CSRF_COOKIE):
         fresh_csrf = sec.new_csrf_token()
     request.state.csrf = fresh_csrf or request.cookies.get(sec.CSRF_COOKIE, "")
+
+    if path.startswith("/admin") and monitoring.configured():
+        try:
+            monitoring.note_admin(sec.current_user(request))
+        except Exception:
+            pass
 
     response = await call_next(request)
 
