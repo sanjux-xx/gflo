@@ -186,12 +186,14 @@ Pages.product = sku => {
     <div class="pdp">
       <div class="gal">
         <div class="gal-main" id="gal-main" aria-label="Product image, hover to zoom">
-          <div class="gal-badges">${p.off >= 25 && !CATALOG_MODE ? `<span class="badge b-deal">${p.off}% off</span>` : ""}${p.isNew ? `<span class="badge b-new">New</span>` : ""}${p.isBest ? `<span class="badge b-best">★ Bestseller</span>` : ""}<span class="badge b-brand">${U.icon("shield", "ic-s")} Genuine</span></div>
           <div id="gal-stage" style="width:100%;height:100%">${prodArt(p)}</div>
-          <button class="btn btn-soft btn-sm gal-360" id="btn-360">${U.icon("rotate", "ic-s")} 360° view</button>
         </div>
         <div class="gal-thumbs" role="tablist" aria-label="Image views">
-          ${["Front", "Detail", "Angle", "Schematic"].map((t, i) => `<button class="gth ${i === 0 ? "on" : ""}" data-thumb="${i}" role="tab" aria-selected="${i === 0}" aria-label="${t} view">${i === 3 ? `<span class="pm">${artFor(p.art, p.hue, p.seed + "|t3", t + " view")}</span>` : prodMediaIdx(p, i, t + " view")}</button>`).join("")}
+          ${(() => {
+            const shots = prodPhotoUrls(p);
+            const n = Math.max(1, Math.min(shots.length, 6));   // one per real photo
+            return Array.from({ length: n }, (_, i) => `<button class="gth ${i === 0 ? "on" : ""}" data-thumb="${i}" role="tab" aria-selected="${i === 0}" aria-label="Photo ${i + 1}">${prodMediaIdx(p, i, p.name)}</button>`).join("");
+          })()}
         </div>
       </div>
       <div class="pinfo">
@@ -305,7 +307,7 @@ Mount.product = sku => {
   // gallery: zoom + thumbs + 360
   const stage = document.getElementById("gal-stage"), main = document.getElementById("gal-main");
   let mode = "static";
-  const setThumb = i => { stage.innerHTML = i === 3 ? `<span class="pm">${artFor(p.art, p.hue, p.seed + "|t3", p.name + " schematic")}</span>` : prodMediaIdx(p, i, p.name); document.querySelectorAll(".gth").forEach((g, gi) => { g.classList.toggle("on", gi === i); g.setAttribute("aria-selected", gi === i); }); };
+  const setThumb = i => { stage.innerHTML = prodMediaIdx(p, i, p.name); document.querySelectorAll(".gth").forEach((g, gi) => { g.classList.toggle("on", gi === i); g.setAttribute("aria-selected", gi === i); }); };
   document.querySelectorAll(".gth").forEach((g, i) => g.addEventListener("click", () => { mode = "static"; main.classList.remove("v360"); setThumb(i); }));
   main.addEventListener("mousemove", e => {
     if (mode !== "static") return;
@@ -315,31 +317,6 @@ Mount.product = sku => {
     if (svg){ svg.style.transformOrigin = `${x}% ${y}%`; svg.style.transform = "scale(2.1)"; }
   });
   main.addEventListener("mouseleave", () => { const svg = stage.querySelector("svg"); if (svg){ svg.style.transform = ""; } });
-  // 360 viewer
-  let deg = 0, dragging = false, lastX = 0, auto = null;
-  const render360 = () => {
-    const svg = stage.querySelector("svg");
-    if (!svg) return;
-    const shade = .75 + .25 * Math.abs(Math.cos(deg * Math.PI / 180));
-    svg.style.transform = `perspective(700px) rotateY(${deg}deg)`;
-    svg.style.filter = `brightness(${shade})`;
-  };
-  document.getElementById("btn-360").addEventListener("click", e => {
-    e.stopPropagation();
-    if (mode === "v360"){ mode = "static"; main.classList.remove("v360"); clearInterval(auto); setThumb(0); e.currentTarget.innerHTML = U.icon("rotate", "ic-s") + " 360° view"; return; }
-    mode = "v360"; main.classList.add("v360"); setThumb(0);
-    e.currentTarget.innerHTML = U.icon("x", "ic-s") + " Exit 360°";
-    toast("Drag to spin the part", "info");
-    clearInterval(auto); auto = setInterval(() => { if (!dragging){ deg = (deg + 1.2) % 360; render360(); } }, 40);
-  });
-  const start = x => { if (mode !== "v360") return; dragging = true; lastX = x; };
-  const move = x => { if (!dragging || mode !== "v360") return; deg = (deg + (x - lastX) * .8 + 360) % 360; lastX = x; render360(); };
-  main.addEventListener("mousedown", e => start(e.clientX));
-  window.addEventListener("mousemove", e => move(e.clientX));
-  window.addEventListener("mouseup", () => dragging = false);
-  main.addEventListener("touchstart", e => start(e.touches[0].clientX), { passive: true });
-  main.addEventListener("touchmove", e => move(e.touches[0].clientX), { passive: true });
-  main.addEventListener("touchend", () => dragging = false);
   // compatibility
   document.getElementById("cmp-check").addEventListener("click", () => {
     const res = AI.compatCheck(p, document.getElementById("cmp-brand").value, document.getElementById("cmp-model").value);

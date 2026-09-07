@@ -121,17 +121,29 @@ function fanRep(){
   });
   return __fanRep;
 }
+/* Every REAL photograph we have for a product, in display order.
+   The gallery is built from this list, so a product with two photos shows two
+   thumbnails — it no longer pads the strip out to four with generated
+   illustrations ("Angle" / "Schematic") sitting next to the real pictures. */
+function prodPhotoUrls(p){
+  const out = [];
+  const push = u => { if (u && out.indexOf(u) === -1) out.push(u); };
+  if ((p.cat === "ceiling-fan" || p.cat === "table-fan") && USER_PT_IMG[p.pt] && typeof USER_IMGS !== "undefined" && fanRep()[p.cat + "|" + p.pt] === p.sku) push(USER_IMGS[USER_PT_IMG[p.pt]]);
+  push(p.img);
+  (p.imgs || []).forEach(push);                 // extra photos uploaded in the admin
+  if (!out.length){
+    const list = PHOTOS[p.cat + "|" + p.pt];    // shared stock photo for the part type
+    if (list && list.length) push(list[U.hash(p.sku) % list.length]);
+  }
+  return out;
+}
 function prodMediaIdx(p, idx, label){
   const svg = artFor(p.art, p.hue, p.seed + (idx ? "|t" + idx : ""), label || p.name);
-  let url = "";
-  if ((p.cat === "ceiling-fan" || p.cat === "table-fan") && USER_PT_IMG[p.pt] && typeof USER_IMGS !== "undefined" && fanRep()[p.cat + "|" + p.pt] === p.sku) url = USER_IMGS[USER_PT_IMG[p.pt]] || "";
-  if (!url) url = p.img || "";
-  if (!url){
-    const list = PHOTOS[p.cat + "|" + p.pt];
-    if (list && list.length) url = list[(U.hash(p.sku) + (idx || 0)) % list.length];
-  }
-  if (!url || idx >= 2) return `<span class="pm">${svg}</span>`;
-  return `<span class="pm${idx === 1 ? " pm-crop" : ""}">${svg}<img src="${U.esc(url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()"></span>`;
+  const url = prodPhotoUrls(p)[idx || 0] || "";
+  /* the artwork stays layered behind the photo: it keeps the 360 spin and the
+     hover zoom working, and shows through if the photo fails to load */
+  if (!url) return `<span class="pm">${svg}</span>`;
+  return `<span class="pm">${svg}<img src="${U.esc(url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()"></span>`;
 }
 /* Override the base renderer: photo-first with layered SVG fallback */
 prodArt = function(p, label){ return prodMediaIdx(p, 0, label); };

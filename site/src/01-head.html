@@ -534,11 +534,12 @@ html[data-theme="light"] .sk::after{background:linear-gradient(90deg,transparent
 .gal{position:sticky;top:180px;align-self:start}
 @media(max-width:959px){.gal{position:static}}
 .gal-main{position:relative;border-radius:var(--r-xl);overflow:hidden;border:1px solid var(--line);background:linear-gradient(150deg,var(--art-bg1),var(--art-bg2));aspect-ratio:1;cursor:zoom-in}
-.gal-main svg{width:100%;height:100%}
+.gal-main .pm svg{width:100%;height:100%}   /* the product artwork only */
+/* NOT ".gal-main svg" — that also matched the badge and 360-button icons
+   inside the gallery and stretched them to fill the stage (a 16px shield
+   rendered ~358x150px on top of the photo). */
 .gal-main .zoom-lens{position:absolute;inset:0;opacity:0;transition:opacity var(--tfast);background-size:220%;pointer-events:none}
 .gal-main:hover .zoom-lens{opacity:1}
-.gal-badges{position:absolute;top:14px;left:14px;display:flex;flex-direction:column;gap:6px;z-index:3}
-.gal-360{position:absolute;bottom:14px;right:14px;z-index:3}
 .gal-thumbs{display:flex;gap:10px;margin-top:12px;overflow-x:auto;padding-bottom:4px}
 .gth{width:70px;height:70px;flex:none;border-radius:14px;overflow:hidden;border:2px solid var(--line);background:linear-gradient(150deg,var(--art-bg1),var(--art-bg2));transition:border-color var(--tfast);cursor:pointer}
 .gth.on{border-color:var(--brand)}
