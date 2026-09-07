@@ -28,6 +28,13 @@ SITE_DIR = os.environ.get("SITE_DIR", os.path.join(os.path.dirname(BASE_DIR), "s
 # so they stay off unless explicitly enabled for development.
 ENABLE_DOCS = os.environ.get("ENABLE_DOCS", "").lower() in ("1", "true", "yes")
 
+# Optional dedicated hostname for the admin console, e.g. ADMIN_HOST=admin.gflo.in
+# Unset -> nothing changes and the console stays at /admin on every hostname.
+# Set   -> the console answers on that hostname only, and /admin is refused on
+#          the storefront hostname. The session cookie is then scoped to the
+#          admin hostname, so it never travels with shop or API requests.
+ADMIN_HOST = (os.environ.get("ADMIN_HOST") or "").split(":")[0].strip().lower()
+
 app = FastAPI(title="G-FLO Store",
               docs_url="/api/docs" if ENABLE_DOCS else None,
               openapi_url="/openapi.json" if ENABLE_DOCS else None,
@@ -67,8 +74,19 @@ SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 
 @app.middleware("http")
 async def security_middleware(request: Request, call_next):
-    """CSRF enforcement for /admin writes + security headers on every response."""
+    """Host routing + CSRF enforcement for /admin writes + security headers."""
     path = request.url.path
+
+    if ADMIN_HOST:
+        host = (request.headers.get("host") or "").split(":")[0].strip().lower()
+        if host == ADMIN_HOST:
+            # admin.example.com/  ->  the console. Assets and the public API are
+            # left alone so the console's own CSS/JS/photos still resolve.
+            if not path.startswith(("/admin", "/static/", "/media/", "/api/", "/healthz")):
+                request.scope["path"] = path = "/admin" + ("" if path == "/" else path)
+        elif path == "/admin" or path.startswith("/admin/"):
+            # keep the console off the shop hostname entirely
+            return RedirectResponse(f"https://{ADMIN_HOST}{path}", status_code=301)
     if request.method not in SAFE_METHODS and path.startswith("/admin"):
         submitted = request.headers.get(sec.CSRF_HEADER)
         if not submitted:
@@ -155,6 +173,22 @@ def storefront_alias():
 def healthz():
     return {"ok": True}
 
+
+# --------------------------------------------------------- sentry self-test
+# Sentry's onboarding "Verify" step: this route crashes on purpose so Sentry
+# records its first event and finishes setup.
+#
+# It only exists when SENTRY_DEBUG_ROUTE is switched on, so the live shop never
+# carries a public URL that anyone can hit to generate 500s and burn through
+# your Sentry quota. Turn it on, visit it once, then turn it off again — no
+# code change needed either way.
+if os.environ.get("SENTRY_DEBUG_ROUTE", "").lower() in ("1", "true", "yes"):
+    @app.get("/sentry-debug")
+    def sentry_debug():
+        division_by_zero = 1 / 0          # noqa: F841  (intentional)
+        return {"ok": True}
+
+
 @app.get("/{asset_path:path}")
 def site_assets(asset_path: str):
     """Serve the storefront's own folders (brand-photos/, tools-photos/, assets/)."""
@@ -167,4 +201,3 @@ def site_assets(asset_path: str):
     if os.path.isfile(full):
         return FileResponse(full, headers={"Cache-Control": "public, max-age=86400"})
     return JSONResponse({"detail": "Not found"}, 404)
-
