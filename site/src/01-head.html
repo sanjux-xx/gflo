@@ -329,8 +329,9 @@ html[data-theme="light"] .b-deal{color:#e11d48}html[data-theme="light"] .b-new{c
 .cat-tile:hover .ct-ic{transform:scale(1.12) rotate(-7deg)}
 .foot-min{margin-top:clamp(16px,3.5vw,32px)}
 /* brand showcase homepage */
-.bhero{background:#080808;color:#fff;overflow:hidden}
-.bhero .wrap{display:flex;flex-direction:column;padding-top:14px;padding-bottom:clamp(26px,4vw,44px)}
+.bhero{background:#000;color:#fff;overflow:hidden}
+.bhero .wrap{display:flex;flex-direction:column;padding-top:14px;padding-bottom:clamp(20px,3vw,34px)}
+.bh-intro{padding-top:clamp(26px,6vw,68px)}
 .bhero-full .wrap{min-height:100vh;min-height:100svh}
 .bh-grid{flex:1;display:grid;gap:clamp(22px,4vw,44px);align-items:center;align-content:center;padding-top:clamp(18px,4vw,40px)}
 @media(min-width:900px){.bh-grid{grid-template-columns:1.15fr 1fr}}
@@ -365,17 +366,23 @@ body.brand-page{padding-bottom:0}
    left to their own devices they ranged from 565px to 1050px tall). The image
    is contained, never stretched: it was being blown up 17% past its real size,
    which is what made it look soft. ---- */
-.brand-strip{background:#080808;padding:clamp(12px,2vw,26px) 0 clamp(40px,6vw,80px)}
-.brand-strip .wrap{display:flex;flex-direction:column;align-items:center;gap:clamp(26px,4vw,56px)}
+.brand-strip{background:#000;padding:0 0 clamp(30px,5vw,66px)}
+/* the wrap is narrowed and its side padding dropped so each poster spans the
+   full column instead of sitting small in a 1280px field */
+.brand-strip .wrap{max-width:1080px;padding:0;display:flex;flex-direction:column;
+  align-items:center;gap:clamp(10px,1.6vw,22px)}
 .bs-shot{margin:0;width:100%;display:flex;justify-content:center}
-.bs-shot img{max-width:100%;max-height:clamp(330px,52vh,540px);width:auto;height:auto;display:block;
-  border-radius:20px;box-shadow:0 34px 80px -28px rgba(236,51,56,.42);
-  transition:transform var(--tslow),box-shadow var(--tslow)}
-/* an absolute cap, not max-height:100% — a percentage against the grid area was
-   not resolving and the picture spilled out of its band at full size */
-.bs-shot:hover img{transform:translateY(-6px) scale(1.015);
-  box-shadow:0 44px 96px -26px rgba(236,51,56,.6)}
-@media (max-width:640px){ .bs-shot img{max-height:none;width:100%} }
+/* No radius and no shadow on purpose. Four of the five creatives are posters
+   whose own background is rgb(1,1,1), so against #000 with no frame their edge
+   is invisible and the page reads as one continuous canvas — a rounded, glowing
+   card is what made the surrounding black look like empty margin.
+   max-height keeps one poster to roughly one screen on desktop; on a phone the
+   width cap wins and each one fills the screen edge to edge. */
+.bs-shot img{display:block;margin:0 auto;width:auto;height:auto;
+  max-width:100%;max-height:92vh;
+  transition:transform var(--tslow),filter var(--tslow)}
+.bs-shot:hover img{transform:scale(1.012);filter:brightness(1.06)}
+@media (max-width:640px){ .bs-shot img{max-height:none;width:100%} .brand-strip .wrap{gap:0} }
 .line-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
 .line-card{position:relative;border-radius:var(--r-l);overflow:hidden;border:1px solid var(--line);aspect-ratio:4/4.6;display:block;background:#fff}
 .line-card img{width:100%;height:100%;object-fit:cover;transition:transform var(--tslow)}
