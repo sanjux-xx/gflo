@@ -119,6 +119,7 @@ def sidebar_counts(db: Session) -> dict:
 
 def render(request: Request, template: str, **ctx) -> HTMLResponse:
     db = ctx.get("db")
+    ctx.setdefault("storefront_url", storefront_url())
     ctx.setdefault("csrf_token", getattr(request.state, "csrf", "")
                    or request.cookies.get(sec.CSRF_COOKIE, ""))
     ctx.setdefault("store_name", get_setting(db, "store_name", "G-FLO") if db is not None else "G-FLO")
@@ -141,6 +142,23 @@ def flash(url: str, msg: str = "", err: str = "") -> RedirectResponse:
         q["err"] = err
     parts[4] = urlencode(q)
     return RedirectResponse(urlunparse(parts), status_code=303)
+
+
+_ADMIN_HOST = (os.environ.get("ADMIN_HOST") or "").split(":")[0].strip().lower()
+_SITE_HOST = (os.environ.get("SITE_HOST") or "").split(":")[0].strip().lower()
+
+
+def storefront_url() -> str:
+    """Absolute link to the shop.
+
+    "/" is wrong once the console has its own hostname: on admin.example.com the
+    host router rewrites "/" to "/admin", so a plain "/" link just reopened the
+    console. Point at the real storefront host instead."""
+    if _SITE_HOST:
+        return f"https://{_SITE_HOST}/"
+    if _ADMIN_HOST.startswith("admin."):
+        return "https://" + _ADMIN_HOST[len("admin."):] + "/"
+    return "/"
 
 
 def _elevated(request: Request) -> bool:

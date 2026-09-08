@@ -253,15 +253,20 @@ function csrfToken() {
   /* ------------------------------------------- unsaved changes guard (forms) */
   document.querySelectorAll("form[data-guard]").forEach(function (form) {
     const status = formControls(form, "[data-dirty-note]")[0] || null;
+    const bar = status ? status.closest(".savebar") : null;
     let dirty = false;
     const mark = function () {
       if (dirty) return;
       dirty = true;
       if (status) { status.textContent = "Unsaved changes"; status.classList.add("dirty"); }
+      if (bar) bar.classList.add("show");        // reveal the save bar
     };
     form.addEventListener("input", mark);
     form.addEventListener("change", mark);
-    form.addEventListener("submit", function () { dirty = false; });
+    form.addEventListener("submit", function () {
+      dirty = false;
+      if (bar) bar.classList.remove("show");     // saving: put it away again
+    });
     window.addEventListener("beforeunload", function (e) {
       if (!dirty) return;
       e.preventDefault();
@@ -332,6 +337,14 @@ function csrfToken() {
       ph.className = "thumb-none";
       if (img.parentNode) img.parentNode.replaceChild(ph, img);
     });
+  });
+
+  /* A "new product" form has nothing saved yet — there is no way to create it
+     without the save bar, so show that one immediately. */
+  document.querySelectorAll(".savebar").forEach(function (bar) {
+    var btn = bar.querySelector('[type="submit"]');
+    var label = btn ? (btn.textContent || "") : "";
+    if (/create/i.test(label)) bar.classList.add("show");
   });
 
   /* Category tile photo: the visible button opens the hidden file input, and

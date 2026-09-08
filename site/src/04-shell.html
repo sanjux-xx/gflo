@@ -62,12 +62,31 @@ function brandMark(b, size){
 }
 
 /* ================= SHELL RENDER ================= */
-const NAV = [
-  ["home", "#/", "Home", "home"], ["store", "#/categories", "Store", "store"], ["categories", "#/categories", "Categories", "grid", true],
-  ["brands", "#/brands", "Brands", "store"], ["finder", "#/finder", "Spare Part Finder", "spark"],
-  ["guides", "#/guides", "Repair Guides", "book"], ["deals", "#/deals", "Deals", "percent", false, "hi"],
-  ["support", "#/support", "Support", "headset"], ["account", "#/account", "Account", "user"], ["about", "#/about", "About Us", "info"], ["contact", "#/contact", "Contact Us", "mail"]
+/* [key, href, label, icon, isMegaMenu, extraClass, scope]
+   scope decides which hostname shows the item once the brand/shop split is on:
+     "brand" -> only gflo.in      "shop" -> only store.gflo.in     omitted -> both
+   The old "Store" entry is gone: it pointed at #/categories, so on the shop host
+   it was a button that appeared to do nothing (you were already there) and it
+   duplicated the Categories menu next to it. */
+const NAV_ALL = [
+  ["home", "#/", "Home", "home"],
+  ["categories", "#/categories", "Categories", "grid", true, "", "shop"],
+  ["brands", "#/brands", "Brands", "store", false, "", "shop"],
+  ["finder", "#/finder", "Spare Part Finder", "spark", false, "", "shop"],
+  ["guides", "#/guides", "Repair Guides", "book", false, "", "brand"],
+  ["deals", "#/deals", "Deals", "percent", false, "hi", "shop"],
+  ["support", "#/support", "Support", "headset", false, "", "brand"],
+  ["account", "#/account", "Account", "user", false, "", "shop"],
+  ["about", "#/about", "About Us", "info", false, "", "brand"],
+  ["contact", "#/contact", "Contact Us", "mail", false, "", "brand"]
 ];
+/* which side of the split are we on? ("" = not split, show everything) */
+const NAV_SIDE = (typeof HOSTS !== "undefined" && HOSTS)
+  ? (location.hostname === HOSTS.store ? "shop" : "brand") : "";
+const NAV = NAV_ALL.filter(n => !NAV_SIDE || !n[6] || n[6] === NAV_SIDE);
+/* the brand site needs one obvious way into the shop */
+const SHOP_CTA = (NAV_SIDE === "brand" && typeof HOSTS !== "undefined" && HOSTS)
+  ? `<a class="nav-lnk hi" href="https://${HOSTS.store}/#/categories">${U.icon("store", "ic-s")} Shop Now</a>` : "";
 function renderShell(){
   document.getElementById("hdr").innerHTML = `
   <div class="topbar"><div class="wrap"><div class="tb-l"><span>${U.icon("truck")} ${CATALOG_MODE ? "Pan-India tracked delivery" : "FREE delivery above ₹4,999"}</span><span class="hide-sm">${U.icon("rotate")} 7-day easy returns</span></div><div class="row" style="gap:16px"><span>${U.icon("phone")} Order status: ${CONTACT.phone}</span></div></div></div>
@@ -89,7 +108,7 @@ function renderShell(){
   <div class="navbar"><div class="wrap"><nav class="nav-row" aria-label="Primary">
     ${NAV.map(n => n[4]
       ? `<div class="mega-wr"><button class="nav-lnk" data-act="mega" data-nav="${n[0]}" aria-haspopup="true" aria-expanded="false">${U.icon(n[3], "ic-s")} ${n[2]} ${U.icon("chev-d", "ic-s")}</button><div class="mega" id="mega" role="menu" aria-label="Categories mega menu"><div class="mega-cats" id="mega-cats"></div><div class="mega-body" id="mega-body"></div></div></div>`
-      : `<a class="nav-lnk ${n[5] || ""}" data-nav="${n[0]}" href="${hostedLink(n[1])}">${U.icon(n[3], "ic-s")} ${n[2]}</a>`).join("")}
+      : `<a class="nav-lnk ${n[5] || ""}" data-nav="${n[0]}" href="${hostedLink(n[1])}">${U.icon(n[3], "ic-s")} ${n[2]}</a>`).join("") + SHOP_CTA}
   </nav></div></div>`;
 
   window.__ftrFull = () => `

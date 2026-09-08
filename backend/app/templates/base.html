@@ -54,7 +54,7 @@
       <a class="nav-item {{ 'on' if path.startswith('/admin/import') }}" href="/admin/import">{{ icon('upload') }} Import / export</a>
       <a class="nav-item {{ 'on' if path.startswith('/admin/settings') }}" href="/admin/settings">{{ icon('cog') }} Settings</a>
       <a class="nav-item {{ 'on' if path.startswith('/admin/activity') }}" href="/admin/activity">{{ icon('activity') }} Activity log</a>
-      <a class="nav-item" href="/" target="_blank" rel="noopener">{{ icon('store') }} View storefront</a>
+      <a class="nav-item" href="{{ storefront_url }}" target="_blank" rel="noopener">{{ icon('store') }} View storefront</a>
     </div>
     <div class="side-foot">
       <div class="who">
