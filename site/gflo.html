@@ -359,6 +359,13 @@ body.brand-page{padding-bottom:0}
 .bhero .bh-stats{display:flex;gap:clamp(18px,3.5vw,40px);margin-top:26px;flex-wrap:wrap}
 .bhero .bh-stats b{display:block;font-family:var(--fd);font-size:clamp(20px,2.4vw,27px);color:#fff}
 .bhero .bh-stats span{font-size:12px;color:rgba(255,255,255,.5)}
+/* ---- brand home: the remaining creatives, presented exactly like the hero
+   image — a plain picture on black. No card, no border, no caption, no link:
+   they are artwork, not category tiles. ---- */
+.brand-strip{background:#080808;padding:clamp(10px,2vw,24px) 0 clamp(34px,6vw,70px)}
+.brand-strip .wrap{display:flex;flex-direction:column;align-items:center;gap:clamp(26px,4vw,52px)}
+.bs-shot{display:block;width:100%;max-width:min(700px,92vw);height:auto;border-radius:24px;
+  box-shadow:0 40px 90px -30px rgba(236,51,56,.35)}
 .line-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
 .line-card{position:relative;border-radius:var(--r-l);overflow:hidden;border:1px solid var(--line);aspect-ratio:4/4.6;display:block;background:#fff}
 .line-card img{width:100%;height:100%;object-fit:cover;transition:transform var(--tslow)}
@@ -2536,14 +2543,11 @@ Pages.home = () => `
     </div>
   </section>
 
-  <section class="sec-tight"><div class="wrap">
-    ${sectionHead("Engineered in-house", "The parts behind the performance", "Shot on our own bench — and stocked in the Store.")}
-    <div class="line-grid">
-      <a class="line-card rv" href="#/c/ceiling-fan"><img src="assets/fan-bronze.jpg" alt="G-FLO ceiling fan, component by component" loading="lazy"><span class="lc-cap"><b>Ceiling Fans</b><span>Shop Now ${U.icon("arr-r", "ic-s")}</span></span></a>
-      <a class="line-card rv rv-d1" href="#/c/power-tools"><img src="assets/power-tools.jpg" alt="G-FLO power tool kit" loading="lazy"><span class="lc-cap"><b>Power Tools</b><span>Shop Now ${U.icon("arr-r", "ic-s")}</span></span></a>
-      <a class="line-card rv rv-d2" href="#/c/cable-management"><img src="assets/wire-connectors.jpg" alt="G-FLO CH2 quick wire connectors" loading="lazy"><span class="lc-cap"><b>Wire Connectors</b><span>Shop Now ${U.icon("arr-r", "ic-s")}</span></span></a>
-      <a class="line-card rv rv-d3" href="#/c/electrical"><img src="assets/safety-plugs.jpg" alt="G-FLO CH-3 safety plugs" loading="lazy"><span class="lc-cap"><b>Safety Plugs</b><span>Shop Now ${U.icon("arr-r", "ic-s")}</span></span></a>
-    </div>
+  <section class="brand-strip"><div class="wrap">
+    <img class="bs-shot" src="assets/fan-bronze.jpg" alt="G-FLO ceiling fan, component by component" loading="lazy">
+    <img class="bs-shot" src="assets/power-tools.jpg" alt="G-FLO power tool kit" loading="lazy">
+    <img class="bs-shot" src="assets/wire-connectors.jpg" alt="G-FLO CH2 quick wire connectors" loading="lazy">
+    <img class="bs-shot" src="assets/safety-plugs.jpg" alt="G-FLO CH-3 safety plugs" loading="lazy">
   </div></section>`;
 Mount.home = () => {};
 </script>

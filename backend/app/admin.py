@@ -146,14 +146,21 @@ def flash(url: str, msg: str = "", err: str = "") -> RedirectResponse:
 
 _ADMIN_HOST = (os.environ.get("ADMIN_HOST") or "").split(":")[0].strip().lower()
 _SITE_HOST = (os.environ.get("SITE_HOST") or "").split(":")[0].strip().lower()
+_STORE_HOST = (os.environ.get("STORE_HOST") or "").split(":")[0].strip().lower()
 
 
 def storefront_url() -> str:
-    """Absolute link to the shop.
+    """Absolute link to the shop, for the "View storefront" link.
 
-    "/" is wrong once the console has its own hostname: on admin.example.com the
-    host router rewrites "/" to "/admin", so a plain "/" link just reopened the
-    console. Point at the real storefront host instead."""
+    Two things this has to get right:
+      * "/" is wrong once the console has its own hostname — on admin.example.com
+        the host router rewrites "/" to "/admin", so a plain "/" link just
+        reopened the console instead of the shop.
+      * When the site is split, "view storefront" from the ADMIN means the shop
+        (store.example.com), not the brand landing page — so STORE_HOST wins.
+    """
+    if _STORE_HOST:
+        return f"https://{_STORE_HOST}/"
     if _SITE_HOST:
         return f"https://{_SITE_HOST}/"
     if _ADMIN_HOST.startswith("admin."):
