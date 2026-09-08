@@ -18,10 +18,10 @@
           <tr>
             <th class="w-img">Tile</th>
             <th>Name</th>
-            <th>ID</th>
-            <th class="c">Popular</th>
+            <th class="col-cid">ID</th>
+            <th class="c col-pop">Popular</th>
             <th class="r">Products</th>
-            <th class="r">Order</th>
+            <th class="r col-ord">Order</th>
             <th class="w-act"></th>
           </tr>
         </thead>
@@ -36,8 +36,8 @@
               <b>{{ c.name }}</b>
               {% if c.description %}<div class="pmeta">{{ c.description }}</div>{% endif %}
             </td>
-            <td><span class="mono sku">{{ c.id }}</span></td>
-            <td class="c">
+            <td class="col-cid"><span class="mono sku">{{ c.id }}</span></td>
+            <td class="c col-pop">
               {% if c.popular %}<span class="bdg bdg-ok"><span class="dot"></span>Yes</span>
               {% else %}<span class="bdg bdg-mute">No</span>{% endif %}
             </td>
@@ -45,7 +45,7 @@
               {% set n = counts_map.get(c.id, 0) %}
               {% if n %}<a href="/admin/products?cat={{ c.id }}"><b>{{ n }}</b></a>{% else %}<span class="mut">0</span>{% endif %}
             </td>
-            <td class="r mut">{{ c.sort_order }}</td>
+            <td class="r mut col-ord">{{ c.sort_order }}</td>
             <td>
               <div class="rowacts">
                 <button class="btn btn-xs" type="button"
@@ -54,6 +54,21 @@
                         data-desc="{{ c.description or '' }}" data-img="{{ c.image_url or '' }}"
                         data-order="{{ c.sort_order }}" data-hue="{{ c.hue }}"
                         data-popular="{{ 1 if c.popular else 0 }}">{{ icon('edit', 13) }} Edit</button>
+                <form method="post" action="/admin/categories/{{ c.id }}/image" style="display:inline"
+                      enctype="multipart/form-data">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="file" name="file" accept="image/*" hidden data-photo-input
+                         id="catimg-{{ c.id }}">
+                  <button class="btn btn-xs btn-ic" type="button" data-photo-pick="catimg-{{ c.id }}"
+                          title="{{ 'Replace photo' if c.image_url else 'Upload photo' }}">{{ icon('upload', 13) }}</button>
+                </form>
+                {% if c.image_url %}
+                <form method="post" action="/admin/categories/{{ c.id }}/image/delete" style="display:inline"
+                      data-confirm="Remove the photo from “{{ c.name }}”?">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button class="btn btn-xs btn-ic" title="Remove photo">{{ icon('image', 13) }}</button>
+                </form>
+                {% endif %}
                 <form method="post" action="/admin/categories/{{ c.id }}/delete" style="display:inline"
                       data-confirm="Delete category “{{ c.name }}”?">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -90,8 +105,10 @@
           <input class="inp" id="c-desc" name="description" placeholder="Down rods, clamps and canopies">
         </div>
         <div class="field">
-          <label class="lbl" for="c-img">Tile image URL</label>
+          <label class="lbl" for="c-img">Tile image</label>
           <input class="inp" id="c-img" name="image_url" placeholder="/media/products/… or https://…">
+          <span class="help">Paste a link here, or use the upload button on any category
+            row above to pick a photo from this device.</span>
         </div>
         <div class="fg">
           <div class="field">

@@ -89,7 +89,7 @@ function renderShell(){
   <div class="navbar"><div class="wrap"><nav class="nav-row" aria-label="Primary">
     ${NAV.map(n => n[4]
       ? `<div class="mega-wr"><button class="nav-lnk" data-act="mega" data-nav="${n[0]}" aria-haspopup="true" aria-expanded="false">${U.icon(n[3], "ic-s")} ${n[2]} ${U.icon("chev-d", "ic-s")}</button><div class="mega" id="mega" role="menu" aria-label="Categories mega menu"><div class="mega-cats" id="mega-cats"></div><div class="mega-body" id="mega-body"></div></div></div>`
-      : `<a class="nav-lnk ${n[5] || ""}" data-nav="${n[0]}" href="${n[1]}">${U.icon(n[3], "ic-s")} ${n[2]}</a>`).join("")}
+      : `<a class="nav-lnk ${n[5] || ""}" data-nav="${n[0]}" href="${hostedLink(n[1])}">${U.icon(n[3], "ic-s")} ${n[2]}</a>`).join("")}
   </nav></div></div>`;
 
   window.__ftrFull = () => `
@@ -118,7 +118,7 @@ function renderShell(){
   <aside class="drawer left" id="mnav" aria-hidden="true" role="dialog" aria-label="Menu">
     <div class="dr-hd"><a class="logo" href="#/"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions" style="height:32px"></a><button class="btn btn-icon" data-act="close" aria-label="Close menu">${U.icon("x")}</button></div>
     <div class="dr-body">
-      ${NAV.map(n => `<a class="acc-lnk" href="${n[1]}" style="margin-bottom:2px">${U.icon(n[3], "ic-s")} ${n[2]}</a>`).join("")}
+      ${NAV.map(n => `<a class="acc-lnk" href="${hostedLink(n[1])}" style="margin-bottom:2px">${U.icon(n[3], "ic-s")} ${n[2]}</a>`).join("")}
     </div>
   </aside>
   <div class="modal-wr" id="modal-wr" aria-hidden="true" role="dialog" aria-modal="true">

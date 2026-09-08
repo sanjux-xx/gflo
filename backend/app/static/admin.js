@@ -334,6 +334,24 @@ function csrfToken() {
     });
   });
 
+  /* Category tile photo: the visible button opens the hidden file input, and
+     choosing a file submits its form straight away — one tap, no extra screen.
+     Kept here (not inline) because of the strict Content-Security-Policy. */
+  document.querySelectorAll("[data-photo-pick]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var input = document.getElementById(btn.getAttribute("data-photo-pick"));
+      if (input) input.click();
+    });
+  });
+  document.querySelectorAll("[data-photo-input]").forEach(function (input) {
+    input.addEventListener("change", function () {
+      if (!input.files || !input.files.length) return;
+      if (window.gfloToast) window.gfloToast("Uploading photo…", "info");
+      var form = input.closest("form");
+      if (form) (form.requestSubmit ? form.requestSubmit() : form.submit());
+    });
+  });
+
   /* Categories page: "Edit" loads the row into the add/update form */
   document.querySelectorAll("[data-edit-cat]").forEach(function (btn) {
     btn.addEventListener("click", function () {

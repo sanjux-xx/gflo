@@ -35,6 +35,15 @@ ENABLE_DOCS = os.environ.get("ENABLE_DOCS", "").lower() in ("1", "true", "yes")
 #          admin hostname, so it never travels with shop or API requests.
 ADMIN_HOST = (os.environ.get("ADMIN_HOST") or "").split(":")[0].strip().lower()
 
+# Optional split of the storefront across two hostnames, GM-Modular style:
+#   SITE_HOST=gflo.in         the brand site  (home, guides, about, contact, policies)
+#   STORE_HOST=store.gflo.in  the shop        (catalogue, product pages, cart, account)
+# Both are served by THIS app; the storefront JS reads the pair below and sends
+# a visitor to the right hostname for the page they asked for. Leave either one
+# unset and the site behaves as a single host exactly as before.
+SITE_HOST = (os.environ.get("SITE_HOST") or "").split(":")[0].strip().lower()
+STORE_HOST = (os.environ.get("STORE_HOST") or "").split(":")[0].strip().lower()
+
 app = FastAPI(title="G-FLO Store",
               docs_url="/api/docs" if ENABLE_DOCS else None,
               openapi_url="/openapi.json" if ENABLE_DOCS else None,
@@ -154,6 +163,24 @@ app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 
 
+_SITE_CACHE = {"mtime": None, "html": None}
+
+
+def _storefront_html(index: str) -> str:
+    """gflo.html with the hostname pair injected, re-read when the file changes."""
+    mtime = os.stat(index).st_mtime
+    if _SITE_CACHE["mtime"] != mtime:
+        html = open(index, encoding="utf-8").read()
+        if SITE_HOST and STORE_HOST:
+            import json as _json
+            cfg = ("<script>window.GFLO_HOSTS=" +
+                   _json.dumps({"main": SITE_HOST, "store": STORE_HOST}) + ";</script>")
+            if "</head>" in html:
+                html = html.replace("</head>", cfg + "</head>", 1)
+        _SITE_CACHE.update(mtime=mtime, html=html)
+    return _SITE_CACHE["html"]
+
+
 @app.get("/", response_class=HTMLResponse)
 def storefront():
     index = os.path.join(SITE_DIR, "gflo.html")
@@ -161,6 +188,8 @@ def storefront():
         return HTMLResponse(
             "<h1>Storefront file missing</h1>"
             f"<p>Expected <code>{index}</code>. Set SITE_DIR to the folder holding gflo.html.</p>", 500)
+    if SITE_HOST and STORE_HOST:
+        return HTMLResponse(_storefront_html(index), headers={"Cache-Control": "no-cache"})
     return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
 

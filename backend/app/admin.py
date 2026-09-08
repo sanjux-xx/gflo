@@ -662,6 +662,45 @@ async def category_save(request: Request, db: Session = Depends(get_db)):
     return flash("/admin/categories", msg=f"Saved “{name}”.")
 
 
+@router.post("/categories/{cid}/image")
+async def category_image_upload(request: Request, cid: str,
+                                file: UploadFile = File(default=None),
+                                db: Session = Depends(get_db)):
+    """Upload a tile photo for a category. Same validation as product photos:
+    the bytes must really decode as an image, and oversized canvases are
+    refused."""
+    if not _user(request):
+        return _login_redirect(request)
+    c = db.get(Category, cid)
+    if not c:
+        return flash("/admin/categories", err="That category no longer exists.")
+    if not file or not file.filename:
+        return flash("/admin/categories", err="Choose a photo to upload.")
+    try:
+        url = save_upload(file.filename, await file.read())
+    except ValueError as exc:
+        return flash("/admin/categories", err=f"{file.filename}: {exc}")
+    delete_media(c.image_url)          # drop the previous upload, if any
+    c.image_url = url
+    log(db, _user(request), "upload_image", "category", cid, url)
+    db.commit()
+    return flash("/admin/categories", msg=f"Photo updated for “{c.name}”.")
+
+
+@router.post("/categories/{cid}/image/delete")
+def category_image_delete(request: Request, cid: str, db: Session = Depends(get_db)):
+    if not _user(request):
+        return _login_redirect(request)
+    c = db.get(Category, cid)
+    if not c:
+        return flash("/admin/categories", err="That category no longer exists.")
+    delete_media(c.image_url)
+    c.image_url = ""
+    log(db, _user(request), "delete_image", "category", cid)
+    db.commit()
+    return flash("/admin/categories", msg=f"Photo removed from “{c.name}”.")
+
+
 @router.post("/categories/{cid}/delete")
 def category_delete(request: Request, cid: str, db: Session = Depends(get_db)):
     if not _user(request):

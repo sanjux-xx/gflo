@@ -506,6 +506,23 @@ tr:hover .rowacts,.rowacts:focus-within{opacity:1}
   .savebar .acts{width:100%}
   .savebar .acts .btn{flex:1}
 }
+/* Categories/brands tables on a phone: the 860px min-width made the row run off
+   the right edge and cut the action buttons off. Drop the columns you can live
+   without on a small screen instead of forcing a sideways scroll. */
+@media (max-width:900px){
+  .tbl .col-cid,.tbl .col-ord{display:none}
+}
+@media (max-width:680px){
+  .tbl .col-pop{display:none}
+  .tblwrap .tbl{min-width:0}
+  /* row actions become icon-only: with Edit + upload + remove + delete the
+     labelled buttons pushed the last one off the right edge of a phone.
+     font-size:0 drops the text; the icons keep their own width/height. */
+  .tbl .rowacts{gap:4px;flex-wrap:wrap;max-width:78px}   /* wrap into 2 rows so the cell stays narrow */
+  .tbl .rowacts .btn{font-size:0;padding:5px 7px;gap:0}
+  .tbl .rowacts .btn .ic{width:14px;height:14px}
+  .tbl td,.tbl th{padding:9px 7px}
+}
 @media (max-width:620px){
   .gsearch kbd{display:none}
   .ph h1{font-size:19px}

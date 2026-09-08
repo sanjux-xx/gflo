@@ -58,6 +58,11 @@ ul,ol{margin:0;padding:0;list-style:none}
 ::selection{background:rgba(236,51,56,.35)}
 :focus{outline:none}
 :focus-visible{outline:2px solid var(--brand2);outline-offset:2px;border-radius:6px}
+/* ...but not for a field sitting inside a search pill: the pill itself already
+   shows focus via .sbox:focus-within, and the ring above was being drawn as a
+   second red rounded box INSIDE the bar as soon as you started typing.
+   Keyboard focus stays clearly visible through the pill border + glow. */
+.sbox input:focus-visible{outline:none}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 
 /* layout */

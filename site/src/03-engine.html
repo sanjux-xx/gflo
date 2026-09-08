@@ -196,15 +196,28 @@ const Search = {
     return it;
   },
   score(p, toks, it){
-    let s = 0;
+    let s = 0, hits = 0, wordHits = 0;
     const hay = U.slug(p.name + " " + p.sku + " " + catOf(p).name + " " + ptOf(p).name + " " + brandNames(p, 6));
-    toks.forEach(t => { if (hay.includes(t)) s += t.length > 3 ? 3 : 1.5; });
-    if (it.cat && p.cat === it.cat) s += 6;
-    if (it.pt && p.pt === it.pt) s += 6;
-    if (it.brand && p.brandFor.includes(it.brand)) s += 5;
-    if (it.model && p.compat.includes(it.model)) s += 10;
+    const name = U.slug(p.name);
+    toks.forEach(t => {
+      if (hay.includes(t)) { s += t.length > 3 ? 3 : 1.5; hits++; wordHits++; }
+      if (name.includes(t)) s += 2;          // a hit in the part's own name counts for more
+    });
+    /* every word of a multi-word query is present -> almost certainly what they meant */
+    if (toks.length > 1 && wordHits === toks.length) s += 5;
+    if (it.cat && p.cat === it.cat) { s += 6; hits++; }
+    if (it.pt && p.pt === it.pt) { s += 6; hits++; }
+    if (it.brand && p.brandFor.includes(it.brand)) { s += 5; hits++; }
+    if (it.model && p.compat.includes(it.model)) { s += 10; hits++; }
+    /* Nothing about this part matched the query, so it is not a result.
+       This guard is the important bit: the popularity bonus below is worth up
+       to ~4.5 points on its own, which used to clear the "s > 3" cut-off all by
+       itself — so a search for "spring" returned 443 of 896 products, ranked by
+       how well they sell rather than by whether they were springs. */
+    if (!hits) return 0;
     if (it.maxPrice && p.price <= it.maxPrice) s += 2;
     if (it.maxPrice && p.price > it.maxPrice) s -= 8;
+    /* popularity only ever breaks ties between genuine matches */
     s += p.rating / 2 + Math.min(2, p.sold / 1500);
     return s;
   },
@@ -277,6 +290,46 @@ const AI = {
 
 /* ================= ROUTER ================= */
 const Pages = {}, Mount = {};
+/* ============ two-hostname split (brand site vs shop) ============
+   The server injects window.GFLO_HOSTS = {main, store} when SITE_HOST and
+   STORE_HOST are both configured. Shop pages then live on the store hostname
+   and brand pages on the main one, and asking the wrong host for a page sends
+   you to the right one — so neither hostname serves the other's pages and
+   Google does not see the catalogue duplicated across two domains.
+   With no config injected, everything below is inert and the site stays
+   single-host exactly as before.                                          */
+const HOSTS = (typeof window !== "undefined" && window.GFLO_HOSTS) || null;
+const SHOP_PAGES = ["categories", "category", "brands", "brand", "deals", "search",
+                    "product", "finder", "cart", "checkout", "order", "wishlist", "account"];
+function hostFor(page){
+  if (!HOSTS) return null;
+  return SHOP_PAGES.indexOf(page) >= 0 ? HOSTS.store : HOSTS.main;
+}
+function onWrongHost(page){
+  if (!HOSTS) return false;
+  const want = hostFor(page);
+  return want && location.hostname !== want;
+}
+/* which page a "#/..." link resolves to, so a link can be pointed at the right host */
+function pageOfHash(hash){
+  const seg = String(hash || "").replace(/^#\/?/, "").split("/")[0];
+  const m = { "": "home", categories: "categories", c: "category", brands: "brands", b: "brand",
+              deals: "deals", search: "search", p: "product", finder: "finder", guides: "guides",
+              g: "guide", support: "support", account: "account", cart: "cart", checkout: "checkout",
+              order: "order", wishlist: "wishlist", about: "about", contact: "contact", policy: "policy" };
+  return m[seg] || "home";
+}
+/* a "#/..." link rewritten to the hostname that owns it (unchanged when single-host) */
+function hostedLink(hash){ return hostedHref(pageOfHash(hash), hash); }
+
+/* absolute link to a route on whichever hostname owns it */
+function hostedHref(page, hash){
+  if (!HOSTS) return hash;
+  const want = hostFor(page);
+  if (!want || location.hostname === want) return hash;
+  return "https://" + want + "/" + hash;
+}
+
 const Router = {
   parse(){
     const h = location.hash.replace(/^#\/?/, "");
@@ -295,6 +348,10 @@ const Router = {
   go(){
     closeOverlays();
     const { page, param } = this.parse();
+    if (onWrongHost(page)){
+      location.replace("https://" + hostFor(page) + "/" + location.hash);
+      return;
+    }
     const app = document.getElementById("app");
     const fn = Pages[page] || Pages.notfound;
     app.innerHTML = `<div class="pg" id="pg-${page}">${fn(param)}</div>`;

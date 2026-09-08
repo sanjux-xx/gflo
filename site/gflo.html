@@ -58,6 +58,11 @@ ul,ol{margin:0;padding:0;list-style:none}
 ::selection{background:rgba(236,51,56,.35)}
 :focus{outline:none}
 :focus-visible{outline:2px solid var(--brand2);outline-offset:2px;border-radius:6px}
+/* ...but not for a field sitting inside a search pill: the pill itself already
+   shows focus via .sbox:focus-within, and the ring above was being drawn as a
+   second red rounded box INSIDE the bar as soon as you started typing.
+   Keyboard focus stays clearly visible through the pill border + glow. */
+.sbox input:focus-visible{outline:none}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 
 /* layout */
@@ -1582,15 +1587,28 @@ const Search = {
     return it;
   },
   score(p, toks, it){
-    let s = 0;
+    let s = 0, hits = 0, wordHits = 0;
     const hay = U.slug(p.name + " " + p.sku + " " + catOf(p).name + " " + ptOf(p).name + " " + brandNames(p, 6));
-    toks.forEach(t => { if (hay.includes(t)) s += t.length > 3 ? 3 : 1.5; });
-    if (it.cat && p.cat === it.cat) s += 6;
-    if (it.pt && p.pt === it.pt) s += 6;
-    if (it.brand && p.brandFor.includes(it.brand)) s += 5;
-    if (it.model && p.compat.includes(it.model)) s += 10;
+    const name = U.slug(p.name);
+    toks.forEach(t => {
+      if (hay.includes(t)) { s += t.length > 3 ? 3 : 1.5; hits++; wordHits++; }
+      if (name.includes(t)) s += 2;          // a hit in the part's own name counts for more
+    });
+    /* every word of a multi-word query is present -> almost certainly what they meant */
+    if (toks.length > 1 && wordHits === toks.length) s += 5;
+    if (it.cat && p.cat === it.cat) { s += 6; hits++; }
+    if (it.pt && p.pt === it.pt) { s += 6; hits++; }
+    if (it.brand && p.brandFor.includes(it.brand)) { s += 5; hits++; }
+    if (it.model && p.compat.includes(it.model)) { s += 10; hits++; }
+    /* Nothing about this part matched the query, so it is not a result.
+       This guard is the important bit: the popularity bonus below is worth up
+       to ~4.5 points on its own, which used to clear the "s > 3" cut-off all by
+       itself — so a search for "spring" returned 443 of 896 products, ranked by
+       how well they sell rather than by whether they were springs. */
+    if (!hits) return 0;
     if (it.maxPrice && p.price <= it.maxPrice) s += 2;
     if (it.maxPrice && p.price > it.maxPrice) s -= 8;
+    /* popularity only ever breaks ties between genuine matches */
     s += p.rating / 2 + Math.min(2, p.sold / 1500);
     return s;
   },
@@ -1663,6 +1681,46 @@ const AI = {
 
 /* ================= ROUTER ================= */
 const Pages = {}, Mount = {};
+/* ============ two-hostname split (brand site vs shop) ============
+   The server injects window.GFLO_HOSTS = {main, store} when SITE_HOST and
+   STORE_HOST are both configured. Shop pages then live on the store hostname
+   and brand pages on the main one, and asking the wrong host for a page sends
+   you to the right one — so neither hostname serves the other's pages and
+   Google does not see the catalogue duplicated across two domains.
+   With no config injected, everything below is inert and the site stays
+   single-host exactly as before.                                          */
+const HOSTS = (typeof window !== "undefined" && window.GFLO_HOSTS) || null;
+const SHOP_PAGES = ["categories", "category", "brands", "brand", "deals", "search",
+                    "product", "finder", "cart", "checkout", "order", "wishlist", "account"];
+function hostFor(page){
+  if (!HOSTS) return null;
+  return SHOP_PAGES.indexOf(page) >= 0 ? HOSTS.store : HOSTS.main;
+}
+function onWrongHost(page){
+  if (!HOSTS) return false;
+  const want = hostFor(page);
+  return want && location.hostname !== want;
+}
+/* which page a "#/..." link resolves to, so a link can be pointed at the right host */
+function pageOfHash(hash){
+  const seg = String(hash || "").replace(/^#\/?/, "").split("/")[0];
+  const m = { "": "home", categories: "categories", c: "category", brands: "brands", b: "brand",
+              deals: "deals", search: "search", p: "product", finder: "finder", guides: "guides",
+              g: "guide", support: "support", account: "account", cart: "cart", checkout: "checkout",
+              order: "order", wishlist: "wishlist", about: "about", contact: "contact", policy: "policy" };
+  return m[seg] || "home";
+}
+/* a "#/..." link rewritten to the hostname that owns it (unchanged when single-host) */
+function hostedLink(hash){ return hostedHref(pageOfHash(hash), hash); }
+
+/* absolute link to a route on whichever hostname owns it */
+function hostedHref(page, hash){
+  if (!HOSTS) return hash;
+  const want = hostFor(page);
+  if (!want || location.hostname === want) return hash;
+  return "https://" + want + "/" + hash;
+}
+
 const Router = {
   parse(){
     const h = location.hash.replace(/^#\/?/, "");
@@ -1681,6 +1739,10 @@ const Router = {
   go(){
     closeOverlays();
     const { page, param } = this.parse();
+    if (onWrongHost(page)){
+      location.replace("https://" + hostFor(page) + "/" + location.hash);
+      return;
+    }
     const app = document.getElementById("app");
     const fn = Pages[page] || Pages.notfound;
     app.innerHTML = `<div class="pg" id="pg-${page}">${fn(param)}</div>`;
@@ -1956,7 +2018,7 @@ function renderShell(){
   <div class="navbar"><div class="wrap"><nav class="nav-row" aria-label="Primary">
     ${NAV.map(n => n[4]
       ? `<div class="mega-wr"><button class="nav-lnk" data-act="mega" data-nav="${n[0]}" aria-haspopup="true" aria-expanded="false">${U.icon(n[3], "ic-s")} ${n[2]} ${U.icon("chev-d", "ic-s")}</button><div class="mega" id="mega" role="menu" aria-label="Categories mega menu"><div class="mega-cats" id="mega-cats"></div><div class="mega-body" id="mega-body"></div></div></div>`
-      : `<a class="nav-lnk ${n[5] || ""}" data-nav="${n[0]}" href="${n[1]}">${U.icon(n[3], "ic-s")} ${n[2]}</a>`).join("")}
+      : `<a class="nav-lnk ${n[5] || ""}" data-nav="${n[0]}" href="${hostedLink(n[1])}">${U.icon(n[3], "ic-s")} ${n[2]}</a>`).join("")}
   </nav></div></div>`;
 
   window.__ftrFull = () => `
@@ -1985,7 +2047,7 @@ function renderShell(){
   <aside class="drawer left" id="mnav" aria-hidden="true" role="dialog" aria-label="Menu">
     <div class="dr-hd"><a class="logo" href="#/"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions" style="height:32px"></a><button class="btn btn-icon" data-act="close" aria-label="Close menu">${U.icon("x")}</button></div>
     <div class="dr-body">
-      ${NAV.map(n => `<a class="acc-lnk" href="${n[1]}" style="margin-bottom:2px">${U.icon(n[3], "ic-s")} ${n[2]}</a>`).join("")}
+      ${NAV.map(n => `<a class="acc-lnk" href="${hostedLink(n[1])}" style="margin-bottom:2px">${U.icon(n[3], "ic-s")} ${n[2]}</a>`).join("")}
     </div>
   </aside>
   <div class="modal-wr" id="modal-wr" aria-hidden="true" role="dialog" aria-modal="true">
