@@ -303,6 +303,10 @@ const SHOP_PAGES = ["categories", "category", "brands", "brand", "deals", "searc
                     "product", "finder", "cart", "checkout", "order", "wishlist", "account"];
 function hostFor(page){
   if (!HOSTS) return null;
+  /* "home" is the brand page — but store.example.com/ with no hash also parses
+     as "home", and bouncing that to the brand site made the shop hostname
+     impossible to open. On the shop host, a bare root stays put. */
+  if (page === "home" && location.hostname === HOSTS.store) return HOSTS.store;
   return SHOP_PAGES.indexOf(page) >= 0 ? HOSTS.store : HOSTS.main;
 }
 function onWrongHost(page){
@@ -335,6 +339,8 @@ const Router = {
     const h = location.hash.replace(/^#\/?/, "");
     const seg = h.split("/").map(decodeURIComponent);
     const map = { "": ["home"], categories: ["categories"], c: ["category", seg[1]], brands: ["brands"], b: ["brand", seg[1]], deals: ["deals"], search: ["search", seg.slice(1).join("/")], p: ["product", seg[1]], finder: ["finder", seg[1]], guides: ["guides"], g: ["guide", seg[1]], support: ["support"], account: ["account", seg[1]], cart: ["cart"], checkout: ["checkout"], order: ["order", seg[1]], wishlist: ["wishlist"], seller: ["seller", seg[1]], admin: ["admin", seg[1]], about: ["about"], contact: ["contact"], policy: ["policy", seg[1]], login: ["account", "overview"] };  /* no customer sign-in — #/login lands on the account page */
+    /* the shop hostname's bare root opens the catalogue, not the brand home */
+    if (!h && HOSTS && location.hostname === HOSTS.store) return { page: "categories" };
     const m = map[seg[0]] || ["notfound"];
     return { page: m[0], param: m[1] };
   },

@@ -359,27 +359,11 @@ body.brand-page{padding-bottom:0}
 .bhero .bh-stats{display:flex;gap:clamp(18px,3.5vw,40px);margin-top:26px;flex-wrap:wrap}
 .bhero .bh-stats b{display:block;font-family:var(--fd);font-size:clamp(20px,2.4vw,27px);color:#fff}
 .bhero .bh-stats span{font-size:12px;color:rgba(255,255,255,.5)}
-/* ---- brand product showcase (gflo.in) — black canvas, red accent ----
-   These are G-FLO's own poster creatives with type baked into them, so the
-   tiles must show the WHOLE image: object-fit:cover was slicing the headings
-   off. Contained on black, which is also what the posters are set on. */
-.brand-lines{background:#080808;color:#fff;padding:clamp(34px,6vw,68px) 0;border-top:1px solid rgba(255,255,255,.07)}
-.bl-head{max-width:640px;margin-bottom:clamp(20px,3vw,30px)}
-.bl-head h2{font-size:clamp(23px,3.4vw,36px);letter-spacing:-.02em;color:#fff;margin:13px 0 10px}
-.bl-head p{color:rgba(255,255,255,.6);font-size:15px;line-height:1.75;margin:0}
-.line-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(232px,1fr));gap:clamp(14px,1.8vw,20px)}
-.line-card{position:relative;border-radius:18px;overflow:hidden;display:block;
-  border:1px solid rgba(255,255,255,.10);background:#0e0e0e;aspect-ratio:4/5;
-  transition:transform var(--tfast),border-color var(--tfast),box-shadow var(--tfast)}
-.line-card img{width:100%;height:100%;object-fit:contain;background:#0e0e0e;
-  transition:transform var(--tslow)}
-.line-card:hover{transform:translateY(-4px);border-color:rgba(224,47,39,.55);
-  box-shadow:0 22px 48px -22px rgba(224,47,39,.5)}
-.line-card:hover img{transform:scale(1.04)}
-.line-card .lc-cap{position:absolute;left:0;right:0;bottom:0;padding:44px 15px 14px;
-  background:linear-gradient(transparent,rgba(0,0,0,.82) 55%);color:#fff}
-.line-card .lc-cap span{color:#ff8177}
-.bl-cta{display:flex;justify-content:center;margin-top:clamp(22px,3vw,34px)}
+.line-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+.line-card{position:relative;border-radius:var(--r-l);overflow:hidden;border:1px solid var(--line);aspect-ratio:4/4.6;display:block;background:#fff}
+.line-card img{width:100%;height:100%;object-fit:cover;transition:transform var(--tslow)}
+.line-card:hover img{transform:scale(1.06)}
+.line-card .lc-cap{position:absolute;left:0;right:0;bottom:0;padding:40px 16px 14px;background:linear-gradient(transparent,rgba(0,0,0,.72));color:#fff}
 .line-card .lc-cap b{font-family:var(--fd);font-size:16.5px;display:block}
 .line-card .lc-cap span{font-size:12px;opacity:.82;display:inline-flex;align-items:center;gap:5px;margin-top:3px}
 .store-band{background:var(--g);border-radius:var(--r-xl);color:#fff;padding:clamp(24px,4vw,44px);display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;position:relative;overflow:hidden}

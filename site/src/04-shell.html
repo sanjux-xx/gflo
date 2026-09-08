@@ -179,11 +179,17 @@ function renderFooter(page){
 /* ================= MEGA MENU ================= */
 let megaCat = CATS[0].id;
 function buildMega(){
+  /* The Categories mega-menu is not in the nav on the brand host, so these
+     elements can legitimately be absent. Without this guard renderShell() threw
+     "Cannot set properties of null", boot aborted before Router.go() ever ran,
+     and the whole page rendered blank. */
+  if (!document.getElementById("mega-cats") || !document.getElementById("mega-body")) return;
   document.getElementById("mega-cats").innerHTML = CATS.map(c => `<button class="mega-cat ${c.id === megaCat ? "on" : ""}" data-mega-cat="${c.id}" role="menuitem"><span class="ci">${U.icon("c-" + c.id, "ic-s")}</span>${U.esc(c.name)}</button>`).join("");
   megaBody(megaCat);
 }
 function megaBody(cid){
   const c = CAT_MAP[cid];
+  if (!document.getElementById("mega-body")) return;
   document.getElementById("mega-body").innerHTML = `
     <h4>${U.esc(c.name)} spare parts</h4><span class="mut3">${U.esc(c.desc)} · ${c.pts.length} part families</span>
     <div class="mega-pts">${c.pts.map(pt => `<a class="mega-pt" href="#/c/${c.id}?pt=${pt}"><span class="dot"></span>${PT_MAP[pt].name}</a>`).join("")}</div>
