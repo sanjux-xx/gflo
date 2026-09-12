@@ -184,6 +184,19 @@ def require(request: Request):
 
 
 # ------------------------------------------------------------------- login
+
+def _small_int(raw, default: int, lo: int = 0, hi: int = 1_000_000) -> int:
+    """Parse a short numeric form field and clamp it into a sane range.
+
+    int() alone is not enough: "abc" raises ValueError (caught by the caller),
+    but a 24-digit number parses cleanly in Python and then overflows SQLite's
+    8-byte integer column at commit, surfacing as an unhandled OverflowError.
+    """
+    if raw is None or str(raw).strip() == "":
+        return default
+    value = int(str(raw).strip())          # ValueError handled by the caller
+    return max(lo, min(hi, value))
+
 @router.get("/login", response_class=HTMLResponse)
 def login_form(request: Request, next: str = "/admin", db: Session = Depends(get_db)):
     if _user(request):
@@ -480,8 +493,21 @@ async def product_inline(request: Request, db: Session = Depends(get_db)):
     """Inline price / stock / visibility edit from the products table."""
     if not _user(request):
         return JSONResponse({"ok": False, "error": "Signed out — reload and sign in again."}, 401)
-    data = await request.json()
-    p = db.get(Product, int(data.get("id", 0)))
+    # A malformed body used to raise straight out of the handler and return a
+    # bare HTTP 500. Same for a non-numeric or oversized id.
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "Malformed request body."}, 400)
+    if not isinstance(data, dict):
+        return JSONResponse({"ok": False, "error": "Malformed request body."}, 400)
+    try:
+        pid = int(data.get("id") or 0)
+    except (TypeError, ValueError):
+        return JSONResponse({"ok": False, "error": "Invalid product id."}, 400)
+    if not 0 < pid < 2 ** 31:
+        return JSONResponse({"ok": False, "error": "Product not found"}, 404)
+    p = db.get(Product, pid)
     if not p:
         return JSONResponse({"ok": False, "error": "Product not found"}, 404)
     field, raw = data.get("field"), data.get("value")
@@ -676,8 +702,10 @@ async def category_save(request: Request, db: Session = Depends(get_db)):
     c.description = (form.get("description") or "").strip()
     c.image_url = (form.get("image_url") or "").strip()
     try:
-        c.sort_order = int(form.get("sort_order") or 100)
-        c.hue = int(form.get("hue") or 210)
+        # clamped: a value that parses in Python can still overflow SQLite's
+        # 8-byte integer and blow up at commit time with OverflowError
+        c.sort_order = _small_int(form.get("sort_order"), 100)
+        c.hue = _small_int(form.get("hue"), 210, lo=0, hi=360)
     except ValueError:
         return flash("/admin/categories", err="Sort order and hue must be numbers.")
     c.popular = bool(form.get("popular"))
@@ -763,8 +791,8 @@ async def brand_save(request: Request, db: Session = Depends(get_db)):
     b = db.get(Brand, bid) or Brand(id=bid)
     b.name = name
     try:
-        b.hue = int(form.get("hue") or 210)
-        b.sort_order = int(form.get("sort_order") or 100)
+        b.hue = _small_int(form.get("hue"), 210, lo=0, hi=360)
+        b.sort_order = _small_int(form.get("sort_order"), 100)
     except ValueError:
         return flash("/admin/brands", err="Hue and sort order must be numbers.")
     db.add(b)

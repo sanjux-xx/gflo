@@ -108,7 +108,18 @@ const State = {
     this.save();
     if (!silent){ toast("Added to cart — " + p.short); renderCartDrawer(); openDrawer("cart-drawer"); }
   },
-  setQty(sku, qty){ const it = this.inCart(sku); if (!it) return; it.qty = U.clamp(qty, 0, 99); if (it.qty === 0) this.cart = this.cart.filter(i => i.sku !== sku); this.save(); },
+  setQty(sku, qty){
+    const it = this.inCart(sku); if (!it) return;
+    /* was clamped to 0..99 with no reference to stock, so the + stepper happily
+       took a part with 25 in stock up to 99 and still said "In stock" */
+    const p = DB.prodMap[sku];
+    const ceiling = Math.max(1, Math.min(99, (p && Number.isFinite(p.stock) && p.stock > 0) ? p.stock : 99));
+    const want = Math.floor(Number(qty) || 0);
+    it.qty = U.clamp(want, 0, ceiling);
+    if (want > ceiling) toast("Only " + ceiling + " in stock", "warn");
+    if (it.qty === 0) this.cart = this.cart.filter(i => i.sku !== sku);
+    this.save();
+  },
   rmCart(sku){ this.cart = this.cart.filter(i => i.sku !== sku); this.save(); },
   cartTotals(){
     let sub = 0, mrp = 0, count = 0;
@@ -199,9 +210,16 @@ const Search = {
     let s = 0, hits = 0, wordHits = 0;
     const hay = U.slug(p.name + " " + p.sku + " " + catOf(p).name + " " + ptOf(p).name + " " + brandNames(p, 6));
     const name = U.slug(p.name);
+    /* Tokens of one or two characters must match a WHOLE word. As a substring,
+       "a" appeared in almost every part and returned 500 of 700 results, and
+       "or" matched inside "motor" and "cover" for 132. Three characters and up
+       keep substring matching, which is what the earlier relevance work tuned. */
+    const hayWords = hay.split("-"), nameWords = name.split("-");
     toks.forEach(t => {
-      if (hay.includes(t)) { s += t.length > 3 ? 3 : 1.5; hits++; wordHits++; }
-      if (name.includes(t)) s += 2;          // a hit in the part's own name counts for more
+      const inHay = t.length <= 2 ? hayWords.includes(t) : hay.includes(t);
+      const inName = t.length <= 2 ? nameWords.includes(t) : name.includes(t);
+      if (inHay) { s += t.length > 3 ? 3 : 1.5; hits++; wordHits++; }
+      if (inName) s += 2;                    // a hit in the part's own name counts for more
     });
     /* every word of a multi-word query is present -> almost certainly what they meant */
     if (toks.length > 1 && wordHits === toks.length) s += 5;
@@ -303,9 +321,9 @@ const SHOP_PAGES = ["categories", "category", "brands", "brand", "deals", "searc
                     "product", "finder", "cart", "checkout", "order", "wishlist", "account"];
 function hostFor(page){
   if (!HOSTS) return null;
-  /* "home" is the brand page — but store.example.com/ with no hash also parses
-     as "home", and bouncing that to the brand site made the shop hostname
-     impossible to open. On the shop host, a bare root stays put. */
+  /* "home" is the brand page — but store.example.com/ with a bare path also
+     parses as "home", and bouncing that to the brand site made the shop
+     hostname impossible to open. On the shop host, a bare root stays put. */
   if (page === "home" && location.hostname === HOSTS.store) return HOSTS.store;
   return SHOP_PAGES.indexOf(page) >= 0 ? HOSTS.store : HOSTS.main;
 }
@@ -314,9 +332,9 @@ function onWrongHost(page){
   const want = hostFor(page);
   return want && location.hostname !== want;
 }
-/* which page a "#/..." link resolves to, so a link can be pointed at the right host */
-function pageOfHash(hash){
-  const seg = String(hash || "").replace(/^#\/?/, "").split("/")[0];
+/* which page a "/..." link resolves to, so a link can be pointed at the right host */
+function pageOfPath(path){
+  const seg = String(path || "").replace(/^#/, "").replace(/^\//, "").split(/[/?#]/)[0];
   const m = { "": "home", categories: "categories", c: "category", brands: "brands", b: "brand",
               deals: "deals", search: "search", p: "product", finder: "finder", guides: "guides",
               g: "guide", support: "support", account: "account", cart: "cart", checkout: "checkout",
@@ -324,20 +342,28 @@ function pageOfHash(hash){
   return m[seg] || "home";
 }
 /* a "#/..." link rewritten to the hostname that owns it (unchanged when single-host) */
-function hostedLink(hash){ return hostedHref(pageOfHash(hash), hash); }
+function hostedLink(path){ return hostedHref(pageOfPath(path), path); }
 
 /* absolute link to a route on whichever hostname owns it */
-function hostedHref(page, hash){
-  if (!HOSTS) return hash;
+function hostedHref(page, path){
+  if (!HOSTS) return path;
   const want = hostFor(page);
-  if (!want || location.hostname === want) return hash;
-  return "https://" + want + "/" + hash;
+  if (!want || location.hostname === want) return path;
+  return "https://" + want + (path.charAt(0) === "/" ? path : "/" + path);
 }
 
 const Router = {
   parse(){
-    const h = location.hash.replace(/^#\/?/, "");
-    const seg = h.split("/").map(decodeURIComponent);
+    /* Routes are real paths now ("/categories"), not fragments ("#/categories"),
+       so the address bar carries no "#" and every page has its own URL that a
+       search engine and a link preview can actually see. */
+    let h = location.pathname.replace(/^\//, "").replace(/\/$/, "");
+    /* "/search?q=fan" is the shape people bookmark and share, but this app's
+       own links use "/search/fan", so the query-string form fell through to
+       the not-found page. Accept it as an alias. */
+    const term = new URLSearchParams(location.search).get("q");
+    if (term && h.replace(/\/.*$/, "") === "search") h = "search/" + term;
+    const seg = h.split("/").map(x => { try { return decodeURIComponent(x); } catch (e) { return x; } });
     const map = { "": ["home"], categories: ["categories"], c: ["category", seg[1]], brands: ["brands"], b: ["brand", seg[1]], deals: ["deals"], search: ["search", seg.slice(1).join("/")], p: ["product", seg[1]], finder: ["finder", seg[1]], guides: ["guides"], g: ["guide", seg[1]], support: ["support"], account: ["account", seg[1]], cart: ["cart"], checkout: ["checkout"], order: ["order", seg[1]], wishlist: ["wishlist"], seller: ["seller", seg[1]], admin: ["admin", seg[1]], about: ["about"], contact: ["contact"], policy: ["policy", seg[1]], login: ["account", "overview"] };  /* no customer sign-in — #/login lands on the account page */
     /* the shop hostname's bare root opens the catalogue, not the brand home */
     if (!h && HOSTS && location.hostname === HOSTS.store) return { page: "categories" };
@@ -351,11 +377,29 @@ const Router = {
     cart: "Cart — G-FLO", checkout: "Checkout — G-FLO", wishlist: "Wishlist — G-FLO",
     seller: "Sell on G-FLO — G-FLO", admin: "Staff sign-in — G-FLO", about: "About Us — G-FLO", contact: "Contact — G-FLO", policy: "Store Policies — G-FLO"
   },
+  /* Navigate without a page load. Replaces the old "location.hash = ..." */
+  push(path, replace){
+    const url = String(path || "/");
+    if (url.charAt(0) !== "/"){ location.href = url; return; }   /* absolute/cross-host */
+    if (url === location.pathname + location.search){ this.go(); return; }
+    try { history[replace ? "replaceState" : "pushState"]({}, "", url); }
+    catch (e) { location.href = url; return; }                   /* file:// etc. */
+    this.go();
+  },
+  /* An old shared or bookmarked "#/c/ceiling-fan" link still has to work, so
+     rewrite it to the clean path once, before the first render. */
+  upgradeLegacyHash(){
+    const h = location.hash;
+    if (!h || h.indexOf("#/") !== 0) return false;
+    const clean = h.slice(1) || "/";
+    try { history.replaceState({}, "", clean); return true; }
+    catch (e) { return false; }
+  },
   go(){
     closeOverlays();
     const { page, param } = this.parse();
     if (onWrongHost(page)){
-      location.replace("https://" + hostFor(page) + "/" + location.hash);
+      location.replace("https://" + hostFor(page) + location.pathname + location.search);
       return;
     }
     const app = document.getElementById("app");

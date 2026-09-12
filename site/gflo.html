@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"WebSite","name":"G-FLO","alternateName":"G-FLO Spare Parts","description":"India's premium marketplace for genuine home-appliance spare parts.","potentialAction":{"@type":"SearchAction","target":"#/search/{search_term_string}","query-input":"required name=search_term_string"}}
+{"@context":"https://schema.org","@type":"WebSite","name":"G-FLO","alternateName":"G-FLO Spare Parts","description":"India's premium marketplace for genuine home-appliance spare parts.","potentialAction":{"@type":"SearchAction","target":"/search/{search_term_string}","query-input":"required name=search_term_string"}}
 </script>
 <style>
 /* ============ GFLO DESIGN SYSTEM ============ */
@@ -1523,7 +1523,18 @@ const State = {
     this.save();
     if (!silent){ toast("Added to cart — " + p.short); renderCartDrawer(); openDrawer("cart-drawer"); }
   },
-  setQty(sku, qty){ const it = this.inCart(sku); if (!it) return; it.qty = U.clamp(qty, 0, 99); if (it.qty === 0) this.cart = this.cart.filter(i => i.sku !== sku); this.save(); },
+  setQty(sku, qty){
+    const it = this.inCart(sku); if (!it) return;
+    /* was clamped to 0..99 with no reference to stock, so the + stepper happily
+       took a part with 25 in stock up to 99 and still said "In stock" */
+    const p = DB.prodMap[sku];
+    const ceiling = Math.max(1, Math.min(99, (p && Number.isFinite(p.stock) && p.stock > 0) ? p.stock : 99));
+    const want = Math.floor(Number(qty) || 0);
+    it.qty = U.clamp(want, 0, ceiling);
+    if (want > ceiling) toast("Only " + ceiling + " in stock", "warn");
+    if (it.qty === 0) this.cart = this.cart.filter(i => i.sku !== sku);
+    this.save();
+  },
   rmCart(sku){ this.cart = this.cart.filter(i => i.sku !== sku); this.save(); },
   cartTotals(){
     let sub = 0, mrp = 0, count = 0;
@@ -1614,9 +1625,16 @@ const Search = {
     let s = 0, hits = 0, wordHits = 0;
     const hay = U.slug(p.name + " " + p.sku + " " + catOf(p).name + " " + ptOf(p).name + " " + brandNames(p, 6));
     const name = U.slug(p.name);
+    /* Tokens of one or two characters must match a WHOLE word. As a substring,
+       "a" appeared in almost every part and returned 500 of 700 results, and
+       "or" matched inside "motor" and "cover" for 132. Three characters and up
+       keep substring matching, which is what the earlier relevance work tuned. */
+    const hayWords = hay.split("-"), nameWords = name.split("-");
     toks.forEach(t => {
-      if (hay.includes(t)) { s += t.length > 3 ? 3 : 1.5; hits++; wordHits++; }
-      if (name.includes(t)) s += 2;          // a hit in the part's own name counts for more
+      const inHay = t.length <= 2 ? hayWords.includes(t) : hay.includes(t);
+      const inName = t.length <= 2 ? nameWords.includes(t) : name.includes(t);
+      if (inHay) { s += t.length > 3 ? 3 : 1.5; hits++; wordHits++; }
+      if (inName) s += 2;                    // a hit in the part's own name counts for more
     });
     /* every word of a multi-word query is present -> almost certainly what they meant */
     if (toks.length > 1 && wordHits === toks.length) s += 5;
@@ -1718,9 +1736,9 @@ const SHOP_PAGES = ["categories", "category", "brands", "brand", "deals", "searc
                     "product", "finder", "cart", "checkout", "order", "wishlist", "account"];
 function hostFor(page){
   if (!HOSTS) return null;
-  /* "home" is the brand page — but store.example.com/ with no hash also parses
-     as "home", and bouncing that to the brand site made the shop hostname
-     impossible to open. On the shop host, a bare root stays put. */
+  /* "home" is the brand page — but store.example.com/ with a bare path also
+     parses as "home", and bouncing that to the brand site made the shop
+     hostname impossible to open. On the shop host, a bare root stays put. */
   if (page === "home" && location.hostname === HOSTS.store) return HOSTS.store;
   return SHOP_PAGES.indexOf(page) >= 0 ? HOSTS.store : HOSTS.main;
 }
@@ -1729,9 +1747,9 @@ function onWrongHost(page){
   const want = hostFor(page);
   return want && location.hostname !== want;
 }
-/* which page a "#/..." link resolves to, so a link can be pointed at the right host */
-function pageOfHash(hash){
-  const seg = String(hash || "").replace(/^#\/?/, "").split("/")[0];
+/* which page a "/..." link resolves to, so a link can be pointed at the right host */
+function pageOfPath(path){
+  const seg = String(path || "").replace(/^#/, "").replace(/^\//, "").split(/[/?#]/)[0];
   const m = { "": "home", categories: "categories", c: "category", brands: "brands", b: "brand",
               deals: "deals", search: "search", p: "product", finder: "finder", guides: "guides",
               g: "guide", support: "support", account: "account", cart: "cart", checkout: "checkout",
@@ -1739,20 +1757,28 @@ function pageOfHash(hash){
   return m[seg] || "home";
 }
 /* a "#/..." link rewritten to the hostname that owns it (unchanged when single-host) */
-function hostedLink(hash){ return hostedHref(pageOfHash(hash), hash); }
+function hostedLink(path){ return hostedHref(pageOfPath(path), path); }
 
 /* absolute link to a route on whichever hostname owns it */
-function hostedHref(page, hash){
-  if (!HOSTS) return hash;
+function hostedHref(page, path){
+  if (!HOSTS) return path;
   const want = hostFor(page);
-  if (!want || location.hostname === want) return hash;
-  return "https://" + want + "/" + hash;
+  if (!want || location.hostname === want) return path;
+  return "https://" + want + (path.charAt(0) === "/" ? path : "/" + path);
 }
 
 const Router = {
   parse(){
-    const h = location.hash.replace(/^#\/?/, "");
-    const seg = h.split("/").map(decodeURIComponent);
+    /* Routes are real paths now ("/categories"), not fragments ("#/categories"),
+       so the address bar carries no "#" and every page has its own URL that a
+       search engine and a link preview can actually see. */
+    let h = location.pathname.replace(/^\//, "").replace(/\/$/, "");
+    /* "/search?q=fan" is the shape people bookmark and share, but this app's
+       own links use "/search/fan", so the query-string form fell through to
+       the not-found page. Accept it as an alias. */
+    const term = new URLSearchParams(location.search).get("q");
+    if (term && h.replace(/\/.*$/, "") === "search") h = "search/" + term;
+    const seg = h.split("/").map(x => { try { return decodeURIComponent(x); } catch (e) { return x; } });
     const map = { "": ["home"], categories: ["categories"], c: ["category", seg[1]], brands: ["brands"], b: ["brand", seg[1]], deals: ["deals"], search: ["search", seg.slice(1).join("/")], p: ["product", seg[1]], finder: ["finder", seg[1]], guides: ["guides"], g: ["guide", seg[1]], support: ["support"], account: ["account", seg[1]], cart: ["cart"], checkout: ["checkout"], order: ["order", seg[1]], wishlist: ["wishlist"], seller: ["seller", seg[1]], admin: ["admin", seg[1]], about: ["about"], contact: ["contact"], policy: ["policy", seg[1]], login: ["account", "overview"] };  /* no customer sign-in — #/login lands on the account page */
     /* the shop hostname's bare root opens the catalogue, not the brand home */
     if (!h && HOSTS && location.hostname === HOSTS.store) return { page: "categories" };
@@ -1766,11 +1792,29 @@ const Router = {
     cart: "Cart — G-FLO", checkout: "Checkout — G-FLO", wishlist: "Wishlist — G-FLO",
     seller: "Sell on G-FLO — G-FLO", admin: "Staff sign-in — G-FLO", about: "About Us — G-FLO", contact: "Contact — G-FLO", policy: "Store Policies — G-FLO"
   },
+  /* Navigate without a page load. Replaces the old "location.hash = ..." */
+  push(path, replace){
+    const url = String(path || "/");
+    if (url.charAt(0) !== "/"){ location.href = url; return; }   /* absolute/cross-host */
+    if (url === location.pathname + location.search){ this.go(); return; }
+    try { history[replace ? "replaceState" : "pushState"]({}, "", url); }
+    catch (e) { location.href = url; return; }                   /* file:// etc. */
+    this.go();
+  },
+  /* An old shared or bookmarked "#/c/ceiling-fan" link still has to work, so
+     rewrite it to the clean path once, before the first render. */
+  upgradeLegacyHash(){
+    const h = location.hash;
+    if (!h || h.indexOf("#/") !== 0) return false;
+    const clean = h.slice(1) || "/";
+    try { history.replaceState({}, "", clean); return true; }
+    catch (e) { return false; }
+  },
   go(){
     closeOverlays();
     const { page, param } = this.parse();
     if (onWrongHost(page)){
-      location.replace("https://" + hostFor(page) + "/" + location.hash);
+      location.replace("https://" + hostFor(page) + location.pathname + location.search);
       return;
     }
     const app = document.getElementById("app");
@@ -1994,7 +2038,7 @@ function productCard(p, i){
     </div>
     <div class="body">
       <span class="cat-ln">${U.esc(catOf(p).name)} · ${U.esc(ptOf(p).name)}</span>
-      <h3><a href="#/p/${p.sku}">${U.esc(p.short)}</a></h3>
+      <h3><a href="/p/${p.sku}">${U.esc(p.short)}</a></h3>
       <div class="rt-ln">${U.stars(p.rating)}<span>${p.rating} (${p.reviews})</span></div>
       <div class="rt-ln"><span class="mono mut3">${p.sku}</span></div>
       ${priceHtml(p)}
@@ -2014,7 +2058,7 @@ function emptyState(icon, title, sub, ctaHref, ctaLabel){
   return `<div class="empty"><div class="e-ic">${U.icon(icon)}</div><div><h3 style="margin-bottom:6px">${U.esc(title)}</h3><p class="mut" style="font-size:13.5px">${U.esc(sub)}</p></div>${ctaHref ? `<a class="btn btn-p" href="${ctaHref}">${U.esc(ctaLabel)}</a>` : ""}</div>`;
 }
 function crumb(items){
-  return `<nav class="crumb" aria-label="Breadcrumb"><a href="#/">Home</a>${items.map((it, i) => `<span class="sep">/</span>${it[1] && i < items.length - 1 ? `<a href="${it[1]}">${U.esc(it[0])}</a>` : `<b>${U.esc(it[0])}</b>`}`).join("")}</nav>`;
+  return `<nav class="crumb" aria-label="Breadcrumb"><a href="/">Home</a>${items.map((it, i) => `<span class="sep">/</span>${it[1] && i < items.length - 1 ? `<a href="${it[1]}">${U.esc(it[0])}</a>` : `<b>${U.esc(it[0])}</b>`}`).join("")}</nav>`;
 }
 function brandMark(b, size){
   return `<span class="brand-mk" style="width:${size || 52}px;height:${size || 52}px;font-size:${(size || 52) * .38}px;background:linear-gradient(135deg,hsl(${b.hue} 65% 46%),hsl(${(b.hue + 40) % 360} 70% 38%))">${U.esc(b.name[0])}</span>`;
@@ -2028,16 +2072,16 @@ function brandMark(b, size){
    it was a button that appeared to do nothing (you were already there) and it
    duplicated the Categories menu next to it. */
 const NAV_ALL = [
-  ["home", "#/", "Home", "home"],
-  ["categories", "#/categories", "Categories", "grid", true, "", "shop"],
-  ["brands", "#/brands", "Brands", "store", false, "", "shop"],
-  ["finder", "#/finder", "Spare Part Finder", "spark", false, "", "shop"],
-  ["guides", "#/guides", "Repair Guides", "book", false, "", "brand"],
-  ["deals", "#/deals", "Deals", "percent", false, "hi", "shop"],
-  ["support", "#/support", "Support", "headset", false, "", "brand"],
-  ["account", "#/account", "Account", "user", false, "", "shop"],
-  ["about", "#/about", "About Us", "info", false, "", "brand"],
-  ["contact", "#/contact", "Contact Us", "mail", false, "", "brand"]
+  ["home", "/", "Home", "home"],
+  ["categories", "/categories", "Categories", "grid", true, "", "shop"],
+  ["brands", "/brands", "Brands", "store", false, "", "shop"],
+  ["finder", "/finder", "Spare Part Finder", "spark", false, "", "shop"],
+  ["guides", "/guides", "Repair Guides", "book", false, "", "brand"],
+  ["deals", "/deals", "Deals", "percent", false, "hi", "shop"],
+  ["support", "/support", "Support", "headset", false, "", "brand"],
+  ["account", "/account", "Account", "user", false, "", "shop"],
+  ["about", "/about", "About Us", "info", false, "", "brand"],
+  ["contact", "/contact", "Contact Us", "mail", false, "", "brand"]
 ];
 /* which side of the split are we on? ("" = not split, show everything) */
 const NAV_SIDE = (typeof HOSTS !== "undefined" && HOSTS)
@@ -2045,13 +2089,13 @@ const NAV_SIDE = (typeof HOSTS !== "undefined" && HOSTS)
 const NAV = NAV_ALL.filter(n => !NAV_SIDE || !n[6] || n[6] === NAV_SIDE);
 /* the brand site needs one obvious way into the shop */
 const SHOP_CTA = (NAV_SIDE === "brand" && typeof HOSTS !== "undefined" && HOSTS)
-  ? `<a class="nav-lnk hi" href="https://${HOSTS.store}/#/categories">${U.icon("store", "ic-s")} Shop Now</a>` : "";
+  ? `<a class="nav-lnk hi" href="https://${HOSTS.store}/categories">${U.icon("store", "ic-s")} Shop Now</a>` : "";
 function renderShell(){
   document.getElementById("hdr").innerHTML = `
   <div class="topbar"><div class="wrap"><div class="tb-l"><span>${U.icon("truck")} ${CATALOG_MODE ? "Pan-India tracked delivery" : "FREE delivery above ₹4,999"}</span><span class="hide-sm">${U.icon("rotate")} 7-day easy returns</span></div><div class="row" style="gap:16px"><span>${U.icon("phone")} Order status: ${CONTACT.phone}</span></div></div></div>
   <div class="hd-main"><div class="wrap hd-row">
     <button class="btn-icon btn" data-act="open-mnav" aria-label="Open menu" id="mnav-btn">${U.icon("menu")}</button>
-    <a class="logo" href="#/" aria-label="G-FLO home"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
+    <a class="logo" href="/" aria-label="G-FLO home"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
     <div class="hd-search" id="hd-search">
       <div class="sbox">${U.icon("search")}<input id="hd-q" type="search" placeholder="Search parts, brands or model numbers…" autocomplete="off" aria-label="Search parts" aria-expanded="false" role="combobox" aria-controls="hd-sug">
         <button class="btn-icon btn" data-mic="hd-q" aria-label="Voice search" style="width:34px;height:34px">${U.icon("mic", "ic-s")}</button>
@@ -2059,8 +2103,8 @@ function renderShell(){
       <div class="sug" id="hd-sug" role="listbox" aria-label="Search suggestions"></div>
     </div>
     <div class="hd-acts">
-      <a class="hd-act" href="#/wishlist" aria-label="Wishlist" title="Wishlist">${U.icon("heart")}<span class="bub" data-badge="wish"></span></a>
-      <a class="hd-act" href="#/account" aria-label="Account" title="Account" data-auth-ava>${U.icon("user")}</a>
+      <a class="hd-act" href="/wishlist" aria-label="Wishlist" title="Wishlist">${U.icon("heart")}<span class="bub" data-badge="wish"></span></a>
+      <a class="hd-act" href="/account" aria-label="Account" title="Account" data-auth-ava>${U.icon("user")}</a>
       <button class="hd-act hd-cart m-keep" data-act="open-cart" aria-label="Open cart" title="Cart">${U.icon("cart")}<span class="cart-total" data-cart-total></span><span class="bub" data-badge="cart"></span></button>
     </div>
   </div></div>
@@ -2073,14 +2117,14 @@ function renderShell(){
   window.__ftrFull = () => `
   <footer class="foot"><div class="wrap">
     <div class="foot-top">
-      <div><a class="logo" href="#/"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
+      <div><a class="logo" href="/"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
         <p class="about">India's premium marketplace for genuine home-appliance spare parts. ${CATS.length} appliance categories, ${DB.products.length}+ certified parts, AI-verified compatibility — delivered to 19,000+ pincodes.</p>
         <div class="foot-pay"><span class="tag">UPI</span><span class="tag">CARDS</span><span class="tag">NETBANKING</span><span class="tag">COD</span><span class="tag">EMI</span></div></div>
-      <div><h5>Shop</h5><div class="foot-lnks"><a href="#/categories">All categories</a><a href="#/brands">Brands</a><a href="#/deals">Deals & offers</a><a href="#/finder">AI part finder</a><a href="#/wishlist">Wishlist</a></div></div>
-      <div><h5>Help</h5><div class="foot-lnks"><a href="#/support">Help centre & FAQs</a><a href="#/policy/return">Return policy</a><a href="#/policy/refund">Refund policy</a><a href="#/policy/shipping">Shipping policy</a><a href="#/guides">Repair guides</a></div></div>
-      <div><h5>Company</h5><div class="foot-lnks"><a href="#/about">About G-FLO</a><a href="#/contact">Contact us</a><a href="#/contact">Sell on G-FLO</a><a href="#/policy/privacy">Privacy policy</a><a href="#/policy/terms">Terms & conditions</a></div></div>
-      <div><h5>Get in touch</h5><div class="foot-lnks"><a href="#/support">${U.icon("phone", "ic-s")} ${CONTACT.phone}</a><a href="#/support">${U.icon("mail", "ic-s")} ${CONTACT.email}</a><a href="#/support">${U.icon("pin", "ic-s")} ${CONTACT.address}</a><a href="#/support">${U.icon("clock", "ic-s")} Mon–Sat, 9 AM – 8 PM IST</a></div>
-        <div class="soc" style="margin-top:14px"><a href="#/" aria-label="Chat">${U.icon("chat", "ic-s")}</a><a href="#/" aria-label="Mail">${U.icon("mail", "ic-s")}</a><a href="#/" aria-label="Phone">${U.icon("phone", "ic-s")}</a><a href="#/" aria-label="Share">${U.icon("share", "ic-s")}</a></div></div>
+      <div><h5>Shop</h5><div class="foot-lnks"><a href="/categories">All categories</a><a href="/brands">Brands</a><a href="/deals">Deals & offers</a><a href="/finder">AI part finder</a><a href="/wishlist">Wishlist</a></div></div>
+      <div><h5>Help</h5><div class="foot-lnks"><a href="/support">Help centre & FAQs</a><a href="/policy/return">Return policy</a><a href="/policy/refund">Refund policy</a><a href="/policy/shipping">Shipping policy</a><a href="/guides">Repair guides</a></div></div>
+      <div><h5>Company</h5><div class="foot-lnks"><a href="/about">About G-FLO</a><a href="/contact">Contact us</a><a href="/contact">Sell on G-FLO</a><a href="/policy/privacy">Privacy policy</a><a href="/policy/terms">Terms & conditions</a></div></div>
+      <div><h5>Get in touch</h5><div class="foot-lnks"><a href="/support">${U.icon("phone", "ic-s")} ${CONTACT.phone}</a><a href="/support">${U.icon("mail", "ic-s")} ${CONTACT.email}</a><a href="/support">${U.icon("pin", "ic-s")} ${CONTACT.address}</a><a href="/support">${U.icon("clock", "ic-s")} Mon–Sat, 9 AM – 8 PM IST</a></div>
+        <div class="soc" style="margin-top:14px"><a href="/" aria-label="Chat">${U.icon("chat", "ic-s")}</a><a href="/" aria-label="Mail">${U.icon("mail", "ic-s")}</a><a href="/" aria-label="Phone">${U.icon("phone", "ic-s")}</a><a href="/" aria-label="Share">${U.icon("share", "ic-s")}</a></div></div>
     </div>
     <div class="foot-bot"><span>© ${new Date().getFullYear()} G-FLO Commerce Pvt Ltd — demo experience. Catalog data & product photos referenced from sparepartwala.in for this commissioned replica; illustrations are original.</span><span class="row" style="gap:7px">${U.icon("shield", "ic-s")} 100% genuine, brand-certified spares</span></div>
   </div></footer>`;
@@ -2094,7 +2138,7 @@ function renderShell(){
     <div class="dr-ft" id="cart-foot"></div>
   </aside>
   <aside class="drawer left" id="mnav" aria-hidden="true" role="dialog" aria-label="Menu">
-    <div class="dr-hd"><a class="logo" href="#/"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions" style="height:32px"></a><button class="btn btn-icon" data-act="close" aria-label="Close menu">${U.icon("x")}</button></div>
+    <div class="dr-hd"><a class="logo" href="/"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions" style="height:32px"></a><button class="btn btn-icon" data-act="close" aria-label="Close menu">${U.icon("x")}</button></div>
     <div class="dr-body">
       ${NAV.map(n => `<a class="acc-lnk" href="${hostedLink(n[1])}" style="margin-bottom:2px">${U.icon(n[3], "ic-s")} ${n[2]}</a>`).join("")}
     </div>
@@ -2111,11 +2155,11 @@ function renderShell(){
     <form class="chat-in" id="chat-form"><input class="inp" id="chat-q" placeholder="Ask about parts, fitment, orders…" autocomplete="off" aria-label="Message the assistant"><button class="btn btn-p btn-icon" aria-label="Send" style="background:var(--g)">${U.icon("send", "ic-s")}</button></form>
   </div>
   <nav class="bnav" aria-label="Mobile navigation">
-    <a href="#/" data-nav="home">${U.icon("home")}Home</a>
-    <a href="#/categories" data-nav="categories">${U.icon("store")}Store</a>
-    <a href="#/finder" data-nav="finder">${U.icon("scan")}Finder</a>
-    <a href="#/cart" data-nav="cart">${U.icon("cart")}<span class="bub" data-badge="cart"></span>Cart</a>
-    <a href="#/account" data-nav="account">${U.icon("user")}Account</a>
+    <a href="/" data-nav="home">${U.icon("home")}Home</a>
+    <a href="/categories" data-nav="categories">${U.icon("store")}Store</a>
+    <a href="/finder" data-nav="finder">${U.icon("scan")}Finder</a>
+    <a href="/cart" data-nav="cart">${U.icon("cart")}<span class="bub" data-badge="cart"></span>Cart</a>
+    <a href="/account" data-nav="account">${U.icon("user")}Account</a>
   </nav>`;
   buildMega(); renderCartDrawer(); chatInit(); syncBadges();
   if (typeof syncAuth === "function") syncAuth();
@@ -2124,7 +2168,7 @@ function renderShell(){
 /* ================= FOOTER SWITCHING ================= */
 function footerMin(){
   return `<footer class="foot foot-min"><div class="wrap" style="display:flex;flex-direction:column;align-items:center;gap:9px;padding:26px 0;text-align:center">
-    <a class="logo" href="#/" aria-label="G-FLO home"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
+    <a class="logo" href="/" aria-label="G-FLO home"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
     <span style="display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--tx2)">${U.icon("shield", "ic-s")} 100% genuine, brand-certified spares</span>
     <span class="mut3" style="font-size:12px">© ${new Date().getFullYear()} G-FLO — genuine appliance & tool spares</span>
   </div></footer>`;
@@ -2151,8 +2195,8 @@ function megaBody(cid){
   if (!document.getElementById("mega-body")) return;
   document.getElementById("mega-body").innerHTML = `
     <h4>${U.esc(c.name)} spare parts</h4><span class="mut3">${U.esc(c.desc)} · ${c.pts.length} part families</span>
-    <div class="mega-pts">${c.pts.map(pt => `<a class="mega-pt" href="#/c/${c.id}?pt=${pt}"><span class="dot"></span>${PT_MAP[pt].name}</a>`).join("")}</div>
-    <div class="mega-foot"><a class="btn btn-p btn-sm" href="#/c/${c.id}">Browse all ${U.esc(c.name)} parts ${U.icon("arr-r", "ic-s")}</a><a class="btn btn-ghost btn-sm" href="#/finder">${U.icon("spark", "ic-s")} Not sure? Use AI finder</a></div>`;
+    <div class="mega-pts">${c.pts.map(pt => `<a class="mega-pt" href="/c/${c.id}?pt=${pt}"><span class="dot"></span>${PT_MAP[pt].name}</a>`).join("")}</div>
+    <div class="mega-foot"><a class="btn btn-p btn-sm" href="/c/${c.id}">Browse all ${U.esc(c.name)} parts ${U.icon("arr-r", "ic-s")}</a><a class="btn btn-ghost btn-sm" href="/finder">${U.icon("spark", "ic-s")} Not sure? Use AI finder</a></div>`;
 }
 
 /* ================= CART DRAWER ================= */
@@ -2160,7 +2204,7 @@ function renderCartDrawer(){
   const body = document.getElementById("cart-body"), foot = document.getElementById("cart-foot");
   if (!body) return;
   if (!State.cart.length){
-    body.innerHTML = emptyState("cart", "Your cart is empty", "Find the exact part your appliance needs.", "#/categories", "Browse categories");
+    body.innerHTML = emptyState("cart", "Your cart is empty", "Find the exact part your appliance needs.", "/categories", "Browse categories");
     foot.innerHTML = "";
     return;
   }
@@ -2168,8 +2212,8 @@ function renderCartDrawer(){
   body.innerHTML = `
     ${CATALOG_MODE ? "" : `<div class="free-bar">${t.freeGap > 0 ? `Add <b>${U.inr(t.freeGap)}</b> more for <b>FREE delivery</b>` : `🎉 You've unlocked <b>FREE delivery</b>`}<div class="tr"><div class="fl" style="width:${Math.min(100, (t.sub - t.disc) / 4999 * 100)}%"></div></div></div>`}
     ${State.cart.map(i => { const p = DB.prodMap[i.sku]; if (!p) return ""; return `
-      <div class="citem"><a class="art" href="#/p/${p.sku}">${prodArt(p)}</a>
-        <div class="inf"><b><a href="#/p/${p.sku}">${U.esc(p.short)}</a></b><span class="mono mut3" style="font-size:10.5px">${p.sku}</span>
+      <div class="citem"><a class="art" href="/p/${p.sku}">${prodArt(p)}</a>
+        <div class="inf"><b><a href="/p/${p.sku}">${U.esc(p.short)}</a></b><span class="mono mut3" style="font-size:10.5px">${p.sku}</span>
           <div class="spread"><div class="qty"><button data-act="qty" data-sku="${p.sku}" data-d="-1" aria-label="Decrease quantity">${U.icon("minus", "ic-s")}</button><b>${i.qty}</b><button data-act="qty" data-sku="${p.sku}" data-d="1" aria-label="Increase quantity">${U.icon("plus", "ic-s")}</button></div>
           ${CATALOG_MODE ? "" : `<span class="price" style="font-size:14.5px">${U.inr(p.price * i.qty)}</span>`}</div></div>
         <button class="btn btn-icon" data-act="rm-cart" data-sku="${p.sku}" aria-label="Remove item" style="width:32px;height:32px">${U.icon("trash", "ic-s")}</button></div>`; }).join("")}`;
@@ -2178,8 +2222,8 @@ function renderCartDrawer(){
     ${t.disc ? `<div class="tot-row" style="color:var(--ok)"><span>Coupon ${State.coupon.code}</span><span>−${U.inr(t.disc)}</span></div>` : ""}
     <div class="tot-row"><span>Delivery</span><span>${t.ship ? U.inr(t.ship) : "FREE"}</span></div>
     <div class="tot-row big"><span>Total</span><span class="price">${U.inr(t.total)}</span></div>`}
-    <a class="btn btn-p btn-lg btn-block" href="#/checkout">Checkout securely ${U.icon("arr-r", "ic-s")}</a>
-    <a class="btn btn-soft btn-block" href="#/cart">View full cart</a>`;
+    <a class="btn btn-p btn-lg btn-block" href="/checkout">Checkout securely ${U.icon("arr-r", "ic-s")}</a>
+    <a class="btn btn-soft btn-block" href="/cart">View full cart</a>`;
   syncBadges();
 }
 
@@ -2190,7 +2234,7 @@ function bindSearch(inputId, sugId){
   inp.dataset.bound = "1";
   let selIdx = -1;
   const close = () => { sug.classList.remove("open"); inp.setAttribute("aria-expanded", "false"); selIdx = -1; };
-  const go = q => { if (!q.trim()) return; close(); location.hash = "#/search/" + encodeURIComponent(q.trim()); };
+  const go = q => { if (!q.trim()) return; close(); Router.push("/search/" + encodeURIComponent(q.trim())); };
   const render = () => {
     const q = inp.value;
     if (q.trim().length < 2){ close(); return; }
@@ -2199,10 +2243,10 @@ function bindSearch(inputId, sugId){
     let html = "";
     if (il) html += `<div class="sug-intent">${U.icon("spark", "ic-s")} <span><b>AI understood:</b> ${U.esc(il)}</span></div>`;
     if (cats.length || brands.length || pts.length){
-      html += `<div class="sug-gr"><div class="sug-tt">Collections</div>${cats.map(c => `<a class="sug-it" href="#/c/${c.id}"><span class="si-ic">${U.icon("c-" + c.id, "ic-s")}</span><span><b>${U.esc(c.name)}</b><small>${c.pts.length} part families</small></span></a>`).join("")}${brands.map(b => `<a class="sug-it" href="#/b/${b.id}"><span class="si-ic">${U.icon("store", "ic-s")}</span><span><b>${U.esc(b.name)}</b><small>Brand store</small></span></a>`).join("")}${pts.map(t => `<a class="sug-it" href="#/search/${encodeURIComponent(t.name)}"><span class="si-ic">${U.icon("cog", "ic-s")}</span><span><b>${U.esc(t.name)}</b><small>Across all appliances</small></span></a>`).join("")}</div>`;
+      html += `<div class="sug-gr"><div class="sug-tt">Collections</div>${cats.map(c => `<a class="sug-it" href="/c/${c.id}"><span class="si-ic">${U.icon("c-" + c.id, "ic-s")}</span><span><b>${U.esc(c.name)}</b><small>${c.pts.length} part families</small></span></a>`).join("")}${brands.map(b => `<a class="sug-it" href="/b/${b.id}"><span class="si-ic">${U.icon("store", "ic-s")}</span><span><b>${U.esc(b.name)}</b><small>Brand store</small></span></a>`).join("")}${pts.map(t => `<a class="sug-it" href="/search/${encodeURIComponent(t.name)}"><span class="si-ic">${U.icon("cog", "ic-s")}</span><span><b>${U.esc(t.name)}</b><small>Across all appliances</small></span></a>`).join("")}</div>`;
     }
     if (products.length){
-      html += `<div class="sug-gr"><div class="sug-tt">Parts</div>${products.map(p => `<a class="sug-it" href="#/p/${p.sku}"><span class="si-art">${prodArt(p)}</span><span style="min-width:0"><b>${U.esc(p.short)}</b><small>${catOf(p).name} · ★ ${p.rating}</small></span>${CATALOG_MODE ? "" : `<span class="price">${U.inr(p.price)}</span>`}</a>`).join("")}</div>`;
+      html += `<div class="sug-gr"><div class="sug-tt">Parts</div>${products.map(p => `<a class="sug-it" href="/p/${p.sku}"><span class="si-art">${prodArt(p)}</span><span style="min-width:0"><b>${U.esc(p.short)}</b><small>${catOf(p).name} · ★ ${p.rating}</small></span>${CATALOG_MODE ? "" : `<span class="price">${U.inr(p.price)}</span>`}</a>`).join("")}</div>`;
     }
     html += `<div class="sug-gr"><button class="sug-it" data-go-search="${U.esc(q)}"><span class="si-ic">${U.icon("search", "ic-s")}</span><span><b>Search “${U.esc(q)}”</b><small>See all matching parts</small></span></button></div>`;
     sug.innerHTML = html; sug.classList.add("open"); inp.setAttribute("aria-expanded", "true");
@@ -2283,20 +2327,20 @@ function chatRespond(q){
     } else if (/slow|not working|broken|repair|fix|problem|noise|leak/.test(ql)){
       const res = Search.query(q, 2);
       const g = GUIDES.find(g => ql.includes(g.cat.split("-")[0])) || GUIDES[4];
-      chatBot(`Sounds fixable 💪 Here's a matching repair guide: <a href="#/g/${g.id}" style="color:var(--brand2);font-weight:600">${g.title} →</a>${res.items.length ? "<br><br>Parts you'll likely need:" + res.items.map(p => chatCard(p)).join("") : ""}`);
+      chatBot(`Sounds fixable 💪 Here's a matching repair guide: <a href="/g/${g.id}" style="color:var(--brand2);font-weight:600">${g.title} →</a>${res.items.length ? "<br><br>Parts you'll likely need:" + res.items.map(p => chatCard(p)).join("") : ""}`);
     } else {
       const res = Search.query(q, 3);
       if (res.items.length){
         const il = AI.intentLabel(res.intent);
-        chatBot(`${il ? `Got it — <b>${U.esc(il)}</b>.` : "Here's what matches:"}${res.items.map(p => chatCard(p)).join("")}<br><a href="#/search/${encodeURIComponent(q)}" style="color:var(--brand2);font-weight:600">See all results →</a>`);
+        chatBot(`${il ? `Got it — <b>${U.esc(il)}</b>.` : "Here's what matches:"}${res.items.map(p => chatCard(p)).join("")}<br><a href="/search/${encodeURIComponent(q)}" style="color:var(--brand2);font-weight:600">See all results →</a>`);
       } else {
-        chatBot(`I couldn't match that directly. Try the <a href="#/finder" style="color:var(--brand2);font-weight:600">AI Part Finder</a> — you can upload a photo of the part or your appliance's model sticker, and I'll identify it.`);
+        chatBot(`I couldn't match that directly. Try the <a href="/finder" style="color:var(--brand2);font-weight:600">AI Part Finder</a> — you can upload a photo of the part or your appliance's model sticker, and I'll identify it.`);
       }
     }
   }, 700 + Math.random() * 500);
 }
 function chatCard(p){
-  return `<a class="mini-p" href="#/p/${p.sku}"><span class="art">${prodArt(p)}</span><span style="min-width:0"><b>${U.esc(p.short)}</b>${CATALOG_MODE ? "" : `<span class="price">${U.inr(p.price)}</span>`} <small style="color:var(--tx3)">★ ${p.rating}</small></span></a>`;
+  return `<a class="mini-p" href="/p/${p.sku}"><span class="art">${prodArt(p)}</span><span style="min-width:0"><b>${U.esc(p.short)}</b>${CATALOG_MODE ? "" : `<span class="price">${U.inr(p.price)}</span>`} <small style="color:var(--tx3)">★ ${p.rating}</small></span></a>`;
 }
 
 /* ================= GLOBAL EVENTS ================= */
@@ -2315,10 +2359,10 @@ function bindGlobal(){
     if (a === "close" || e.target.id === "ovl-bg") closeOverlays();
     if (a === "open-cart"){ renderCartDrawer(); openDrawer("cart-drawer"); }
     if (a === "open-mnav") openDrawer("mnav");
-    if (a === "mega"){ if (window.matchMedia("(max-width:767px)").matches){ location.hash = "#/categories"; return; } const m = document.getElementById("mega"); const open = m.classList.toggle("open"); act.setAttribute("aria-expanded", open); }
+    if (a === "mega"){ if (window.matchMedia("(max-width:767px)").matches){ Router.push("/categories"); return; } const m = document.getElementById("mega"); const open = m.classList.toggle("open"); act.setAttribute("aria-expanded", open); }
     if (a === "chat"){ const c = document.getElementById("chat"); c.classList.add("open"); c.setAttribute("aria-hidden", "false"); document.getElementById("ovl-bg").classList.add("open"); document.getElementById("chat-q").focus(); }
     if (a === "add-cart") State.addCart(sku, 1);
-    if (a === "buy-now"){ State.addCart(sku, 1, true); location.hash = "#/checkout"; }
+    if (a === "buy-now"){ State.addCart(sku, 1, true); Router.push("/checkout"); }
     if (a === "wish"){ State.toggleWish(sku); refreshActionStates(); if (Router.parse().page === "wishlist") Router.go(); }
     if (a === "cmp"){ State.toggleCmp(sku); refreshActionStates(); }
     if (a === "qty"){ const it = State.inCart(sku); State.setQty(sku, (it ? it.qty : 1) + (+act.getAttribute("data-d"))); renderCartDrawer(); if (["cart", "checkout"].includes(Router.parse().page)) Router.go(); }
@@ -2333,7 +2377,34 @@ function bindGlobal(){
   });
   document.getElementById("ovl-bg").addEventListener("click", closeOverlays);
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeOverlays(); if (e.key === "/" && !/input|textarea|select/i.test(document.activeElement.tagName)){ e.preventDefault(); document.getElementById("hd-q").focus(); } });
-  window.addEventListener("hashchange", () => Router.go());
+  /* Back / forward buttons. Replaces the old "hashchange" listener now that
+     navigation goes through history.pushState instead of location.hash. */
+  window.addEventListener("popstate", () => Router.go());
+
+  /* One interceptor for every internal link, so all the ordinary <a href="/...">
+     tags in the pages navigate without a full page load. Anything that is not
+     a plain left-click on a same-site route is left completely alone: modified
+     clicks (new tab), target="_blank", downloads, other hostnames, mailto/tel,
+     and in-page anchors like href="#main" all behave normally. */
+  document.addEventListener("click", e => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = e.target.closest && e.target.closest("a[href]");
+    if (!a) return;
+    if (a.target && a.target !== "" && a.target !== "_self") return;
+    if (a.hasAttribute("download") || a.getAttribute("rel") === "external") return;
+    const raw = a.getAttribute("href") || "";
+    if (!raw || raw.charAt(0) === "#") return;                 /* in-page anchor */
+    if (/^[a-z][a-z0-9+.-]*:/i.test(raw) && !/^https?:/i.test(raw)) return;  /* mailto:, tel: */
+    let u;
+    try { u = new URL(raw, location.href); } catch (err) { return; }
+    if (u.origin !== location.origin) return;                  /* other hostname */
+    /* real files and the server-rendered admin are not app routes */
+    if (/^\/(admin|api|media|static|assets|brand-photos|tools-photos)(\/|$)/.test(u.pathname)) return;
+    const last = u.pathname.split("/").pop();
+    if (last && last.indexOf(".") > 0) return;                 /* looks like a file */
+    e.preventDefault();
+    Router.push(u.pathname + u.search);
+  });
 }
 function refreshActionStates(){
   document.querySelectorAll("[data-act=wish][data-sku]").forEach(b => { const on = State.wish.includes(b.getAttribute("data-sku")); b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
@@ -2349,7 +2420,7 @@ function quickView(sku){
     <div style="margin:12px 0">${priceHtml(p)}</div>
     ${stockHtml(p)}
     <p class="mut" style="font-size:13px;margin:12px 0">Fits: ${U.esc(brandNames(p, 4))}. ${p.compat.length} verified models. ${p.warranty} warranty.</p>
-    <div class="row"><button class="btn btn-p" data-act="add-cart" data-sku="${p.sku}" ${p.stock === 0 ? "disabled" : ""}>${U.icon("cart", "ic-s")} Add to cart</button><a class="btn btn-ghost" href="#/p/${p.sku}" onclick="closeOverlays()">Full details</a></div></div>
+    <div class="row"><button class="btn btn-p" data-act="add-cart" data-sku="${p.sku}" ${p.stock === 0 ? "disabled" : ""}>${U.icon("cart", "ic-s")} Add to cart</button><a class="btn btn-ghost" href="/p/${p.sku}" onclick="closeOverlays()">Full details</a></div></div>
   </div>`, { title: "Quick view", wide: true });
 }
 </script>
@@ -2373,12 +2444,12 @@ Pages.home = () => {
         <div class="hero-search rv in rv-d1">
           <div class="sbox">${U.icon("search")}<input id="hero-q" type="search" placeholder='Try “Preethi mixer coupler” or a model number…' autocomplete="off" aria-label="Search spare parts" role="combobox" aria-expanded="false" aria-controls="hero-sug">
           <button class="btn-icon btn" data-mic="hero-q" aria-label="Voice search">${U.icon("mic", "ic-s")}</button>
-          <button class="btn btn-p" data-go="finder" onclick="location.hash='#/finder'" style="height:42px">${U.icon("spark", "ic-s")} AI Finder</button></div>
+          <a class="btn btn-p" href="/finder" style="height:42px">${U.icon("spark", "ic-s")} AI Finder</a></div>
           <div class="sug" id="hero-sug" role="listbox"></div>
         </div>
         <div class="hero-chips rv in rv-d2">
           <span class="mut3" style="font-size:12px;align-self:center">Trending:</span>
-          ${["Mixer coupler", "Fan capacitor", "Carbon brush", "Armature", "Geyser element"].map(t => `<a class="chip" href="#/search/${encodeURIComponent(t)}">${t}</a>`).join("")}
+          ${["Mixer coupler", "Fan capacitor", "Carbon brush", "Armature", "Geyser element"].map(t => `<a class="chip" href="/search/${encodeURIComponent(t)}">${t}</a>`).join("")}
         </div>
         <div class="hero-stats rv in rv-d3">
           <div class="hstat"><b data-count="98.2">0</b><span>% first-time fit rate</span></div>
@@ -2410,9 +2481,9 @@ Pages.home = () => {
   </div></section>
 
   <section class="sec"><div class="wrap">
-    ${sectionHead("Popular categories", "What are we fixing today?", "Complete spare-part catalogues for every major home appliance.", "#/categories", "All 26 categories")}
+    ${sectionHead("Popular categories", "What are we fixing today?", "Complete spare-part catalogues for every major home appliance.", "/categories", "All 26 categories")}
     <div class="cat-grid">${CATS.filter(c => c.popular).concat(CATS.filter(c => !c.popular).slice(0, 4)).slice(0, 12).map((c, i) => `
-      <a class="cat-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" href="#/c/${c.id}"><span class="ct-ic">${U.icon("c-" + c.id)}</span><div><b>${U.esc(c.name)}</b><br><span>${c.pts.length} part families</span></div></a>`).join("")}
+      <a class="cat-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" href="/c/${c.id}"><span class="ct-ic">${U.icon("c-" + c.id)}</span><div><b>${U.esc(c.name)}</b><br><span>${c.pts.length} part families</span></div></a>`).join("")}
     </div>
   </div></section>
 
@@ -2423,28 +2494,28 @@ Pages.home = () => {
         <h2 style="font-size:clamp(20px,3vw,30px);margin:10px 0 6px">Up to 40% off service-season essentials</h2>
         <p style="opacity:.85;font-size:13.5px">Capacitors, couplers, filters & more — refreshed every day at midnight.</p>
         <div class="cd" id="home-cd" aria-label="Deal countdown"></div></div>
-        <a class="btn btn-lg" style="background:#fff;color:#be123c" href="#/deals">Explore deals ${U.icon("arr-r", "ic-s")}</a>
+        <a class="btn btn-lg" style="background:#fff;color:#be123c" href="/deals">Explore deals ${U.icon("arr-r", "ic-s")}</a>
       </div>
     </div>
   </div></section>
 
   <section class="sec-tight"><div class="wrap">
-    ${sectionHead("Featured spare parts", "Hand-picked, service-grade", null, "#/search/featured", "See more")}
+    ${sectionHead("Featured spare parts", "Hand-picked, service-grade", null, "/search/featured", "See more")}
     ${railOf(featured)}
   </div></section>
 
   <section class="sec-tight"><div class="wrap">
-    ${sectionHead("Shop by brand", "Parts for the brands you own", "Compatible spares for 55+ appliance brands sold in India.", "#/brands", "All brands")}
-    <div class="brand-grid">${BRANDS.slice(0, 12).map((b, i) => `<a class="brand-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" href="#/b/${b.id}">${brandMark(b)}<b>${U.esc(b.name)}</b><span>${DB.products.filter(p => p.brandFor.includes(b.id)).length} parts</span></a>`).join("")}</div>
+    ${sectionHead("Shop by brand", "Parts for the brands you own", "Compatible spares for 55+ appliance brands sold in India.", "/brands", "All brands")}
+    <div class="brand-grid">${BRANDS.slice(0, 12).map((b, i) => `<a class="brand-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" href="/b/${b.id}">${brandMark(b)}<b>${U.esc(b.name)}</b><span>${DB.products.filter(p => p.brandFor.includes(b.id)).length} parts</span></a>`).join("")}</div>
   </div></section>
 
   <section class="sec-tight"><div class="wrap">
-    ${sectionHead("New arrivals", "Fresh off the assembly line", null, "#/search/new arrivals", "See more")}
+    ${sectionHead("New arrivals", "Fresh off the assembly line", null, "/search/new arrivals", "See more")}
     ${railOf(fresh)}
   </div></section>
 
   <section class="sec-tight"><div class="wrap">
-    ${sectionHead("Best sellers", "Trusted by 1,20,000+ repairs", null, "#/search/best sellers", "See more")}
+    ${sectionHead("Best sellers", "Trusted by 1,20,000+ repairs", null, "/search/best sellers", "See more")}
     ${railOf(best)}
   </div></section>
 
@@ -2454,7 +2525,7 @@ Pages.home = () => {
   </div></section>
 
   <section class="sec"><div class="wrap">
-    ${sectionHead("Repair guides", "Fix it yourself, the safe way", "Step-by-step guides written by service engineers — with the exact parts linked.", "#/guides", "All guides")}
+    ${sectionHead("Repair guides", "Fix it yourself, the safe way", "Step-by-step guides written by service engineers — with the exact parts linked.", "/guides", "All guides")}
     <div class="guide-grid">${GUIDES.slice(0, 4).map((g, i) => guideCard(g, i)).join("")}</div>
   </div></section>
 
@@ -2501,7 +2572,7 @@ function countdownInto(id){
 function guideCard(g, i){
   const c = CAT_MAP[g.cat];
   const lvlColor = { Easy: "b-ok", Moderate: "b-best", Pro: "b-deal" }[g.level] || "b-info";
-  return `<a class="gcard rv ${i % 4 ? "rv-d" + (i % 4) : ""}" href="#/g/${g.id}">
+  return `<a class="gcard rv ${i % 4 ? "rv-d" + (i % 4) : ""}" href="/g/${g.id}">
     <div class="g-art"><span class="badge ${lvlColor} g-lvl">${g.level}</span>${artFor(PT_MAP[c.pts[0]].art, c.hue, g.id, g.title)}</div>
     <div class="body"><span class="cat-ln" style="font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--tx3)">${U.esc(c.name)}</span><h3>${U.esc(g.title)}</h3>
     <div class="meta"><span>${U.icon("clock", "ic-s")} ${g.mins} min</span><span>${U.icon("wrench", "ic-s")} ${g.tools.length} tools</span><span>${U.icon("book", "ic-s")} ${g.steps.length} steps</span></div></div></a>`;
@@ -2513,7 +2584,7 @@ Pages.categories = () => `
     ${crumb([["Categories"]])}
     <div class="sec-head" style="margin-top:14px"><div><span class="kick">Browse everything</span><h2>All appliance categories</h2><p>${CATS.length} appliances · ${PT.length} part families · ${DB.products.length} genuine parts. Every category carries the complete spare-part catalogue.</p></div></div>
     <div class="cat-grid" style="padding-bottom:50px">${CATS.map((c, i) => `
-      <a class="cat-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" style="--i:${i}" href="#/c/${c.id}"><span class="cat-img"><span class="ct-ic">${U.icon("c-" + c.id)}</span>${CAT_IMG[c.id] ? `<img src="${CAT_IMG[c.id]}" alt="${U.esc(c.name)} spare parts" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</span>
+      <a class="cat-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" style="--i:${i}" href="/c/${c.id}"><span class="cat-img"><span class="ct-ic">${U.icon("c-" + c.id)}</span>${CAT_IMG[c.id] ? `<img src="${CAT_IMG[c.id]}" alt="${U.esc(c.name)} spare parts" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</span>
         <div><b>${U.esc(c.name)}</b><br><span>${DB.products.filter(p => p.cat === c.id).length} parts · ${c.pts.length} families</span></div>
         <span class="mut3" style="font-size:11.5px">${U.esc(c.desc)}</span></a>`).join("")}
     </div>
@@ -2526,7 +2597,7 @@ Pages.brands = () => `
     ${crumb([["Brands"]])}
     <div class="sec-head" style="margin-top:14px"><div><span class="kick">Shop by brand</span><h2>Compatible parts for ${BRANDS.length}+ brands</h2><p>Pick your appliance's brand — we'll show every part with verified model fitment.</p></div></div>
     <div class="brand-grid" style="padding-bottom:50px">${BRANDS.map((b, i) => `
-      <a class="brand-tile rv ${i % 5 ? "rv-d" + Math.min(3, i % 5) : ""}" href="#/b/${b.id}">${brandMark(b)}<b>${U.esc(b.name)}</b><span>${DB.products.filter(p => p.brandFor.includes(b.id)).length} parts</span></a>`).join("")}
+      <a class="brand-tile rv ${i % 5 ? "rv-d" + Math.min(3, i % 5) : ""}" href="/b/${b.id}">${brandMark(b)}<b>${U.esc(b.name)}</b><span>${DB.products.filter(p => p.brandFor.includes(b.id)).length} parts</span></a>`).join("")}
     </div>
   </div>`;
 Mount.brands = () => bindSearch("hd-q", "hd-sug");
@@ -2538,15 +2609,15 @@ Pages.home = () => `
   <section class="bhero">
     <div class="wrap">
       <div class="bbar">
-        <a href="#/" aria-label="G-FLO home"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
-        <nav aria-label="Brand page"><a class="blnk" href="#/about">About</a><a class="blnk" href="#/contact">Contact</a><a class="btn btn-p" href="#/categories">${U.icon("store", "ic-s")} Shop Now</a></nav>
+        <a href="/" aria-label="G-FLO home"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
+        <nav aria-label="Brand page"><a class="blnk" href="/about">About</a><a class="blnk" href="/contact">Contact</a><a class="btn btn-p" href="/categories">${U.icon("store", "ic-s")} Shop Now</a></nav>
       </div>
       <div class="bh-intro">
         <span class="bh-kick">G-FLO Electrical Solutions</span>
         <h1>Tranquillity in<br><span class="grad-tx">every rotation.</span></h1>
         <p>The fan overhead, the mixer on the counter, the geyser in the bathroom, the pump in the yard, the drill in your toolbox — when any of them stops, G-FLO has the exact genuine part to bring it back. ${DB.products.length}+ spares across ${CATS.length} categories, led by fan components we engineer in-house.</p>
         <div class="row" style="margin-top:24px;flex-wrap:wrap">
-          <a class="btn btn-lg" style="background:rgba(255,255,255,.1);color:#fff" href="#/about">Our story</a>
+          <a class="btn btn-lg" style="background:rgba(255,255,255,.1);color:#fff" href="/about">Our story</a>
         </div>
         <div class="bh-stats">
           <div><b>${DB.products.length}+</b><span>Genuine spares</span></div>
@@ -2643,7 +2714,7 @@ function listingRender(reset){
     grid.insertAdjacentHTML("beforeend", next.map((p, i) => productCard(p, i)).join(""));
     LX.shown += next.length;
     revealInit(grid);
-    if (!list.length) grid.innerHTML = `<div style="grid-column:1/-1">${emptyState("box", "No parts match these filters", "Try clearing a filter or use the AI finder to locate your part.", "#/finder", "Open AI finder")}</div>`;
+    if (!list.length) grid.innerHTML = `<div style="grid-column:1/-1">${emptyState("box", "No parts match these filters", "Try clearing a filter or use the AI finder to locate your part.", "/finder", "Open AI finder")}</div>`;
     sent.innerHTML = LX.shown < list.length ? `<div class="spinner" aria-label="Loading more"></div>` : (list.length ? `<span>— you've seen all ${list.length} parts —</span>` : "");
   };
   reset ? setTimeout(draw, 420) : draw();
@@ -2702,7 +2773,7 @@ Pages.category = param => {
   const { id, q } = parseParam(param);
   const c = CAT_MAP[id];
   if (!c) return Pages.notfound();
-  return listingHtml({ pool: DB.products.filter(p => p.cat === id), pt: q.get("pt") || undefined, kick: "Category", title: c.name + " spare parts", sub: c.desc + ". Every part ships with fitment data and install guidance.", img: typeof CAT_IMG !== "undefined" ? CAT_IMG[id] : "", crumbs: [["Categories", "#/categories"], [c.name]] });
+  return listingHtml({ pool: DB.products.filter(p => p.cat === id), pt: q.get("pt") || undefined, kick: "Category", title: c.name + " spare parts", sub: c.desc + ". Every part ships with fitment data and install guidance.", img: typeof CAT_IMG !== "undefined" ? CAT_IMG[id] : "", crumbs: [["Categories", "/categories"], [c.name]] });
 };
 Mount.category = listingMount;
 
@@ -2710,7 +2781,7 @@ Pages.brand = param => {
   const { id } = parseParam(param);
   const b = BRAND_MAP[id];
   if (!b) return Pages.notfound();
-  return listingHtml({ pool: DB.products.filter(p => p.brandFor.includes(id)), brand: id, showCats: true, kick: "Brand store", title: "Parts compatible with " + b.name, sub: "Verified-fit spares for " + b.name + " appliances. Match your exact model with the compatibility checker.", crumbs: [["Brands", "#/brands"], [b.name]] });
+  return listingHtml({ pool: DB.products.filter(p => p.brandFor.includes(id)), brand: id, showCats: true, kick: "Brand store", title: "Parts compatible with " + b.name, sub: "Verified-fit spares for " + b.name + " appliances. Match your exact model with the compatibility checker.", crumbs: [["Brands", "/brands"], [b.name]] });
 };
 Mount.brand = listingMount;
 
@@ -2751,7 +2822,7 @@ Pages.product = sku => {
   const specRows = [["SKU", `<span class="mono">${p.sku}</span>`], ["Part family", pt.name], ["Appliance", c.name], ...pt.specs.map(s => [s[0], s[1]]), ["Compatible brands", brandNames(p, 6)], ["Verified models", p.compat.length + " model numbers"], ["Warranty", p.warranty + " replacement"], ["Net weight", p.weight], ["Installation", p.install], ["Country of origin", "India"]];
   return `
   <div class="wrap">
-    ${crumb([["Categories", "#/categories"], [c.name, "#/c/" + c.id], [pt.name]])}
+    ${crumb([["Categories", "/categories"], [c.name, "/c/" + c.id], [pt.name]])}
     <div class="pdp">
       <div class="gal">
         <div class="gal-main" id="gal-main" aria-label="Product image, hover to zoom">
@@ -2782,7 +2853,7 @@ Pages.product = sku => {
             <button class="btn btn-p" id="cmp-check">Verify</button>
           </div>
           <div class="compat-res" id="cmp-res" role="status"></div>
-          <p class="mut3" style="font-size:11.5px;margin-top:9px">${p.compat.length} verified models · Can't find yours? <a href="#/finder" style="color:var(--brand2);font-weight:600">Scan your model sticker →</a></p>
+          <p class="mut3" style="font-size:11.5px;margin-top:9px">${p.compat.length} verified models · Can't find yours? <a href="/finder" style="color:var(--brand2);font-weight:600">Scan your model sticker →</a></p>
         </div>
 
         <div class="spread" style="margin:6px 0 2px">${stockHtml(p)}<span class="mut3" style="font-size:12px">Sold & fulfilled by <b style="color:var(--tx2)">G-FLO Certified</b></span></div>
@@ -2856,7 +2927,7 @@ Pages.product = sku => {
         <div class="fbt-total"><span class="mut3" style="font-size:12px">${CATALOG_MODE ? "Repair kit" : "Bundle total"}</span><span class="price" style="font-size:22px" id="fbt-total"></span><button class="btn btn-p" id="fbt-add">${U.icon("cart", "ic-s")} Add selected</button></div>
       </div></section>` : ""}
 
-    <section class="sec-tight">${sectionHead("Related parts", "More for your " + c.name.toLowerCase(), null, "#/c/" + c.id, "Browse " + c.name)}${railOf(rel)}</section>
+    <section class="sec-tight">${sectionHead("Related parts", "More for your " + c.name.toLowerCase(), null, "/c/" + c.id, "Browse " + c.name)}${railOf(rel)}</section>
   </div>`;
 };
 Mount.product = sku => {
@@ -2865,7 +2936,7 @@ Mount.product = sku => {
   let qty = 1;
   document.querySelectorAll("[data-pq]").forEach(b => b.addEventListener("click", () => { qty = U.clamp(qty + (+b.getAttribute("data-pq")), 1, 99); document.getElementById("pq").textContent = qty; }));
   document.getElementById("p-add").addEventListener("click", () => State.addCart(sku, qty));
-  document.getElementById("p-buy").addEventListener("click", () => { State.addCart(sku, qty, true); location.hash = "#/checkout"; });
+  document.getElementById("p-buy").addEventListener("click", () => { State.addCart(sku, qty, true); Router.push("/checkout"); });
   // tabs
   document.querySelectorAll("[data-ptab]").forEach(t => t.addEventListener("click", () => {
     document.querySelectorAll("[data-ptab]").forEach(x => { x.classList.toggle("on", x === t); x.setAttribute("aria-selected", x === t); });
@@ -2891,7 +2962,7 @@ Mount.product = sku => {
     const res = AI.compatCheck(p, document.getElementById("cmp-brand").value, document.getElementById("cmp-model").value);
     const el = document.getElementById("cmp-res");
     el.className = "compat-res " + (res.ok ? "ok" : "no");
-    el.innerHTML = (res.ok ? U.icon("check") : U.icon("alert")) + `<div>${U.esc(res.msg)}${!res.ok && res.near && res.near.length ? `<div style="font-weight:500;margin-top:5px;font-size:12.5px">Close matches in list: ${res.near.map(m => `<b class="mono">${m}</b>`).join(", ")}</div>` : ""}${!res.ok && res.alt ? `<div style="margin-top:7px"><a href="#/p/${res.alt.sku}" class="btn btn-soft btn-sm">View the part that fits ${U.esc(document.getElementById("cmp-model").value.toUpperCase())} →</a></div>` : ""}</div>`;
+    el.innerHTML = (res.ok ? U.icon("check") : U.icon("alert")) + `<div>${U.esc(res.msg)}${!res.ok && res.near && res.near.length ? `<div style="font-weight:500;margin-top:5px;font-size:12.5px">Close matches in list: ${res.near.map(m => `<b class="mono">${m}</b>`).join(", ")}</div>` : ""}${!res.ok && res.alt ? `<div style="margin-top:7px"><a href="/p/${res.alt.sku}" class="btn btn-soft btn-sm">View the part that fits ${U.esc(document.getElementById("cmp-model").value.toUpperCase())} →</a></div>` : ""}</div>`;
   });
   // pincode
   document.getElementById("pin-check").addEventListener("click", () => {
@@ -2940,7 +3011,7 @@ Pages.finder = tab => {
       <p style="opacity:.9;max-width:560px;font-size:14.5px">Answer three quick questions, upload a photo, or scan your appliance's model sticker — G-FLO AI matches it against ${DB.products.length} certified parts.</p>
     </div>
     <div class="hub-tabs" role="tablist">
-      ${[["wizard", "spark", "Guided finder"], ["photo", "camera", "Photo ID"], ["ocr", "scan", "Model sticker OCR"], ["voice", "mic", "Voice search"]].map(x => `<a class="hub-tab ${t === x[0] ? "on" : ""}" href="#/finder/${x[0]}" role="tab" aria-selected="${t === x[0]}">${U.icon(x[1], "ic-s")} ${x[2]}</a>`).join("")}
+      ${[["wizard", "spark", "Guided finder"], ["photo", "camera", "Photo ID"], ["ocr", "scan", "Model sticker OCR"], ["voice", "mic", "Voice search"]].map(x => `<a class="hub-tab ${t === x[0] ? "on" : ""}" href="/finder/${x[0]}" role="tab" aria-selected="${t === x[0]}">${U.icon(x[1], "ic-s")} ${x[2]}</a>`).join("")}
     </div>
     <div style="padding-bottom:50px" id="hub-body">${t === "photo" ? finderPhoto() : t === "ocr" ? finderOcr() : t === "voice" ? finderVoice() : finderWizard()}</div>
   </div>`;
@@ -2965,7 +3036,7 @@ function wzRender(){
   if (s.cat && s.pt && s.brand){
     const list = DB.products.filter(p => p.cat === s.cat && (s.pt === "any" || p.pt === s.pt) && (s.brand === "any" || p.brandFor.includes(s.brand))).sort((a, b) => b.rating - a.rating).slice(0, 6);
     res.innerHTML = `<div class="row" style="margin-bottom:14px">${U.icon("spark")}<div><b>${list.length ? list.length + " AI-ranked matches" : "No exact match"}</b><div class="mut3" style="font-size:12px">${CAT_MAP[s.cat].name}${s.pt !== "any" ? " · " + PT_MAP[s.pt].name : ""}${s.brand !== "any" ? " · " + BRAND_MAP[s.brand].name : ""}</div></div></div>
-      ${list.length ? `<div class="grid-cards" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">${list.map(p => productCard(p)).join("")}</div><a class="btn btn-ghost btn-block" style="margin-top:14px" href="#/c/${s.cat}${s.pt !== "any" ? "?pt=" + s.pt : ""}">See all in category ${U.icon("arr-r", "ic-s")}</a>` : emptyState("box", "Nothing exact yet", "Try 'Any brand', or chat with the assistant — we restock weekly.", "#/c/" + s.cat, "Browse category")}`;
+      ${list.length ? `<div class="grid-cards" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">${list.map(p => productCard(p)).join("")}</div><a class="btn btn-ghost btn-block" style="margin-top:14px" href="/c/${s.cat}${s.pt !== "any" ? "?pt=" + s.pt : ""}">See all in category ${U.icon("arr-r", "ic-s")}</a>` : emptyState("box", "Nothing exact yet", "Try 'Any brand', or chat with the assistant — we restock weekly.", "/c/" + s.cat, "Browse category")}`;
     revealInit(res);
   }
 }
@@ -3025,7 +3096,7 @@ Mount.finder = tab => {
         const picks = DB.products.filter(p => p.cat === d.cat.id && d.pts.some(t => t.id === p.pt)).sort((a, b) => b.rating - a.rating).slice(0, 4);
         res.innerHTML = `<div class="row" style="gap:12px"><img src="${url}" alt="" style="width:74px;height:74px;object-fit:cover;border-radius:14px;border:1px solid var(--line)"><div><b>Looks like a ${d.cat.name}</b><div class="mut3" style="font-size:12px">Confidence</div><div class="conf-bar" style="width:160px"><i style="width:0"></i></div></div><span class="badge b-ok" style="margin-left:auto">${d.conf}%</span></div>
         <p class="mut" style="font-size:13px;margin:14px 0 10px">Common failure parts for this appliance:</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">${d.pts.map(t => `<a class="chip" href="#/c/${d.cat.id}?pt=${t.id}">${U.esc(t.name)}</a>`).join("")}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${d.pts.map(t => `<a class="chip" href="/c/${d.cat.id}?pt=${t.id}">${U.esc(t.name)}</a>`).join("")}</div>
         ${picks.length ? `<p class="mut" style="font-size:13px;margin:16px 0 10px">Top matches:</p><div class="grid-cards" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${picks.map(p => productCard(p)).join("")}</div>` : ""}
         <p class="mut3" style="font-size:11px;margin-top:14px">Demo classifier — production uses a vision model + your catalogue embeddings.</p>`;
         setTimeout(() => { const cb = res.querySelector(".conf-bar i"); if (cb) cb.style.width = d.conf + "%"; }, 60);
@@ -3037,11 +3108,11 @@ Mount.finder = tab => {
     const showModel = (code, imgUrl, conf, serial) => {
       const m = DB.modelList.find(x => x.code === code.toUpperCase()) || null;
       const res = document.getElementById("ocr-result");
-      if (!m){ res.innerHTML = emptyState("alert", "Model not in fitment DB yet", "We add models weekly. Chat with support and we'll source parts for it.", "#/support", "Contact support"); return; }
+      if (!m){ res.innerHTML = emptyState("alert", "Model not in fitment DB yet", "We add models weekly. Chat with support and we'll source parts for it.", "/support", "Contact support"); return; }
       const parts = DB.products.filter(p => p.compat.includes(m.code)).sort((a, b) => b.rating - a.rating);
       res.innerHTML = `${imgUrl ? `<div class="row" style="gap:12px;margin-bottom:12px"><img src="${imgUrl}" alt="" style="width:74px;height:74px;object-fit:cover;border-radius:14px;border:1px solid var(--line)"><div><div class="mut3" style="font-size:11px">EXTRACTED</div><b class="mono" style="font-size:17px">${m.code}</b>${serial ? `<div class="mut3" style="font-size:11px">Serial ${serial}</div>` : ""}</div><span class="badge b-ok" style="margin-left:auto">${conf || 95}% OCR</span></div>` : `<div class="row" style="margin-bottom:12px"><b class="mono" style="font-size:17px">${m.code}</b><span class="badge b-ok">Verified model</span></div>`}
       <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:14px"><span class="tag">${BRAND_MAP[m.brand].name}</span><span class="tag">${CAT_MAP[m.cat].name}</span><span class="tag">${parts.length} verified parts</span></div>
-      ${parts.length ? `<div class="grid-cards" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${parts.slice(0, 6).map(p => productCard(p)).join("")}</div>` : emptyState("box", "No parts mapped yet", "Support can source this — usually within 48 hours.", "#/support", "Request part")}`;
+      ${parts.length ? `<div class="grid-cards" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${parts.slice(0, 6).map(p => productCard(p)).join("")}</div>` : emptyState("box", "No parts mapped yet", "Support can source this — usually within 48 hours.", "/support", "Request part")}`;
       revealInit(res);
     };
     document.getElementById("ocr-file").addEventListener("change", e => {
@@ -3056,22 +3127,22 @@ Mount.finder = tab => {
   if (tab === "voice"){
     bindSearch("voice-q", "voice-sug");
     document.getElementById("voice-big").addEventListener("click", e => startVoice("voice-q", e.currentTarget));
-    document.getElementById("voice-go").addEventListener("click", () => { const v = document.getElementById("voice-q").value.trim(); if (v) location.hash = "#/search/" + encodeURIComponent(v); });
+    document.getElementById("voice-go").addEventListener("click", () => { const v = document.getElementById("voice-q").value.trim(); if (v) Router.push("/search/" + encodeURIComponent(v)); });
   }
 };
 
 /* ================= CART PAGE ================= */
 Pages.cart = () => {
   const t = State.cartTotals();
-  if (!State.cart.length) return `<div class="wrap">${crumb([["Cart"]])}${emptyState("cart", "Your cart is empty", "Every repair starts with the right part.", "#/categories", "Start browsing")}</div>`;
+  if (!State.cart.length) return `<div class="wrap">${crumb([["Cart"]])}${emptyState("cart", "Your cart is empty", "Every repair starts with the right part.", "/categories", "Start browsing")}</div>`;
   return `<div class="wrap">${crumb([["Cart"]])}
   <div class="sec-head" style="margin-top:12px"><div><span class="kick">Cart</span><h2>${t.count} item${t.count > 1 ? "s" : ""} ready to ship</h2></div></div>
   <div class="co-grid">
     <div>
       <div class="co-sec">
         ${State.cart.map(i => { const p = DB.prodMap[i.sku]; return `
-        <div class="citem"><a class="art" href="#/p/${p.sku}">${prodArt(p)}</a>
-          <div class="inf"><b><a href="#/p/${p.sku}">${U.esc(p.name)}</a></b>
+        <div class="citem"><a class="art" href="/p/${p.sku}">${prodArt(p)}</a>
+          <div class="inf"><b><a href="/p/${p.sku}">${U.esc(p.name)}</a></b>
             <span class="mut3" style="font-size:11.5px">${catOf(p).name} · <span class="mono">${p.sku}</span> · ${p.warranty} warranty</span>
             ${stockHtml(p)}
             <div class="spread" style="margin-top:5px"><div class="qty"><button data-act="qty" data-sku="${p.sku}" data-d="-1" aria-label="Decrease">${U.icon("minus", "ic-s")}</button><b>${i.qty}</b><button data-act="qty" data-sku="${p.sku}" data-d="1" aria-label="Increase">${U.icon("plus", "ic-s")}</button></div>
@@ -3094,7 +3165,7 @@ Pages.cart = () => {
         <div class="tot-row big"><span>Payable</span><span class="price">${U.inr(t.total)}</span></div>
         <span class="badge b-ok" style="justify-self:start">You save ${U.inr(t.saveMrp + t.disc)} on this order</span>`}
       </div>
-      <a class="btn btn-p btn-lg btn-block" style="margin-top:16px" href="#/checkout">Proceed to checkout ${U.icon("arr-r", "ic-s")}</a>
+      <a class="btn btn-p btn-lg btn-block" style="margin-top:16px" href="/checkout">Proceed to checkout ${U.icon("arr-r", "ic-s")}</a>
       <p class="mut3" style="font-size:11.5px;margin-top:10px;text-align:center">${U.icon("shield", "ic-s")} Demo checkout — no payment is collected</p>
     </div></div>
   </div></div>`;
@@ -3116,9 +3187,9 @@ Mount.cart = () => {
 
 /* ================= CHECKOUT ================= */
 Pages.checkout = () => {
-  if (!State.cart.length) return `<div class="wrap">${crumb([["Checkout"]])}${emptyState("cart", "Nothing to checkout", "Add a part to your cart first.", "#/categories", "Browse parts")}</div>`;
+  if (!State.cart.length) return `<div class="wrap">${crumb([["Checkout"]])}${emptyState("cart", "Nothing to checkout", "Add a part to your cart first.", "/categories", "Browse parts")}</div>`;
   const t = State.cartTotals();
-  return `<div class="wrap">${crumb([["Cart", "#/cart"], ["Checkout"]])}
+  return `<div class="wrap">${crumb([["Cart", "/cart"], ["Checkout"]])}
   <div class="sec-head" style="margin-top:12px"><div><span class="kick">Secure checkout</span><h2>Almost done</h2><p>Demo mode — no payment is processed, no data leaves your browser.</p></div></div>
   <form class="co-grid" id="co-form" novalidate>
     <div>
@@ -3181,7 +3252,7 @@ Mount.checkout = () => {
         gstin: null,
         pay: form.querySelector("[name=pay]:checked").value, shipExtra
       });
-      location.hash = "#/order/" + order.id;
+      Router.push("/order/" + order.id);
     }, 900);
   });
 };
@@ -3198,35 +3269,76 @@ function orderTimeline(o){
 }
 Pages.order = id => {
   const o = State.orders.find(x => x.id === id);
-  if (!o) return `<div class="wrap">${emptyState("box", "Order not found", "This demo stores orders locally in your browser.", "#/", "Go home")}</div>`;
+  if (!o) return `<div class="wrap">${emptyState("box", "Order not found", "This demo stores orders locally in your browser.", "/", "Go home")}</div>`;
   return `<div class="wrap" style="max-width:820px">
     <div class="empty" style="padding:40px 10px 20px"><div class="e-ic" style="background:rgba(16,185,129,.14);color:var(--ok)">${U.icon("check")}</div>
       <h2 style="font-size:clamp(21px,3vw,28px)">Order placed! 🎉</h2>
       <p class="mut">Order <b class="mono">${o.id}</b> · ${o.items.length} item(s)${CATALOG_MODE ? " · quote enquiry received" : ` · <b>${U.inr(o.totals.total + (o.shipExtra || 0))}</b> ${o.pay === "cod" ? "payable on delivery" : "paid (demo)"}`}</p>
-      <div class="row">${CATALOG_MODE ? "" : `<button class="btn btn-ghost" data-invoice="${o.id}">${U.icon("doc", "ic-s")} GST invoice</button>`}<a class="btn btn-soft" href="#/categories">Continue shopping</a></div>
+      <div class="row">${CATALOG_MODE ? "" : `<button class="btn btn-ghost" data-invoice="${o.id}">${U.icon("doc", "ic-s")} GST invoice</button>`}<a class="btn btn-soft" href="/categories">Continue shopping</a></div>
     </div>
     <div class="co-sec"><h3>What happens next</h3>${orderTimeline(o)}</div>
   </div>`;
 };
+/* Called from Mount.order and Mount.account but never defined, so every render
+   of #/account threw "bindInvoiceButtons is not defined". The throw happened
+   BEFORE the rest of Mount.account ran, which silently killed the "clear demo
+   data" button and every Return button on the page. */
+function bindInvoiceButtons(){
+  document.querySelectorAll("[data-invoice]").forEach(b => b.addEventListener("click", () => {
+    const id = b.getAttribute("data-invoice");
+    const o = (State.orders || []).find(x => x.id === id);
+    if (!o) { toast("Invoice not available for this order", "warn"); return; }
+    const t = o.totals || {};
+    const rows = (o.items || []).map(i => {
+      const pr = DB.prodMap[i.sku];
+      if (!pr) return "";
+      const line = (pr.price || 0) * (i.qty || 0);
+      return `<tr><td style="padding:6px 0"><b style="font-size:13px">${U.esc(pr.name)}</b>
+        <div class="mut3 mono" style="font-size:11px">${U.esc(pr.sku)}</div></td>
+        <td style="text-align:center;font-size:13px">${i.qty}</td>
+        <td style="text-align:right;font-size:13px">${U.inr(line)}</td></tr>`;
+    }).join("");
+    const line = (label, value, strong) => `<div class="tot-row${strong ? " big" : ""}"><span>${label}</span><span${strong ? ' class="price"' : ""}>${value}</span></div>`;
+    modal(`<div class="mut3" style="font-size:12px">Order <b class="mono">${U.esc(o.id)}</b> ·
+        ${new Date(o.ts).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:12px">
+        <thead><tr style="border-bottom:1px solid var(--line)">
+          <th style="text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--tx3);padding-bottom:6px">Part</th>
+          <th style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--tx3)">Qty</th>
+          <th style="text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--tx3)">Amount</th>
+        </tr></thead><tbody>${rows}</tbody></table>
+      <div style="display:grid;gap:7px;margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)">
+        ${line("Subtotal", U.inr(t.sub || 0))}
+        ${t.disc ? line("Discount", "−" + U.inr(t.disc)) : ""}
+        ${line("Delivery", t.ship ? U.inr(t.ship) : "FREE")}
+        ${line("GST (included)", U.inr(t.gst || 0))}
+        ${line("Total paid", U.inr((t.total || 0) + (o.shipExtra || 0)), true)}
+      </div>
+      <p class="mut3" style="font-size:11.5px;margin-top:12px;text-align:center">
+        Demo invoice — generated in your browser, not a valid tax document.</p>`,
+      { title: "GST invoice — " + U.esc(o.id) });
+  }));
+}
+
 Mount.order = () => { bindSearch("hd-q", "hd-sug"); bindInvoiceButtons(); };
 
 Pages.account = tab => {
   const U0 = State.user || { name: "Guest", email: "", via: "guest", hue: 358 };
   const t = tab || "overview";
-  const lnk = (id, ic, label) => `<a class="acc-lnk ${t === id ? "on" : ""}" href="#/account/${id}">${U.icon(ic, "ic-s")} ${label}</a>`;
+  const lnk = (id, ic, label) => `<a class="acc-lnk ${t === id ? "on" : ""}" href="/account/${id}">${U.icon(ic, "ic-s")} ${label}</a>`;
   let body = "";
   if (t === "orders" || t === "overview"){
     body = `<h3 style="margin-bottom:14px">${t === "overview" ? "Welcome back, " + U.esc(U0.name.split(" ")[0]) + " 👋" : "Your orders"}</h3>
     ${t === "overview" ? `<div class="kpis" style="margin-bottom:18px"><div class="kpi"><span class="k-ic">${U.icon("package")}</span><b>${State.orders.length}</b><span>Orders placed</span></div><div class="kpi"><span class="k-ic">${U.icon("heart")}</span><b>${State.wish.length}</b><span>Wishlisted parts</span></div>${CATALOG_MODE ? `<div class="kpi"><span class="k-ic">${U.icon("eye")}</span><b>${State.recent.length}</b><span>Recently viewed</span></div>` : `<div class="kpi"><span class="k-ic">${U.icon("bolt")}</span><b>${U.inr(State.orders.reduce((s, o) => s + o.totals.total, 0))}</b><span>Lifetime spend</span></div>`}<div class="kpi"><span class="k-ic">${U.icon("shield")}</span><b>Gold</b><span>G-FLO Circle tier</span></div></div>` : ""}
     ${State.orders.length ? State.orders.map(o => `<div class="order-card"><div class="spread" style="flex-wrap:wrap;gap:10px"><div><b class="mono">${o.id}</b><div class="mut3" style="font-size:12px">${new Date(o.ts).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} · ${o.items.length} item(s)${CATALOG_MODE ? "" : " · " + U.inr(o.totals.total + (o.shipExtra || 0))}</div></div><div class="row"><span class="st-chip b-info" style="background:var(--g-soft);color:var(--brand2)">${ORDER_STEPS[Math.min(o.status, 4)]}</span>${CATALOG_MODE ? "" : `<button class="btn btn-ghost btn-sm" data-invoice="${o.id}">Invoice</button>`}<button class="btn btn-ghost btn-sm" data-return="${o.id}">Return</button></div></div>
-      <div class="row" style="margin-top:11px;gap:7px">${o.items.slice(0, 5).map(i => { const p = DB.prodMap[i.sku]; return p ? `<a href="#/p/${p.sku}" style="width:44px;height:44px;border-radius:10px;overflow:hidden;background:var(--art-bg1);border:1px solid var(--line)" title="${U.esc(p.short)}">${prodArt(p)}</a>` : ""; }).join("")}</div></div>`).join("") : emptyState("package", "No orders yet", "Your demo orders will appear here.", "#/categories", "Shop parts")}`;
+      <div class="row" style="margin-top:11px;gap:7px">${o.items.slice(0, 5).map(i => { const p = DB.prodMap[i.sku]; return p ? `<a href="/p/${p.sku}" style="width:44px;height:44px;border-radius:10px;overflow:hidden;background:var(--art-bg1);border:1px solid var(--line)" title="${U.esc(p.short)}">${prodArt(p)}</a>` : ""; }).join("")}</div></div>`).join("") : emptyState("package", "No orders yet", "Your demo orders will appear here.", "/categories", "Shop parts")}`;
   } else if (t === "addresses"){
     body = `<h3 style="margin-bottom:14px">Saved addresses</h3>
     <div class="order-card"><b>Home</b> <span class="badge b-info">Default</span><p class="mut" style="font-size:13px;margin-top:6px">Flat 14B, Volt Residency, MG Road, Bengaluru 560048<br>Asha Sharma · 98450 00000</p></div>
     <div class="order-card"><b>Workshop</b><p class="mut" style="font-size:13px;margin-top:6px">Unit 7, Service Lane, Whitefield, Bengaluru 560066<br>Asha Sharma · 98450 00000</p></div>
     <button class="btn btn-ghost" onclick="toast('Address book is read-only in the demo','info')">${U.icon("plus", "ic-s")} Add address</button>`;
   } else if (t === "returns"){
-    body = `<h3 style="margin-bottom:14px">Returns & warranty claims</h3>${emptyState("rotate", "No active returns", "Start a return from any delivered order within 7 days.", "#/account/orders", "View orders")}`;
+    body = `<h3 style="margin-bottom:14px">Returns & warranty claims</h3>${emptyState("rotate", "No active returns", "Start a return from any delivered order within 7 days.", "/account/orders", "View orders")}`;
   } else if (t === "settings"){
     body = `<h3 style="margin-bottom:14px">Preferences</h3>
     <div class="order-card spread"><div><b>Newsletter</b><div class="mut3" style="font-size:12.5px">Weekly parts drops & repair tips</div></div><span class="badge ${State.news ? "b-ok" : "b-off"}">${State.news ? "Subscribed" : "Off"}</span></div>
@@ -3237,7 +3349,7 @@ Pages.account = tab => {
     <div class="sec-head" style="margin-top:12px"><div><span class="kick">My G-FLO</span><h2>Account</h2></div></div>
     <div class="acc-user"><span class="ava" style="background:linear-gradient(135deg,hsl(358 62% 46%),hsl(48 66% 40%))">${U.icon("package", "ic-s")}</span><div><b style="font-family:var(--fd);font-size:16px">Your orders &amp; enquiries</b><div class="mut3" style="font-size:12.5px">Saved in this browser — no account needed</div></div></div>
     <div class="acc-grid">
-      <nav class="acc-nav" aria-label="Account sections">${lnk("overview", "dash", "Overview")}${lnk("orders", "package", "Orders")}${lnk("addresses", "pin", "Addresses")}${lnk("returns", "rotate", "Returns")}${lnk("settings", "cog", "Settings")}<a class="acc-lnk" href="#/wishlist">${U.icon("heart", "ic-s")} Wishlist</a><a class="acc-lnk" href="/admin/login">${U.icon("lock", "ic-s")} Admin login</a></nav>
+      <nav class="acc-nav" aria-label="Account sections">${lnk("overview", "dash", "Overview")}${lnk("orders", "package", "Orders")}${lnk("addresses", "pin", "Addresses")}${lnk("returns", "rotate", "Returns")}${lnk("settings", "cog", "Settings")}<a class="acc-lnk" href="/wishlist">${U.icon("heart", "ic-s")} Wishlist</a><a class="acc-lnk" href="/admin/login">${U.icon("lock", "ic-s")} Admin login</a></nav>
       <div>${body}</div>
     </div>
   </div>`;
@@ -3259,7 +3371,7 @@ Pages.wishlist = () => {
   const items = State.wish.map(s => DB.prodMap[s]).filter(Boolean);
   return `<div class="wrap">${crumb([["Wishlist"]])}
   <div class="sec-head" style="margin-top:12px"><div><span class="kick">Saved for later</span><h2>Wishlist${items.length ? ` (${items.length})` : ""}</h2></div>${items.length ? `<button class="btn btn-ghost btn-sm" id="wish-all">${U.icon("cart", "ic-s")} Add all to cart</button>` : ""}</div>
-  ${items.length ? `<div class="grid-cards" style="padding-bottom:50px">${items.map((p, i) => productCard(p, i)).join("")}</div>` : emptyState("heart", "Nothing saved yet", "Tap the heart on any part to keep it here.", "#/categories", "Discover parts")}</div>`;
+  ${items.length ? `<div class="grid-cards" style="padding-bottom:50px">${items.map((p, i) => productCard(p, i)).join("")}</div>` : emptyState("heart", "Nothing saved yet", "Tap the heart on any part to keep it here.", "/categories", "Discover parts")}</div>`;
 };
 Mount.wishlist = () => {
   bindSearch("hd-q", "hd-sug");
@@ -3269,8 +3381,8 @@ Mount.wishlist = () => {
 
 Pages.compare = () => {
   const items = State.cmp.map(s => DB.prodMap[s]).filter(Boolean);
-  if (!items.length) return `<div class="wrap">${crumb([["Compare"]])}${emptyState("scale", "Nothing to compare", "Add up to 4 parts using the ⚖ button on any card.", "#/categories", "Browse parts")}</div>`;
-  const rows = [["Illustration", p => `<div class="art">${prodArt(p)}</div>`], ["Part", p => `<a href="#/p/${p.sku}" style="font-weight:700;color:var(--brand2)">${U.esc(p.short)}</a><div class="mono mut3" style="font-size:10.5px;margin-top:4px">${p.sku}</div>`], ...(CATALOG_MODE ? [] : [["Price", p => `<span class="price">${U.inr(p.price)}</span>${p.off ? ` <span class="off">${p.off}% off</span>` : ""}`]]), ["Rating", p => `${U.stars(p.rating)} ${p.rating} (${p.reviews})`], ["Appliance", p => catOf(p).name], ["Part family", p => ptOf(p).name], ["Fits brands", p => brandNames(p, 5)], ["Verified models", p => p.compat.length + " models"], ["Stock", p => stockHtml(p)], ["Warranty", p => p.warranty], ["Install", p => p.install], ["", p => `<button class="btn btn-p btn-sm" data-act="add-cart" data-sku="${p.sku}">Add to cart</button> <button class="btn btn-ghost btn-sm" data-act="cmp" data-sku="${p.sku}">Remove</button>`]];
+  if (!items.length) return `<div class="wrap">${crumb([["Compare"]])}${emptyState("scale", "Nothing to compare", "Add up to 4 parts using the ⚖ button on any card.", "/categories", "Browse parts")}</div>`;
+  const rows = [["Illustration", p => `<div class="art">${prodArt(p)}</div>`], ["Part", p => `<a href="/p/${p.sku}" style="font-weight:700;color:var(--brand2)">${U.esc(p.short)}</a><div class="mono mut3" style="font-size:10.5px;margin-top:4px">${p.sku}</div>`], ...(CATALOG_MODE ? [] : [["Price", p => `<span class="price">${U.inr(p.price)}</span>${p.off ? ` <span class="off">${p.off}% off</span>` : ""}`]]), ["Rating", p => `${U.stars(p.rating)} ${p.rating} (${p.reviews})`], ["Appliance", p => catOf(p).name], ["Part family", p => ptOf(p).name], ["Fits brands", p => brandNames(p, 5)], ["Verified models", p => p.compat.length + " models"], ["Stock", p => stockHtml(p)], ["Warranty", p => p.warranty], ["Install", p => p.install], ["", p => `<button class="btn btn-p btn-sm" data-act="add-cart" data-sku="${p.sku}">Add to cart</button> <button class="btn btn-ghost btn-sm" data-act="cmp" data-sku="${p.sku}">Remove</button>`]];
   return `<div class="wrap">${crumb([["Compare"]])}
   <div class="sec-head" style="margin-top:12px"><div><span class="kick">Side by side</span><h2>Compare ${items.length} parts</h2></div></div>
   <div class="cmp-wr"><table class="cmp-tbl">${rows.map(r => `<tr><td>${r[0]}</td>${items.map(p => `<td>${r[1](p)}</td>`).join("")}</tr>`).join("")}</table></div></div>`;
@@ -3289,7 +3401,7 @@ Pages.guide = id => {
   const c = CAT_MAP[g.cat];
   const parts = DB.products.filter(p => p.cat === g.cat).sort((a, b) => b.rating - a.rating).slice(0, 4);
   const lvlColor = { Easy: "b-ok", Moderate: "b-best", Pro: "b-deal" }[g.level];
-  return `<div class="wrap" style="max-width:880px">${crumb([["Repair guides", "#/guides"], [g.title]])}
+  return `<div class="wrap" style="max-width:880px">${crumb([["Repair guides", "/guides"], [g.title]])}
     <div style="margin:16px 0 8px" class="row"><span class="badge ${lvlColor}">${g.level}</span><span class="tag">${U.icon("clock", "ic-s")} ${g.mins} min</span><span class="tag">${U.icon("wrench", "ic-s")} ${U.esc(c.name)}</span></div>
     <h1 style="font-size:clamp(24px,3.6vw,36px);margin-bottom:12px">${U.esc(g.title)}</h1>
     <p class="mut" style="font-size:15px;max-width:640px">${U.esc(g.intro)}</p>
@@ -3299,8 +3411,8 @@ Pages.guide = id => {
       <div><h3 style="margin-bottom:14px">Steps</h3><div class="step-list">${g.steps.map(s => `<div class="step"><span class="n"></span><div><p style="font-size:14px;color:var(--tx)">${U.esc(s)}</p></div></div>`).join("")}</div>
         <h3 style="margin:22px 0 10px">Tools needed</h3><div style="display:flex;gap:8px;flex-wrap:wrap">${g.tools.map(t => `<span class="tag">${U.icon("wrench", "ic-s")} ${t}</span>`).join("")}</div>
         ${g.safety[1] ? `<div class="lock-note" style="margin-top:16px">${U.icon("info")} ${U.esc(g.safety[1])}</div>` : ""}</div>
-      <div><h3 style="margin-bottom:14px">Parts for this repair</h3><div style="display:grid;gap:12px">${parts.map(p => `<a class="dl-row" href="#/p/${p.sku}" style="margin:0"><span style="width:52px;height:52px;border-radius:12px;overflow:hidden;flex:none;background:var(--art-bg1)">${prodArt(p)}</span><div><b>${U.esc(p.short)}</b><small>★ ${p.rating}${CATALOG_MODE ? "" : " · " + U.inr(p.price)}</small></div><span class="btn btn-soft btn-sm" style="margin-left:auto">View</span></a>`).join("")}</div>
-      <a class="btn btn-p btn-block" style="margin-top:14px" href="#/c/${c.id}">All ${U.esc(c.name)} parts ${U.icon("arr-r", "ic-s")}</a></div>
+      <div><h3 style="margin-bottom:14px">Parts for this repair</h3><div style="display:grid;gap:12px">${parts.map(p => `<a class="dl-row" href="/p/${p.sku}" style="margin:0"><span style="width:52px;height:52px;border-radius:12px;overflow:hidden;flex:none;background:var(--art-bg1)">${prodArt(p)}</span><div><b>${U.esc(p.short)}</b><small>★ ${p.rating}${CATALOG_MODE ? "" : " · " + U.inr(p.price)}</small></div><span class="btn btn-soft btn-sm" style="margin-left:auto">View</span></a>`).join("")}</div>
+      <a class="btn btn-p btn-block" style="margin-top:14px" href="/c/${c.id}">All ${U.esc(c.name)} parts ${U.icon("arr-r", "ic-s")}</a></div>
     </div></div>`;
 };
 Mount.guide = () => bindSearch("hd-q", "hd-sug");
@@ -3311,8 +3423,8 @@ Pages.support = () => `<div class="wrap">${crumb([["Support"]])}
   <div class="sup-grid" style="margin-bottom:30px">
     <button class="sup-tile" data-act="chat" style="text-align:left">${U.icon("spark")}<b>Chat with G-FLO AI</b><span class="mut3" style="font-size:12.5px">Parts, fitment, orders — instant answers</span></button>
     
-    <a class="sup-tile" href="#/account/returns">${U.icon("rotate")}<b>Returns & refunds</b><span class="mut3" style="font-size:12.5px">7-day easy returns, 48-hr refunds</span></a>
-    <a class="sup-tile" href="#/guides">${U.icon("book")}<b>Repair guides</b><span class="mut3" style="font-size:12.5px">DIY with engineer-written steps</span></a>
+    <a class="sup-tile" href="/account/returns">${U.icon("rotate")}<b>Returns & refunds</b><span class="mut3" style="font-size:12.5px">7-day easy returns, 48-hr refunds</span></a>
+    <a class="sup-tile" href="/guides">${U.icon("book")}<b>Repair guides</b><span class="mut3" style="font-size:12.5px">DIY with engineer-written steps</span></a>
     <a class="sup-tile" href="tel:${CONTACT.phone}">${U.icon("phone")}<b>${CONTACT.phone}</b><span class="mut3" style="font-size:12.5px">Order status & complaints · Mon–Sat 9–8</span></a>
     <a class="sup-tile" href="mailto:${CONTACT.email}">${U.icon("mail")}<b>${CONTACT.email}</b><span class="mut3" style="font-size:12.5px">Replies within 4 business hours</span></a>
   </div>
@@ -3401,16 +3513,16 @@ const POLICIES = {
 };
 Pages.policy = id => {
   const pol = POLICIES[id] || null;
-  if (!pol) return `<div class="wrap">${crumb([["Policies"]])}<div class="sec-head" style="margin-top:12px"><div><span class="kick">Store policies</span><h2>Policies</h2></div></div><div class="sup-grid" style="padding-bottom:50px">${Object.keys(POLICIES).map(k => `<a class="sup-tile" href="#/policy/${k}">${U.icon("doc")}<b>${POLICIES[k][0]}</b></a>`).join("")}</div></div>`;
-  return `<div class="wrap" style="max-width:780px">${crumb([["Policies", "#/policy"], [pol[0]]])}
+  if (!pol) return `<div class="wrap">${crumb([["Policies"]])}<div class="sec-head" style="margin-top:12px"><div><span class="kick">Store policies</span><h2>Policies</h2></div></div><div class="sup-grid" style="padding-bottom:50px">${Object.keys(POLICIES).map(k => `<a class="sup-tile" href="/policy/${k}">${U.icon("doc")}<b>${POLICIES[k][0]}</b></a>`).join("")}</div></div>`;
+  return `<div class="wrap" style="max-width:780px">${crumb([["Policies", "/policy"], [pol[0]]])}
     <div class="sec-head" style="margin-top:12px"><div><span class="kick">Store policy</span><h2>${pol[0]}</h2><p>Last updated: July 2026 · Plain-language version</p></div></div>
     ${pol[1].map(s => `<div class="co-sec"><h3 style="margin-bottom:8px">${s[0]}</h3><p class="mut" style="font-size:14px;line-height:1.75">${s[1]}</p></div>`).join("")}
-    <div class="row" style="padding-bottom:44px;flex-wrap:wrap"><a class="btn btn-soft" href="#/support">${U.icon("headset","ic-s")} Questions? Help centre</a><a class="btn btn-ghost" href="#/contact">Contact us</a></div>
+    <div class="row" style="padding-bottom:44px;flex-wrap:wrap"><a class="btn btn-soft" href="/support">${U.icon("headset","ic-s")} Questions? Help centre</a><a class="btn btn-ghost" href="/contact">Contact us</a></div>
   </div>`;
 };
 Mount.policy = () => bindSearch("hd-q", "hd-sug");
 
-Pages.notfound = () => `<div class="wrap">${emptyState("alert", "Page not found", "The link may be old — but the parts are all still here.", "#/", "Back to home")}</div>`;
+Pages.notfound = () => `<div class="wrap">${emptyState("alert", "Page not found", "The link may be old — but the parts are all still here.", "/", "Back to home")}</div>`;
 </script>
 <script>
 "use strict";
@@ -3461,8 +3573,8 @@ Pages.admin = () => `<div class="wrap" style="padding:60px 0;text-align:center">
 Mount.admin = () => { setTimeout(() => { location.href = "/admin/login"; }, 400); };
 
 /* Old #/seller links land on the contact page — seller onboarding is handled there. */
-Pages.seller = () => `<div class="wrap" style="padding:60px 0;text-align:center"><h2>Sell on G-FLO</h2><p class="mut" style="margin:10px 0 18px">Taking you to our contact page…</p><a class="btn btn-p" href="#/contact">Contact G-FLO</a></div>`;
-Mount.seller = () => { setTimeout(() => { location.hash = "#/contact"; }, 300); };
+Pages.seller = () => `<div class="wrap" style="padding:60px 0;text-align:center"><h2>Sell on G-FLO</h2><p class="mut" style="margin:10px 0 18px">Taking you to our contact page…</p><a class="btn btn-p" href="/contact">Contact G-FLO</a></div>`;
+Mount.seller = () => { setTimeout(() => { Router.push("/contact"); }, 300); };
 /* ================= BOOT ================= */
 (async function init(){
   document.documentElement.dataset.theme = "light";
@@ -3471,6 +3583,8 @@ Mount.seller = () => { setTimeout(() => { location.hash = "#/contact"; }, 300); 
   buildDB();
   const boot = () => {
     try { const lk = document.querySelector('link[rel="icon"]'); if (lk && typeof BRAND_MARK === "string") lk.href = BRAND_MARK; } catch(e){}
+    /* an old "#/..." bookmark becomes its clean path before anything renders */
+    Router.upgradeLegacyHash();
     renderShell(); bindGlobal(); Router.go(); revealInit(document);
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();

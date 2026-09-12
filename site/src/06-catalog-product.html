@@ -74,7 +74,7 @@ function listingRender(reset){
     grid.insertAdjacentHTML("beforeend", next.map((p, i) => productCard(p, i)).join(""));
     LX.shown += next.length;
     revealInit(grid);
-    if (!list.length) grid.innerHTML = `<div style="grid-column:1/-1">${emptyState("box", "No parts match these filters", "Try clearing a filter or use the AI finder to locate your part.", "#/finder", "Open AI finder")}</div>`;
+    if (!list.length) grid.innerHTML = `<div style="grid-column:1/-1">${emptyState("box", "No parts match these filters", "Try clearing a filter or use the AI finder to locate your part.", "/finder", "Open AI finder")}</div>`;
     sent.innerHTML = LX.shown < list.length ? `<div class="spinner" aria-label="Loading more"></div>` : (list.length ? `<span>— you've seen all ${list.length} parts —</span>` : "");
   };
   reset ? setTimeout(draw, 420) : draw();
@@ -133,7 +133,7 @@ Pages.category = param => {
   const { id, q } = parseParam(param);
   const c = CAT_MAP[id];
   if (!c) return Pages.notfound();
-  return listingHtml({ pool: DB.products.filter(p => p.cat === id), pt: q.get("pt") || undefined, kick: "Category", title: c.name + " spare parts", sub: c.desc + ". Every part ships with fitment data and install guidance.", img: typeof CAT_IMG !== "undefined" ? CAT_IMG[id] : "", crumbs: [["Categories", "#/categories"], [c.name]] });
+  return listingHtml({ pool: DB.products.filter(p => p.cat === id), pt: q.get("pt") || undefined, kick: "Category", title: c.name + " spare parts", sub: c.desc + ". Every part ships with fitment data and install guidance.", img: typeof CAT_IMG !== "undefined" ? CAT_IMG[id] : "", crumbs: [["Categories", "/categories"], [c.name]] });
 };
 Mount.category = listingMount;
 
@@ -141,7 +141,7 @@ Pages.brand = param => {
   const { id } = parseParam(param);
   const b = BRAND_MAP[id];
   if (!b) return Pages.notfound();
-  return listingHtml({ pool: DB.products.filter(p => p.brandFor.includes(id)), brand: id, showCats: true, kick: "Brand store", title: "Parts compatible with " + b.name, sub: "Verified-fit spares for " + b.name + " appliances. Match your exact model with the compatibility checker.", crumbs: [["Brands", "#/brands"], [b.name]] });
+  return listingHtml({ pool: DB.products.filter(p => p.brandFor.includes(id)), brand: id, showCats: true, kick: "Brand store", title: "Parts compatible with " + b.name, sub: "Verified-fit spares for " + b.name + " appliances. Match your exact model with the compatibility checker.", crumbs: [["Brands", "/brands"], [b.name]] });
 };
 Mount.brand = listingMount;
 
@@ -182,7 +182,7 @@ Pages.product = sku => {
   const specRows = [["SKU", `<span class="mono">${p.sku}</span>`], ["Part family", pt.name], ["Appliance", c.name], ...pt.specs.map(s => [s[0], s[1]]), ["Compatible brands", brandNames(p, 6)], ["Verified models", p.compat.length + " model numbers"], ["Warranty", p.warranty + " replacement"], ["Net weight", p.weight], ["Installation", p.install], ["Country of origin", "India"]];
   return `
   <div class="wrap">
-    ${crumb([["Categories", "#/categories"], [c.name, "#/c/" + c.id], [pt.name]])}
+    ${crumb([["Categories", "/categories"], [c.name, "/c/" + c.id], [pt.name]])}
     <div class="pdp">
       <div class="gal">
         <div class="gal-main" id="gal-main" aria-label="Product image, hover to zoom">
@@ -213,7 +213,7 @@ Pages.product = sku => {
             <button class="btn btn-p" id="cmp-check">Verify</button>
           </div>
           <div class="compat-res" id="cmp-res" role="status"></div>
-          <p class="mut3" style="font-size:11.5px;margin-top:9px">${p.compat.length} verified models · Can't find yours? <a href="#/finder" style="color:var(--brand2);font-weight:600">Scan your model sticker →</a></p>
+          <p class="mut3" style="font-size:11.5px;margin-top:9px">${p.compat.length} verified models · Can't find yours? <a href="/finder" style="color:var(--brand2);font-weight:600">Scan your model sticker →</a></p>
         </div>
 
         <div class="spread" style="margin:6px 0 2px">${stockHtml(p)}<span class="mut3" style="font-size:12px">Sold & fulfilled by <b style="color:var(--tx2)">G-FLO Certified</b></span></div>
@@ -287,7 +287,7 @@ Pages.product = sku => {
         <div class="fbt-total"><span class="mut3" style="font-size:12px">${CATALOG_MODE ? "Repair kit" : "Bundle total"}</span><span class="price" style="font-size:22px" id="fbt-total"></span><button class="btn btn-p" id="fbt-add">${U.icon("cart", "ic-s")} Add selected</button></div>
       </div></section>` : ""}
 
-    <section class="sec-tight">${sectionHead("Related parts", "More for your " + c.name.toLowerCase(), null, "#/c/" + c.id, "Browse " + c.name)}${railOf(rel)}</section>
+    <section class="sec-tight">${sectionHead("Related parts", "More for your " + c.name.toLowerCase(), null, "/c/" + c.id, "Browse " + c.name)}${railOf(rel)}</section>
   </div>`;
 };
 Mount.product = sku => {
@@ -296,7 +296,7 @@ Mount.product = sku => {
   let qty = 1;
   document.querySelectorAll("[data-pq]").forEach(b => b.addEventListener("click", () => { qty = U.clamp(qty + (+b.getAttribute("data-pq")), 1, 99); document.getElementById("pq").textContent = qty; }));
   document.getElementById("p-add").addEventListener("click", () => State.addCart(sku, qty));
-  document.getElementById("p-buy").addEventListener("click", () => { State.addCart(sku, qty, true); location.hash = "#/checkout"; });
+  document.getElementById("p-buy").addEventListener("click", () => { State.addCart(sku, qty, true); Router.push("/checkout"); });
   // tabs
   document.querySelectorAll("[data-ptab]").forEach(t => t.addEventListener("click", () => {
     document.querySelectorAll("[data-ptab]").forEach(x => { x.classList.toggle("on", x === t); x.setAttribute("aria-selected", x === t); });
@@ -322,7 +322,7 @@ Mount.product = sku => {
     const res = AI.compatCheck(p, document.getElementById("cmp-brand").value, document.getElementById("cmp-model").value);
     const el = document.getElementById("cmp-res");
     el.className = "compat-res " + (res.ok ? "ok" : "no");
-    el.innerHTML = (res.ok ? U.icon("check") : U.icon("alert")) + `<div>${U.esc(res.msg)}${!res.ok && res.near && res.near.length ? `<div style="font-weight:500;margin-top:5px;font-size:12.5px">Close matches in list: ${res.near.map(m => `<b class="mono">${m}</b>`).join(", ")}</div>` : ""}${!res.ok && res.alt ? `<div style="margin-top:7px"><a href="#/p/${res.alt.sku}" class="btn btn-soft btn-sm">View the part that fits ${U.esc(document.getElementById("cmp-model").value.toUpperCase())} →</a></div>` : ""}</div>`;
+    el.innerHTML = (res.ok ? U.icon("check") : U.icon("alert")) + `<div>${U.esc(res.msg)}${!res.ok && res.near && res.near.length ? `<div style="font-weight:500;margin-top:5px;font-size:12.5px">Close matches in list: ${res.near.map(m => `<b class="mono">${m}</b>`).join(", ")}</div>` : ""}${!res.ok && res.alt ? `<div style="margin-top:7px"><a href="/p/${res.alt.sku}" class="btn btn-soft btn-sm">View the part that fits ${U.esc(document.getElementById("cmp-model").value.toUpperCase())} →</a></div>` : ""}</div>`;
   });
   // pincode
   document.getElementById("pin-check").addEventListener("click", () => {

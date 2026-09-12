@@ -66,8 +66,8 @@ def catalog(db: Session = Depends(get_db)):
 
 
 @router.get("/products")
-def products(q: str = "", cat: str = "", page: int = 1,
-             per_page: int = Query(50, le=200), db: Session = Depends(get_db)):
+def products(q: str = "", cat: str = "", page: int = Query(1, ge=1),
+             per_page: int = Query(50, ge=1, le=200), db: Session = Depends(get_db)):
     show_prices = get_setting(db, "show_prices", "true") == "true"
     query = db.query(Product).filter(Product.visible == True)       # noqa: E712
     if cat:

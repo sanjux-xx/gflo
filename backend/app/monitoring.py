@@ -23,10 +23,22 @@ except ValueError:
     TRACES_SAMPLE_RATE = 0.0
 
 # Field / header / cookie names whose values must never be sent.
-_SENSITIVE_KEYS = {
-    "password", "current", "new", "confirm", "csrf_token", "admin_password",
-    "secret_key", "sentry_dsn", "token", "api_key", "authorization",
-}
+# Matched as SUBSTRINGS, not exact names. Exact matching was fragile: the
+# password form happens to use "current"/"new"/"confirm" today, so it was
+# covered, but renaming a field to "new_password" or adding "access_token"
+# would have silently started shipping the value to Sentry.
+_SENSITIVE_FRAGMENTS = (
+    "password", "passwd", "secret", "token", "api_key", "apikey",
+    "authorization", "auth", "credential", "private", "session", "cookie",
+    "dsn", "otp",
+)
+# exact names that carry a secret but contain none of the fragments above
+_SENSITIVE_KEYS = {"current", "new", "confirm", "pwd", "key"}
+
+
+def _is_sensitive(key) -> bool:
+    low = str(key).lower()
+    return low in _SENSITIVE_KEYS or any(f in low for f in _SENSITIVE_FRAGMENTS)
 _SENSITIVE_COOKIES = {"gflo_admin", "gflo_csrf"}
 _REDACTED = "[redacted]"
 
@@ -40,10 +52,12 @@ def _scrub_mapping(data):
         return data
     out = {}
     for key, value in data.items():
-        if str(key).lower() in _SENSITIVE_KEYS:
+        if _is_sensitive(key):
             out[key] = _REDACTED
         elif isinstance(value, dict):
             out[key] = _scrub_mapping(value)
+        elif isinstance(value, (list, tuple)):
+            out[key] = [_scrub_mapping(v) if isinstance(v, dict) else v for v in value]
         else:
             out[key] = value
     return out

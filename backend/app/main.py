@@ -7,8 +7,10 @@ Serves:
   /media/*         uploaded product photos
 """
 import os
+import re
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import (FileResponse, HTMLResponse, RedirectResponse,
+                               JSONResponse, PlainTextResponse, Response)
 from fastapi.staticfiles import StaticFiles
 
 from . import monitoring
@@ -20,6 +22,7 @@ from . import security as sec
 from .api import router as api_router
 from .admin import router as admin_router
 from .store import ensure_defaults
+from . import seo
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))     # backend/
 SITE_DIR = os.environ.get("SITE_DIR", os.path.join(os.path.dirname(BASE_DIR), "site"))
@@ -87,7 +90,10 @@ async def security_middleware(request: Request, call_next):
     path = request.url.path
 
     if ADMIN_HOST:
-        host = (request.headers.get("host") or "").split(":")[0].strip().lower()
+        # rstrip("."): "admin.gflo.in." is a legitimate fully-qualified form of
+        # the same hostname, and without this it missed the ADMIN_HOST match and
+        # took an extra redirect through the public host.
+        host = (request.headers.get("host") or "").split(":")[0].strip().lower().rstrip(".")
         if host == ADMIN_HOST:
             # admin.example.com/  ->  the console. Assets and the public API are
             # left alone so the console's own CSS/JS/photos still resolve.
@@ -181,16 +187,100 @@ def _storefront_html(index: str) -> str:
     return _SITE_CACHE["html"]
 
 
-@app.get("/", response_class=HTMLResponse)
-def storefront():
+_STATIC_META_RE = re.compile(
+    r"<title>.*?</title>"
+    r"|<meta\s+name=\"description\"[^>]*>"
+    r"|<meta\s+property=\"og:(?:title|description|type|image|url|site_name)\"[^>]*>"
+    r"|<meta\s+name=\"twitter:[^\"]*\"[^>]*>"
+    r"|<link\s+rel=\"canonical\"[^>]*>",
+    re.I | re.S)
+
+
+def _strip_static_meta(html: str) -> str:
+    """Remove gflo.html's one fixed set of tags before injecting the real ones.
+
+    Without this the page carries two titles and two og:title tags, and which
+    one a crawler believes is anyone's guess.
+    """
+    head_end = html.lower().find("</head>")
+    if head_end == -1:
+        return html
+    return _STATIC_META_RE.sub("", html[:head_end]) + html[head_end:]
+
+
+def _canonical_host(request: Request) -> str:
+    """The hostname to build canonical / sitemap URLs from.
+
+    When SITE_HOST / STORE_HOST are configured this NEVER trusts the request's
+    Host header: an attacker who could set it would otherwise poison your
+    canonical tags and point your search ranking at their own domain. An
+    unrecognised Host falls back to the configured hostname.
+
+    With neither configured there is nothing better to use, so the request's
+    host is used — a sitemap needs absolute URLs to be valid at all, and a
+    relative <loc> is rejected outright. Configure SITE_HOST on any real
+    deployment so this path is never taken.
+    """
+    asked = (request.headers.get("host") or "").split(":")[0].strip().lower().rstrip(".")
+    if SITE_HOST or STORE_HOST:
+        if asked in (h for h in (SITE_HOST, STORE_HOST) if h):
+            return asked
+        return SITE_HOST or STORE_HOST
+    return asked
+
+
+def _render_storefront(request: Request, path: str = "/"):
+    """gflo.html with this route's real meta tags injected into <head>.
+
+    The SPA used to serve one fixed set of tags for every route, so a crawler
+    or a WhatsApp preview saw the same generic home page whatever was shared.
+    """
     index = os.path.join(SITE_DIR, "gflo.html")
     if not os.path.exists(index):
         return HTMLResponse(
             "<h1>Storefront file missing</h1>"
             f"<p>Expected <code>{index}</code>. Set SITE_DIR to the folder holding gflo.html.</p>", 500)
-    if SITE_HOST and STORE_HOST:
-        return HTMLResponse(_storefront_html(index), headers={"Cache-Control": "no-cache"})
-    return FileResponse(index, headers={"Cache-Control": "no-cache"})
+    html = _storefront_html(index)
+    status = 200
+    try:
+        db = SessionLocal()
+        try:
+            # with no host configured, fall back to the requested host so the
+            # canonical URL is still absolute
+            _site = SITE_HOST or (("" if STORE_HOST else _canonical_host(request)))
+            meta = seo.page_meta(path, db, _site, STORE_HOST)
+        finally:
+            db.close()
+        html = _strip_static_meta(html).replace("</head>", seo.meta_html(meta) + "</head>", 1)
+        # a URL that names no real product/category/brand is genuinely absent
+        if meta["page"] == "notfound":
+            status = 404
+    except Exception:
+        pass                      # never let meta generation take the shop down
+    return HTMLResponse(html, status_code=status, headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/", response_class=HTMLResponse)
+def storefront(request: Request):
+    return _render_storefront(request, "/")
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+def robots(request: Request):
+    return PlainTextResponse(seo.build_robots(_canonical_host(request)),
+                             headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/sitemap.xml")
+def sitemap(request: Request):
+    host = _canonical_host(request)
+    db = SessionLocal()
+    try:
+        xml = seo.build_sitemap(db, host, SITE_HOST, STORE_HOST)
+    finally:
+        db.close()
+    return Response(content=xml, media_type="application/xml",
+                    headers={"Cache-Control": "public, max-age=900"})
 
 
 @app.get("/gflo.html")
@@ -219,14 +309,30 @@ if os.environ.get("SENTRY_DEBUG_ROUTE", "").lower() in ("1", "true", "yes"):
 
 
 @app.get("/{asset_path:path}")
-def site_assets(asset_path: str):
-    """Serve the storefront's own folders (brand-photos/, tools-photos/, assets/)."""
+def site_assets(request: Request, asset_path: str):
+    """Storefront files first, then the app itself for clean URLs.
+
+    Now that routes are real paths rather than "#/..." fragments, /categories
+    and /p/GF-CS-SPA-0101 arrive here on a hard refresh or a shared link. They
+    are not files, so they used to 404. They now render the app, which reads
+    the path and draws the right page.
+    """
+    # API and admin keep answering in their own language; handing a JSON client
+    # a page of HTML instead of a 404 is worse than the 404.
     if asset_path.startswith(("api/", "admin/", "media/", "static/")):
         return JSONResponse({"detail": "Not found"}, 404)
+
     safe = os.path.normpath(asset_path).lstrip("./")
     full = os.path.join(SITE_DIR, safe)
     if os.path.commonpath([os.path.abspath(full), os.path.abspath(SITE_DIR)]) != os.path.abspath(SITE_DIR):
         return JSONResponse({"detail": "Not found"}, 404)
     if os.path.isfile(full):
         return FileResponse(full, headers={"Cache-Control": "public, max-age=86400"})
-    return JSONResponse({"detail": "Not found"}, 404)
+
+    # A path with a file extension was asking for a file that is not there —
+    # a missing image should stay a 404 and not silently become a web page.
+    last = safe.rsplit("/", 1)[-1]
+    if "." in last and not last.startswith("."):
+        return JSONResponse({"detail": "Not found"}, 404)
+
+    return _render_storefront(request, "/" + asset_path.strip("/"))

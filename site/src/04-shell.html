@@ -35,7 +35,7 @@ function productCard(p, i){
     </div>
     <div class="body">
       <span class="cat-ln">${U.esc(catOf(p).name)} · ${U.esc(ptOf(p).name)}</span>
-      <h3><a href="#/p/${p.sku}">${U.esc(p.short)}</a></h3>
+      <h3><a href="/p/${p.sku}">${U.esc(p.short)}</a></h3>
       <div class="rt-ln">${U.stars(p.rating)}<span>${p.rating} (${p.reviews})</span></div>
       <div class="rt-ln"><span class="mono mut3">${p.sku}</span></div>
       ${priceHtml(p)}
@@ -55,7 +55,7 @@ function emptyState(icon, title, sub, ctaHref, ctaLabel){
   return `<div class="empty"><div class="e-ic">${U.icon(icon)}</div><div><h3 style="margin-bottom:6px">${U.esc(title)}</h3><p class="mut" style="font-size:13.5px">${U.esc(sub)}</p></div>${ctaHref ? `<a class="btn btn-p" href="${ctaHref}">${U.esc(ctaLabel)}</a>` : ""}</div>`;
 }
 function crumb(items){
-  return `<nav class="crumb" aria-label="Breadcrumb"><a href="#/">Home</a>${items.map((it, i) => `<span class="sep">/</span>${it[1] && i < items.length - 1 ? `<a href="${it[1]}">${U.esc(it[0])}</a>` : `<b>${U.esc(it[0])}</b>`}`).join("")}</nav>`;
+  return `<nav class="crumb" aria-label="Breadcrumb"><a href="/">Home</a>${items.map((it, i) => `<span class="sep">/</span>${it[1] && i < items.length - 1 ? `<a href="${it[1]}">${U.esc(it[0])}</a>` : `<b>${U.esc(it[0])}</b>`}`).join("")}</nav>`;
 }
 function brandMark(b, size){
   return `<span class="brand-mk" style="width:${size || 52}px;height:${size || 52}px;font-size:${(size || 52) * .38}px;background:linear-gradient(135deg,hsl(${b.hue} 65% 46%),hsl(${(b.hue + 40) % 360} 70% 38%))">${U.esc(b.name[0])}</span>`;
@@ -69,16 +69,16 @@ function brandMark(b, size){
    it was a button that appeared to do nothing (you were already there) and it
    duplicated the Categories menu next to it. */
 const NAV_ALL = [
-  ["home", "#/", "Home", "home"],
-  ["categories", "#/categories", "Categories", "grid", true, "", "shop"],
-  ["brands", "#/brands", "Brands", "store", false, "", "shop"],
-  ["finder", "#/finder", "Spare Part Finder", "spark", false, "", "shop"],
-  ["guides", "#/guides", "Repair Guides", "book", false, "", "brand"],
-  ["deals", "#/deals", "Deals", "percent", false, "hi", "shop"],
-  ["support", "#/support", "Support", "headset", false, "", "brand"],
-  ["account", "#/account", "Account", "user", false, "", "shop"],
-  ["about", "#/about", "About Us", "info", false, "", "brand"],
-  ["contact", "#/contact", "Contact Us", "mail", false, "", "brand"]
+  ["home", "/", "Home", "home"],
+  ["categories", "/categories", "Categories", "grid", true, "", "shop"],
+  ["brands", "/brands", "Brands", "store", false, "", "shop"],
+  ["finder", "/finder", "Spare Part Finder", "spark", false, "", "shop"],
+  ["guides", "/guides", "Repair Guides", "book", false, "", "brand"],
+  ["deals", "/deals", "Deals", "percent", false, "hi", "shop"],
+  ["support", "/support", "Support", "headset", false, "", "brand"],
+  ["account", "/account", "Account", "user", false, "", "shop"],
+  ["about", "/about", "About Us", "info", false, "", "brand"],
+  ["contact", "/contact", "Contact Us", "mail", false, "", "brand"]
 ];
 /* which side of the split are we on? ("" = not split, show everything) */
 const NAV_SIDE = (typeof HOSTS !== "undefined" && HOSTS)
@@ -86,13 +86,13 @@ const NAV_SIDE = (typeof HOSTS !== "undefined" && HOSTS)
 const NAV = NAV_ALL.filter(n => !NAV_SIDE || !n[6] || n[6] === NAV_SIDE);
 /* the brand site needs one obvious way into the shop */
 const SHOP_CTA = (NAV_SIDE === "brand" && typeof HOSTS !== "undefined" && HOSTS)
-  ? `<a class="nav-lnk hi" href="https://${HOSTS.store}/#/categories">${U.icon("store", "ic-s")} Shop Now</a>` : "";
+  ? `<a class="nav-lnk hi" href="https://${HOSTS.store}/categories">${U.icon("store", "ic-s")} Shop Now</a>` : "";
 function renderShell(){
   document.getElementById("hdr").innerHTML = `
   <div class="topbar"><div class="wrap"><div class="tb-l"><span>${U.icon("truck")} ${CATALOG_MODE ? "Pan-India tracked delivery" : "FREE delivery above ₹4,999"}</span><span class="hide-sm">${U.icon("rotate")} 7-day easy returns</span></div><div class="row" style="gap:16px"><span>${U.icon("phone")} Order status: ${CONTACT.phone}</span></div></div></div>
   <div class="hd-main"><div class="wrap hd-row">
     <button class="btn-icon btn" data-act="open-mnav" aria-label="Open menu" id="mnav-btn">${U.icon("menu")}</button>
-    <a class="logo" href="#/" aria-label="G-FLO home"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
+    <a class="logo" href="/" aria-label="G-FLO home"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
     <div class="hd-search" id="hd-search">
       <div class="sbox">${U.icon("search")}<input id="hd-q" type="search" placeholder="Search parts, brands or model numbers…" autocomplete="off" aria-label="Search parts" aria-expanded="false" role="combobox" aria-controls="hd-sug">
         <button class="btn-icon btn" data-mic="hd-q" aria-label="Voice search" style="width:34px;height:34px">${U.icon("mic", "ic-s")}</button>
@@ -100,8 +100,8 @@ function renderShell(){
       <div class="sug" id="hd-sug" role="listbox" aria-label="Search suggestions"></div>
     </div>
     <div class="hd-acts">
-      <a class="hd-act" href="#/wishlist" aria-label="Wishlist" title="Wishlist">${U.icon("heart")}<span class="bub" data-badge="wish"></span></a>
-      <a class="hd-act" href="#/account" aria-label="Account" title="Account" data-auth-ava>${U.icon("user")}</a>
+      <a class="hd-act" href="/wishlist" aria-label="Wishlist" title="Wishlist">${U.icon("heart")}<span class="bub" data-badge="wish"></span></a>
+      <a class="hd-act" href="/account" aria-label="Account" title="Account" data-auth-ava>${U.icon("user")}</a>
       <button class="hd-act hd-cart m-keep" data-act="open-cart" aria-label="Open cart" title="Cart">${U.icon("cart")}<span class="cart-total" data-cart-total></span><span class="bub" data-badge="cart"></span></button>
     </div>
   </div></div>
@@ -114,14 +114,14 @@ function renderShell(){
   window.__ftrFull = () => `
   <footer class="foot"><div class="wrap">
     <div class="foot-top">
-      <div><a class="logo" href="#/"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
+      <div><a class="logo" href="/"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
         <p class="about">India's premium marketplace for genuine home-appliance spare parts. ${CATS.length} appliance categories, ${DB.products.length}+ certified parts, AI-verified compatibility — delivered to 19,000+ pincodes.</p>
         <div class="foot-pay"><span class="tag">UPI</span><span class="tag">CARDS</span><span class="tag">NETBANKING</span><span class="tag">COD</span><span class="tag">EMI</span></div></div>
-      <div><h5>Shop</h5><div class="foot-lnks"><a href="#/categories">All categories</a><a href="#/brands">Brands</a><a href="#/deals">Deals & offers</a><a href="#/finder">AI part finder</a><a href="#/wishlist">Wishlist</a></div></div>
-      <div><h5>Help</h5><div class="foot-lnks"><a href="#/support">Help centre & FAQs</a><a href="#/policy/return">Return policy</a><a href="#/policy/refund">Refund policy</a><a href="#/policy/shipping">Shipping policy</a><a href="#/guides">Repair guides</a></div></div>
-      <div><h5>Company</h5><div class="foot-lnks"><a href="#/about">About G-FLO</a><a href="#/contact">Contact us</a><a href="#/contact">Sell on G-FLO</a><a href="#/policy/privacy">Privacy policy</a><a href="#/policy/terms">Terms & conditions</a></div></div>
-      <div><h5>Get in touch</h5><div class="foot-lnks"><a href="#/support">${U.icon("phone", "ic-s")} ${CONTACT.phone}</a><a href="#/support">${U.icon("mail", "ic-s")} ${CONTACT.email}</a><a href="#/support">${U.icon("pin", "ic-s")} ${CONTACT.address}</a><a href="#/support">${U.icon("clock", "ic-s")} Mon–Sat, 9 AM – 8 PM IST</a></div>
-        <div class="soc" style="margin-top:14px"><a href="#/" aria-label="Chat">${U.icon("chat", "ic-s")}</a><a href="#/" aria-label="Mail">${U.icon("mail", "ic-s")}</a><a href="#/" aria-label="Phone">${U.icon("phone", "ic-s")}</a><a href="#/" aria-label="Share">${U.icon("share", "ic-s")}</a></div></div>
+      <div><h5>Shop</h5><div class="foot-lnks"><a href="/categories">All categories</a><a href="/brands">Brands</a><a href="/deals">Deals & offers</a><a href="/finder">AI part finder</a><a href="/wishlist">Wishlist</a></div></div>
+      <div><h5>Help</h5><div class="foot-lnks"><a href="/support">Help centre & FAQs</a><a href="/policy/return">Return policy</a><a href="/policy/refund">Refund policy</a><a href="/policy/shipping">Shipping policy</a><a href="/guides">Repair guides</a></div></div>
+      <div><h5>Company</h5><div class="foot-lnks"><a href="/about">About G-FLO</a><a href="/contact">Contact us</a><a href="/contact">Sell on G-FLO</a><a href="/policy/privacy">Privacy policy</a><a href="/policy/terms">Terms & conditions</a></div></div>
+      <div><h5>Get in touch</h5><div class="foot-lnks"><a href="/support">${U.icon("phone", "ic-s")} ${CONTACT.phone}</a><a href="/support">${U.icon("mail", "ic-s")} ${CONTACT.email}</a><a href="/support">${U.icon("pin", "ic-s")} ${CONTACT.address}</a><a href="/support">${U.icon("clock", "ic-s")} Mon–Sat, 9 AM – 8 PM IST</a></div>
+        <div class="soc" style="margin-top:14px"><a href="/" aria-label="Chat">${U.icon("chat", "ic-s")}</a><a href="/" aria-label="Mail">${U.icon("mail", "ic-s")}</a><a href="/" aria-label="Phone">${U.icon("phone", "ic-s")}</a><a href="/" aria-label="Share">${U.icon("share", "ic-s")}</a></div></div>
     </div>
     <div class="foot-bot"><span>© ${new Date().getFullYear()} G-FLO Commerce Pvt Ltd — demo experience. Catalog data & product photos referenced from sparepartwala.in for this commissioned replica; illustrations are original.</span><span class="row" style="gap:7px">${U.icon("shield", "ic-s")} 100% genuine, brand-certified spares</span></div>
   </div></footer>`;
@@ -135,7 +135,7 @@ function renderShell(){
     <div class="dr-ft" id="cart-foot"></div>
   </aside>
   <aside class="drawer left" id="mnav" aria-hidden="true" role="dialog" aria-label="Menu">
-    <div class="dr-hd"><a class="logo" href="#/"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions" style="height:32px"></a><button class="btn btn-icon" data-act="close" aria-label="Close menu">${U.icon("x")}</button></div>
+    <div class="dr-hd"><a class="logo" href="/"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions" style="height:32px"></a><button class="btn btn-icon" data-act="close" aria-label="Close menu">${U.icon("x")}</button></div>
     <div class="dr-body">
       ${NAV.map(n => `<a class="acc-lnk" href="${hostedLink(n[1])}" style="margin-bottom:2px">${U.icon(n[3], "ic-s")} ${n[2]}</a>`).join("")}
     </div>
@@ -152,11 +152,11 @@ function renderShell(){
     <form class="chat-in" id="chat-form"><input class="inp" id="chat-q" placeholder="Ask about parts, fitment, orders…" autocomplete="off" aria-label="Message the assistant"><button class="btn btn-p btn-icon" aria-label="Send" style="background:var(--g)">${U.icon("send", "ic-s")}</button></form>
   </div>
   <nav class="bnav" aria-label="Mobile navigation">
-    <a href="#/" data-nav="home">${U.icon("home")}Home</a>
-    <a href="#/categories" data-nav="categories">${U.icon("store")}Store</a>
-    <a href="#/finder" data-nav="finder">${U.icon("scan")}Finder</a>
-    <a href="#/cart" data-nav="cart">${U.icon("cart")}<span class="bub" data-badge="cart"></span>Cart</a>
-    <a href="#/account" data-nav="account">${U.icon("user")}Account</a>
+    <a href="/" data-nav="home">${U.icon("home")}Home</a>
+    <a href="/categories" data-nav="categories">${U.icon("store")}Store</a>
+    <a href="/finder" data-nav="finder">${U.icon("scan")}Finder</a>
+    <a href="/cart" data-nav="cart">${U.icon("cart")}<span class="bub" data-badge="cart"></span>Cart</a>
+    <a href="/account" data-nav="account">${U.icon("user")}Account</a>
   </nav>`;
   buildMega(); renderCartDrawer(); chatInit(); syncBadges();
   if (typeof syncAuth === "function") syncAuth();
@@ -165,7 +165,7 @@ function renderShell(){
 /* ================= FOOTER SWITCHING ================= */
 function footerMin(){
   return `<footer class="foot foot-min"><div class="wrap" style="display:flex;flex-direction:column;align-items:center;gap:9px;padding:26px 0;text-align:center">
-    <a class="logo" href="#/" aria-label="G-FLO home"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
+    <a class="logo" href="/" aria-label="G-FLO home"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions"></a>
     <span style="display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--tx2)">${U.icon("shield", "ic-s")} 100% genuine, brand-certified spares</span>
     <span class="mut3" style="font-size:12px">© ${new Date().getFullYear()} G-FLO — genuine appliance & tool spares</span>
   </div></footer>`;
@@ -192,8 +192,8 @@ function megaBody(cid){
   if (!document.getElementById("mega-body")) return;
   document.getElementById("mega-body").innerHTML = `
     <h4>${U.esc(c.name)} spare parts</h4><span class="mut3">${U.esc(c.desc)} · ${c.pts.length} part families</span>
-    <div class="mega-pts">${c.pts.map(pt => `<a class="mega-pt" href="#/c/${c.id}?pt=${pt}"><span class="dot"></span>${PT_MAP[pt].name}</a>`).join("")}</div>
-    <div class="mega-foot"><a class="btn btn-p btn-sm" href="#/c/${c.id}">Browse all ${U.esc(c.name)} parts ${U.icon("arr-r", "ic-s")}</a><a class="btn btn-ghost btn-sm" href="#/finder">${U.icon("spark", "ic-s")} Not sure? Use AI finder</a></div>`;
+    <div class="mega-pts">${c.pts.map(pt => `<a class="mega-pt" href="/c/${c.id}?pt=${pt}"><span class="dot"></span>${PT_MAP[pt].name}</a>`).join("")}</div>
+    <div class="mega-foot"><a class="btn btn-p btn-sm" href="/c/${c.id}">Browse all ${U.esc(c.name)} parts ${U.icon("arr-r", "ic-s")}</a><a class="btn btn-ghost btn-sm" href="/finder">${U.icon("spark", "ic-s")} Not sure? Use AI finder</a></div>`;
 }
 
 /* ================= CART DRAWER ================= */
@@ -201,7 +201,7 @@ function renderCartDrawer(){
   const body = document.getElementById("cart-body"), foot = document.getElementById("cart-foot");
   if (!body) return;
   if (!State.cart.length){
-    body.innerHTML = emptyState("cart", "Your cart is empty", "Find the exact part your appliance needs.", "#/categories", "Browse categories");
+    body.innerHTML = emptyState("cart", "Your cart is empty", "Find the exact part your appliance needs.", "/categories", "Browse categories");
     foot.innerHTML = "";
     return;
   }
@@ -209,8 +209,8 @@ function renderCartDrawer(){
   body.innerHTML = `
     ${CATALOG_MODE ? "" : `<div class="free-bar">${t.freeGap > 0 ? `Add <b>${U.inr(t.freeGap)}</b> more for <b>FREE delivery</b>` : `🎉 You've unlocked <b>FREE delivery</b>`}<div class="tr"><div class="fl" style="width:${Math.min(100, (t.sub - t.disc) / 4999 * 100)}%"></div></div></div>`}
     ${State.cart.map(i => { const p = DB.prodMap[i.sku]; if (!p) return ""; return `
-      <div class="citem"><a class="art" href="#/p/${p.sku}">${prodArt(p)}</a>
-        <div class="inf"><b><a href="#/p/${p.sku}">${U.esc(p.short)}</a></b><span class="mono mut3" style="font-size:10.5px">${p.sku}</span>
+      <div class="citem"><a class="art" href="/p/${p.sku}">${prodArt(p)}</a>
+        <div class="inf"><b><a href="/p/${p.sku}">${U.esc(p.short)}</a></b><span class="mono mut3" style="font-size:10.5px">${p.sku}</span>
           <div class="spread"><div class="qty"><button data-act="qty" data-sku="${p.sku}" data-d="-1" aria-label="Decrease quantity">${U.icon("minus", "ic-s")}</button><b>${i.qty}</b><button data-act="qty" data-sku="${p.sku}" data-d="1" aria-label="Increase quantity">${U.icon("plus", "ic-s")}</button></div>
           ${CATALOG_MODE ? "" : `<span class="price" style="font-size:14.5px">${U.inr(p.price * i.qty)}</span>`}</div></div>
         <button class="btn btn-icon" data-act="rm-cart" data-sku="${p.sku}" aria-label="Remove item" style="width:32px;height:32px">${U.icon("trash", "ic-s")}</button></div>`; }).join("")}`;
@@ -219,8 +219,8 @@ function renderCartDrawer(){
     ${t.disc ? `<div class="tot-row" style="color:var(--ok)"><span>Coupon ${State.coupon.code}</span><span>−${U.inr(t.disc)}</span></div>` : ""}
     <div class="tot-row"><span>Delivery</span><span>${t.ship ? U.inr(t.ship) : "FREE"}</span></div>
     <div class="tot-row big"><span>Total</span><span class="price">${U.inr(t.total)}</span></div>`}
-    <a class="btn btn-p btn-lg btn-block" href="#/checkout">Checkout securely ${U.icon("arr-r", "ic-s")}</a>
-    <a class="btn btn-soft btn-block" href="#/cart">View full cart</a>`;
+    <a class="btn btn-p btn-lg btn-block" href="/checkout">Checkout securely ${U.icon("arr-r", "ic-s")}</a>
+    <a class="btn btn-soft btn-block" href="/cart">View full cart</a>`;
   syncBadges();
 }
 
@@ -231,7 +231,7 @@ function bindSearch(inputId, sugId){
   inp.dataset.bound = "1";
   let selIdx = -1;
   const close = () => { sug.classList.remove("open"); inp.setAttribute("aria-expanded", "false"); selIdx = -1; };
-  const go = q => { if (!q.trim()) return; close(); location.hash = "#/search/" + encodeURIComponent(q.trim()); };
+  const go = q => { if (!q.trim()) return; close(); Router.push("/search/" + encodeURIComponent(q.trim())); };
   const render = () => {
     const q = inp.value;
     if (q.trim().length < 2){ close(); return; }
@@ -240,10 +240,10 @@ function bindSearch(inputId, sugId){
     let html = "";
     if (il) html += `<div class="sug-intent">${U.icon("spark", "ic-s")} <span><b>AI understood:</b> ${U.esc(il)}</span></div>`;
     if (cats.length || brands.length || pts.length){
-      html += `<div class="sug-gr"><div class="sug-tt">Collections</div>${cats.map(c => `<a class="sug-it" href="#/c/${c.id}"><span class="si-ic">${U.icon("c-" + c.id, "ic-s")}</span><span><b>${U.esc(c.name)}</b><small>${c.pts.length} part families</small></span></a>`).join("")}${brands.map(b => `<a class="sug-it" href="#/b/${b.id}"><span class="si-ic">${U.icon("store", "ic-s")}</span><span><b>${U.esc(b.name)}</b><small>Brand store</small></span></a>`).join("")}${pts.map(t => `<a class="sug-it" href="#/search/${encodeURIComponent(t.name)}"><span class="si-ic">${U.icon("cog", "ic-s")}</span><span><b>${U.esc(t.name)}</b><small>Across all appliances</small></span></a>`).join("")}</div>`;
+      html += `<div class="sug-gr"><div class="sug-tt">Collections</div>${cats.map(c => `<a class="sug-it" href="/c/${c.id}"><span class="si-ic">${U.icon("c-" + c.id, "ic-s")}</span><span><b>${U.esc(c.name)}</b><small>${c.pts.length} part families</small></span></a>`).join("")}${brands.map(b => `<a class="sug-it" href="/b/${b.id}"><span class="si-ic">${U.icon("store", "ic-s")}</span><span><b>${U.esc(b.name)}</b><small>Brand store</small></span></a>`).join("")}${pts.map(t => `<a class="sug-it" href="/search/${encodeURIComponent(t.name)}"><span class="si-ic">${U.icon("cog", "ic-s")}</span><span><b>${U.esc(t.name)}</b><small>Across all appliances</small></span></a>`).join("")}</div>`;
     }
     if (products.length){
-      html += `<div class="sug-gr"><div class="sug-tt">Parts</div>${products.map(p => `<a class="sug-it" href="#/p/${p.sku}"><span class="si-art">${prodArt(p)}</span><span style="min-width:0"><b>${U.esc(p.short)}</b><small>${catOf(p).name} · ★ ${p.rating}</small></span>${CATALOG_MODE ? "" : `<span class="price">${U.inr(p.price)}</span>`}</a>`).join("")}</div>`;
+      html += `<div class="sug-gr"><div class="sug-tt">Parts</div>${products.map(p => `<a class="sug-it" href="/p/${p.sku}"><span class="si-art">${prodArt(p)}</span><span style="min-width:0"><b>${U.esc(p.short)}</b><small>${catOf(p).name} · ★ ${p.rating}</small></span>${CATALOG_MODE ? "" : `<span class="price">${U.inr(p.price)}</span>`}</a>`).join("")}</div>`;
     }
     html += `<div class="sug-gr"><button class="sug-it" data-go-search="${U.esc(q)}"><span class="si-ic">${U.icon("search", "ic-s")}</span><span><b>Search “${U.esc(q)}”</b><small>See all matching parts</small></span></button></div>`;
     sug.innerHTML = html; sug.classList.add("open"); inp.setAttribute("aria-expanded", "true");
@@ -324,20 +324,20 @@ function chatRespond(q){
     } else if (/slow|not working|broken|repair|fix|problem|noise|leak/.test(ql)){
       const res = Search.query(q, 2);
       const g = GUIDES.find(g => ql.includes(g.cat.split("-")[0])) || GUIDES[4];
-      chatBot(`Sounds fixable 💪 Here's a matching repair guide: <a href="#/g/${g.id}" style="color:var(--brand2);font-weight:600">${g.title} →</a>${res.items.length ? "<br><br>Parts you'll likely need:" + res.items.map(p => chatCard(p)).join("") : ""}`);
+      chatBot(`Sounds fixable 💪 Here's a matching repair guide: <a href="/g/${g.id}" style="color:var(--brand2);font-weight:600">${g.title} →</a>${res.items.length ? "<br><br>Parts you'll likely need:" + res.items.map(p => chatCard(p)).join("") : ""}`);
     } else {
       const res = Search.query(q, 3);
       if (res.items.length){
         const il = AI.intentLabel(res.intent);
-        chatBot(`${il ? `Got it — <b>${U.esc(il)}</b>.` : "Here's what matches:"}${res.items.map(p => chatCard(p)).join("")}<br><a href="#/search/${encodeURIComponent(q)}" style="color:var(--brand2);font-weight:600">See all results →</a>`);
+        chatBot(`${il ? `Got it — <b>${U.esc(il)}</b>.` : "Here's what matches:"}${res.items.map(p => chatCard(p)).join("")}<br><a href="/search/${encodeURIComponent(q)}" style="color:var(--brand2);font-weight:600">See all results →</a>`);
       } else {
-        chatBot(`I couldn't match that directly. Try the <a href="#/finder" style="color:var(--brand2);font-weight:600">AI Part Finder</a> — you can upload a photo of the part or your appliance's model sticker, and I'll identify it.`);
+        chatBot(`I couldn't match that directly. Try the <a href="/finder" style="color:var(--brand2);font-weight:600">AI Part Finder</a> — you can upload a photo of the part or your appliance's model sticker, and I'll identify it.`);
       }
     }
   }, 700 + Math.random() * 500);
 }
 function chatCard(p){
-  return `<a class="mini-p" href="#/p/${p.sku}"><span class="art">${prodArt(p)}</span><span style="min-width:0"><b>${U.esc(p.short)}</b>${CATALOG_MODE ? "" : `<span class="price">${U.inr(p.price)}</span>`} <small style="color:var(--tx3)">★ ${p.rating}</small></span></a>`;
+  return `<a class="mini-p" href="/p/${p.sku}"><span class="art">${prodArt(p)}</span><span style="min-width:0"><b>${U.esc(p.short)}</b>${CATALOG_MODE ? "" : `<span class="price">${U.inr(p.price)}</span>`} <small style="color:var(--tx3)">★ ${p.rating}</small></span></a>`;
 }
 
 /* ================= GLOBAL EVENTS ================= */
@@ -356,10 +356,10 @@ function bindGlobal(){
     if (a === "close" || e.target.id === "ovl-bg") closeOverlays();
     if (a === "open-cart"){ renderCartDrawer(); openDrawer("cart-drawer"); }
     if (a === "open-mnav") openDrawer("mnav");
-    if (a === "mega"){ if (window.matchMedia("(max-width:767px)").matches){ location.hash = "#/categories"; return; } const m = document.getElementById("mega"); const open = m.classList.toggle("open"); act.setAttribute("aria-expanded", open); }
+    if (a === "mega"){ if (window.matchMedia("(max-width:767px)").matches){ Router.push("/categories"); return; } const m = document.getElementById("mega"); const open = m.classList.toggle("open"); act.setAttribute("aria-expanded", open); }
     if (a === "chat"){ const c = document.getElementById("chat"); c.classList.add("open"); c.setAttribute("aria-hidden", "false"); document.getElementById("ovl-bg").classList.add("open"); document.getElementById("chat-q").focus(); }
     if (a === "add-cart") State.addCart(sku, 1);
-    if (a === "buy-now"){ State.addCart(sku, 1, true); location.hash = "#/checkout"; }
+    if (a === "buy-now"){ State.addCart(sku, 1, true); Router.push("/checkout"); }
     if (a === "wish"){ State.toggleWish(sku); refreshActionStates(); if (Router.parse().page === "wishlist") Router.go(); }
     if (a === "cmp"){ State.toggleCmp(sku); refreshActionStates(); }
     if (a === "qty"){ const it = State.inCart(sku); State.setQty(sku, (it ? it.qty : 1) + (+act.getAttribute("data-d"))); renderCartDrawer(); if (["cart", "checkout"].includes(Router.parse().page)) Router.go(); }
@@ -374,7 +374,34 @@ function bindGlobal(){
   });
   document.getElementById("ovl-bg").addEventListener("click", closeOverlays);
   document.addEventListener("keydown", e => { if (e.key === "Escape") closeOverlays(); if (e.key === "/" && !/input|textarea|select/i.test(document.activeElement.tagName)){ e.preventDefault(); document.getElementById("hd-q").focus(); } });
-  window.addEventListener("hashchange", () => Router.go());
+  /* Back / forward buttons. Replaces the old "hashchange" listener now that
+     navigation goes through history.pushState instead of location.hash. */
+  window.addEventListener("popstate", () => Router.go());
+
+  /* One interceptor for every internal link, so all the ordinary <a href="/...">
+     tags in the pages navigate without a full page load. Anything that is not
+     a plain left-click on a same-site route is left completely alone: modified
+     clicks (new tab), target="_blank", downloads, other hostnames, mailto/tel,
+     and in-page anchors like href="#main" all behave normally. */
+  document.addEventListener("click", e => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = e.target.closest && e.target.closest("a[href]");
+    if (!a) return;
+    if (a.target && a.target !== "" && a.target !== "_self") return;
+    if (a.hasAttribute("download") || a.getAttribute("rel") === "external") return;
+    const raw = a.getAttribute("href") || "";
+    if (!raw || raw.charAt(0) === "#") return;                 /* in-page anchor */
+    if (/^[a-z][a-z0-9+.-]*:/i.test(raw) && !/^https?:/i.test(raw)) return;  /* mailto:, tel: */
+    let u;
+    try { u = new URL(raw, location.href); } catch (err) { return; }
+    if (u.origin !== location.origin) return;                  /* other hostname */
+    /* real files and the server-rendered admin are not app routes */
+    if (/^\/(admin|api|media|static|assets|brand-photos|tools-photos)(\/|$)/.test(u.pathname)) return;
+    const last = u.pathname.split("/").pop();
+    if (last && last.indexOf(".") > 0) return;                 /* looks like a file */
+    e.preventDefault();
+    Router.push(u.pathname + u.search);
+  });
 }
 function refreshActionStates(){
   document.querySelectorAll("[data-act=wish][data-sku]").forEach(b => { const on = State.wish.includes(b.getAttribute("data-sku")); b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
@@ -390,7 +417,7 @@ function quickView(sku){
     <div style="margin:12px 0">${priceHtml(p)}</div>
     ${stockHtml(p)}
     <p class="mut" style="font-size:13px;margin:12px 0">Fits: ${U.esc(brandNames(p, 4))}. ${p.compat.length} verified models. ${p.warranty} warranty.</p>
-    <div class="row"><button class="btn btn-p" data-act="add-cart" data-sku="${p.sku}" ${p.stock === 0 ? "disabled" : ""}>${U.icon("cart", "ic-s")} Add to cart</button><a class="btn btn-ghost" href="#/p/${p.sku}" onclick="closeOverlays()">Full details</a></div></div>
+    <div class="row"><button class="btn btn-p" data-act="add-cart" data-sku="${p.sku}" ${p.stock === 0 ? "disabled" : ""}>${U.icon("cart", "ic-s")} Add to cart</button><a class="btn btn-ghost" href="/p/${p.sku}" onclick="closeOverlays()">Full details</a></div></div>
   </div>`, { title: "Quick view", wide: true });
 }
 </script>

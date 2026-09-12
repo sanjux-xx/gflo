@@ -47,8 +47,8 @@ Pages.admin = () => `<div class="wrap" style="padding:60px 0;text-align:center">
 Mount.admin = () => { setTimeout(() => { location.href = "/admin/login"; }, 400); };
 
 /* Old #/seller links land on the contact page — seller onboarding is handled there. */
-Pages.seller = () => `<div class="wrap" style="padding:60px 0;text-align:center"><h2>Sell on G-FLO</h2><p class="mut" style="margin:10px 0 18px">Taking you to our contact page…</p><a class="btn btn-p" href="#/contact">Contact G-FLO</a></div>`;
-Mount.seller = () => { setTimeout(() => { location.hash = "#/contact"; }, 300); };
+Pages.seller = () => `<div class="wrap" style="padding:60px 0;text-align:center"><h2>Sell on G-FLO</h2><p class="mut" style="margin:10px 0 18px">Taking you to our contact page…</p><a class="btn btn-p" href="/contact">Contact G-FLO</a></div>`;
+Mount.seller = () => { setTimeout(() => { Router.push("/contact"); }, 300); };
 /* ================= BOOT ================= */
 (async function init(){
   document.documentElement.dataset.theme = "light";
@@ -57,6 +57,8 @@ Mount.seller = () => { setTimeout(() => { location.hash = "#/contact"; }, 300); 
   buildDB();
   const boot = () => {
     try { const lk = document.querySelector('link[rel="icon"]'); if (lk && typeof BRAND_MARK === "string") lk.href = BRAND_MARK; } catch(e){}
+    /* an old "#/..." bookmark becomes its clean path before anything renders */
+    Router.upgradeLegacyHash();
     renderShell(); bindGlobal(); Router.go(); revealInit(document);
   };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();

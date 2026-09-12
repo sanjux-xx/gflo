@@ -18,12 +18,12 @@ Pages.home = () => {
         <div class="hero-search rv in rv-d1">
           <div class="sbox">${U.icon("search")}<input id="hero-q" type="search" placeholder='Try “Preethi mixer coupler” or a model number…' autocomplete="off" aria-label="Search spare parts" role="combobox" aria-expanded="false" aria-controls="hero-sug">
           <button class="btn-icon btn" data-mic="hero-q" aria-label="Voice search">${U.icon("mic", "ic-s")}</button>
-          <button class="btn btn-p" data-go="finder" onclick="location.hash='#/finder'" style="height:42px">${U.icon("spark", "ic-s")} AI Finder</button></div>
+          <a class="btn btn-p" href="/finder" style="height:42px">${U.icon("spark", "ic-s")} AI Finder</a></div>
           <div class="sug" id="hero-sug" role="listbox"></div>
         </div>
         <div class="hero-chips rv in rv-d2">
           <span class="mut3" style="font-size:12px;align-self:center">Trending:</span>
-          ${["Mixer coupler", "Fan capacitor", "Carbon brush", "Armature", "Geyser element"].map(t => `<a class="chip" href="#/search/${encodeURIComponent(t)}">${t}</a>`).join("")}
+          ${["Mixer coupler", "Fan capacitor", "Carbon brush", "Armature", "Geyser element"].map(t => `<a class="chip" href="/search/${encodeURIComponent(t)}">${t}</a>`).join("")}
         </div>
         <div class="hero-stats rv in rv-d3">
           <div class="hstat"><b data-count="98.2">0</b><span>% first-time fit rate</span></div>
@@ -55,9 +55,9 @@ Pages.home = () => {
   </div></section>
 
   <section class="sec"><div class="wrap">
-    ${sectionHead("Popular categories", "What are we fixing today?", "Complete spare-part catalogues for every major home appliance.", "#/categories", "All 26 categories")}
+    ${sectionHead("Popular categories", "What are we fixing today?", "Complete spare-part catalogues for every major home appliance.", "/categories", "All 26 categories")}
     <div class="cat-grid">${CATS.filter(c => c.popular).concat(CATS.filter(c => !c.popular).slice(0, 4)).slice(0, 12).map((c, i) => `
-      <a class="cat-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" href="#/c/${c.id}"><span class="ct-ic">${U.icon("c-" + c.id)}</span><div><b>${U.esc(c.name)}</b><br><span>${c.pts.length} part families</span></div></a>`).join("")}
+      <a class="cat-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" href="/c/${c.id}"><span class="ct-ic">${U.icon("c-" + c.id)}</span><div><b>${U.esc(c.name)}</b><br><span>${c.pts.length} part families</span></div></a>`).join("")}
     </div>
   </div></section>
 
@@ -68,28 +68,28 @@ Pages.home = () => {
         <h2 style="font-size:clamp(20px,3vw,30px);margin:10px 0 6px">Up to 40% off service-season essentials</h2>
         <p style="opacity:.85;font-size:13.5px">Capacitors, couplers, filters & more — refreshed every day at midnight.</p>
         <div class="cd" id="home-cd" aria-label="Deal countdown"></div></div>
-        <a class="btn btn-lg" style="background:#fff;color:#be123c" href="#/deals">Explore deals ${U.icon("arr-r", "ic-s")}</a>
+        <a class="btn btn-lg" style="background:#fff;color:#be123c" href="/deals">Explore deals ${U.icon("arr-r", "ic-s")}</a>
       </div>
     </div>
   </div></section>
 
   <section class="sec-tight"><div class="wrap">
-    ${sectionHead("Featured spare parts", "Hand-picked, service-grade", null, "#/search/featured", "See more")}
+    ${sectionHead("Featured spare parts", "Hand-picked, service-grade", null, "/search/featured", "See more")}
     ${railOf(featured)}
   </div></section>
 
   <section class="sec-tight"><div class="wrap">
-    ${sectionHead("Shop by brand", "Parts for the brands you own", "Compatible spares for 55+ appliance brands sold in India.", "#/brands", "All brands")}
-    <div class="brand-grid">${BRANDS.slice(0, 12).map((b, i) => `<a class="brand-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" href="#/b/${b.id}">${brandMark(b)}<b>${U.esc(b.name)}</b><span>${DB.products.filter(p => p.brandFor.includes(b.id)).length} parts</span></a>`).join("")}</div>
+    ${sectionHead("Shop by brand", "Parts for the brands you own", "Compatible spares for 55+ appliance brands sold in India.", "/brands", "All brands")}
+    <div class="brand-grid">${BRANDS.slice(0, 12).map((b, i) => `<a class="brand-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" href="/b/${b.id}">${brandMark(b)}<b>${U.esc(b.name)}</b><span>${DB.products.filter(p => p.brandFor.includes(b.id)).length} parts</span></a>`).join("")}</div>
   </div></section>
 
   <section class="sec-tight"><div class="wrap">
-    ${sectionHead("New arrivals", "Fresh off the assembly line", null, "#/search/new arrivals", "See more")}
+    ${sectionHead("New arrivals", "Fresh off the assembly line", null, "/search/new arrivals", "See more")}
     ${railOf(fresh)}
   </div></section>
 
   <section class="sec-tight"><div class="wrap">
-    ${sectionHead("Best sellers", "Trusted by 1,20,000+ repairs", null, "#/search/best sellers", "See more")}
+    ${sectionHead("Best sellers", "Trusted by 1,20,000+ repairs", null, "/search/best sellers", "See more")}
     ${railOf(best)}
   </div></section>
 
@@ -99,7 +99,7 @@ Pages.home = () => {
   </div></section>
 
   <section class="sec"><div class="wrap">
-    ${sectionHead("Repair guides", "Fix it yourself, the safe way", "Step-by-step guides written by service engineers — with the exact parts linked.", "#/guides", "All guides")}
+    ${sectionHead("Repair guides", "Fix it yourself, the safe way", "Step-by-step guides written by service engineers — with the exact parts linked.", "/guides", "All guides")}
     <div class="guide-grid">${GUIDES.slice(0, 4).map((g, i) => guideCard(g, i)).join("")}</div>
   </div></section>
 
@@ -146,7 +146,7 @@ function countdownInto(id){
 function guideCard(g, i){
   const c = CAT_MAP[g.cat];
   const lvlColor = { Easy: "b-ok", Moderate: "b-best", Pro: "b-deal" }[g.level] || "b-info";
-  return `<a class="gcard rv ${i % 4 ? "rv-d" + (i % 4) : ""}" href="#/g/${g.id}">
+  return `<a class="gcard rv ${i % 4 ? "rv-d" + (i % 4) : ""}" href="/g/${g.id}">
     <div class="g-art"><span class="badge ${lvlColor} g-lvl">${g.level}</span>${artFor(PT_MAP[c.pts[0]].art, c.hue, g.id, g.title)}</div>
     <div class="body"><span class="cat-ln" style="font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--tx3)">${U.esc(c.name)}</span><h3>${U.esc(g.title)}</h3>
     <div class="meta"><span>${U.icon("clock", "ic-s")} ${g.mins} min</span><span>${U.icon("wrench", "ic-s")} ${g.tools.length} tools</span><span>${U.icon("book", "ic-s")} ${g.steps.length} steps</span></div></div></a>`;
@@ -158,7 +158,7 @@ Pages.categories = () => `
     ${crumb([["Categories"]])}
     <div class="sec-head" style="margin-top:14px"><div><span class="kick">Browse everything</span><h2>All appliance categories</h2><p>${CATS.length} appliances · ${PT.length} part families · ${DB.products.length} genuine parts. Every category carries the complete spare-part catalogue.</p></div></div>
     <div class="cat-grid" style="padding-bottom:50px">${CATS.map((c, i) => `
-      <a class="cat-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" style="--i:${i}" href="#/c/${c.id}"><span class="cat-img"><span class="ct-ic">${U.icon("c-" + c.id)}</span>${CAT_IMG[c.id] ? `<img src="${CAT_IMG[c.id]}" alt="${U.esc(c.name)} spare parts" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</span>
+      <a class="cat-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" style="--i:${i}" href="/c/${c.id}"><span class="cat-img"><span class="ct-ic">${U.icon("c-" + c.id)}</span>${CAT_IMG[c.id] ? `<img src="${CAT_IMG[c.id]}" alt="${U.esc(c.name)} spare parts" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</span>
         <div><b>${U.esc(c.name)}</b><br><span>${DB.products.filter(p => p.cat === c.id).length} parts · ${c.pts.length} families</span></div>
         <span class="mut3" style="font-size:11.5px">${U.esc(c.desc)}</span></a>`).join("")}
     </div>
@@ -171,7 +171,7 @@ Pages.brands = () => `
     ${crumb([["Brands"]])}
     <div class="sec-head" style="margin-top:14px"><div><span class="kick">Shop by brand</span><h2>Compatible parts for ${BRANDS.length}+ brands</h2><p>Pick your appliance's brand — we'll show every part with verified model fitment.</p></div></div>
     <div class="brand-grid" style="padding-bottom:50px">${BRANDS.map((b, i) => `
-      <a class="brand-tile rv ${i % 5 ? "rv-d" + Math.min(3, i % 5) : ""}" href="#/b/${b.id}">${brandMark(b)}<b>${U.esc(b.name)}</b><span>${DB.products.filter(p => p.brandFor.includes(b.id)).length} parts</span></a>`).join("")}
+      <a class="brand-tile rv ${i % 5 ? "rv-d" + Math.min(3, i % 5) : ""}" href="/b/${b.id}">${brandMark(b)}<b>${U.esc(b.name)}</b><span>${DB.products.filter(p => p.brandFor.includes(b.id)).length} parts</span></a>`).join("")}
     </div>
   </div>`;
 Mount.brands = () => bindSearch("hd-q", "hd-sug");
