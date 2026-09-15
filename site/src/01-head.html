@@ -787,7 +787,11 @@ body{padding-bottom:74px}
 .acc-grid{display:grid;gap:18px;padding-bottom:50px}
 @media(min-width:900px){.acc-grid{grid-template-columns:250px 1fr}}
 .acc-nav{display:flex;flex-direction:column;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-l);padding:10px;height:max-content;position:sticky;top:180px}
-@media(max-width:899px){.acc-nav{flex-direction:row;overflow-x:auto;position:static}}
+/* was overflow-x:auto, which pushed "Admin login" — the last of seven
+   items — off the right edge on a phone. Wrapping shows all of them. */
+@media(max-width:899px){.acc-nav{flex-direction:row;flex-wrap:wrap;overflow-x:visible;position:static}}
+/* separates the staff link from the shopper links in the mobile menu */
+.dr-admin{margin-top:10px;padding-top:14px;border-top:1px solid var(--line);border-radius:0 0 12px 12px}
 .acc-lnk{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:12px;font-size:13.5px;font-weight:600;color:var(--tx2);white-space:nowrap;transition:all var(--tfast)}
 .acc-lnk.on,.acc-lnk:hover{background:var(--g-soft);color:var(--tx)}
 .order-card{border:1px solid var(--line);border-radius:var(--r-l);padding:16px;margin-bottom:13px;background:var(--card)}

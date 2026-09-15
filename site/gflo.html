@@ -787,7 +787,11 @@ body{padding-bottom:74px}
 .acc-grid{display:grid;gap:18px;padding-bottom:50px}
 @media(min-width:900px){.acc-grid{grid-template-columns:250px 1fr}}
 .acc-nav{display:flex;flex-direction:column;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-l);padding:10px;height:max-content;position:sticky;top:180px}
-@media(max-width:899px){.acc-nav{flex-direction:row;overflow-x:auto;position:static}}
+/* was overflow-x:auto, which pushed "Admin login" — the last of seven
+   items — off the right edge on a phone. Wrapping shows all of them. */
+@media(max-width:899px){.acc-nav{flex-direction:row;flex-wrap:wrap;overflow-x:visible;position:static}}
+/* separates the staff link from the shopper links in the mobile menu */
+.dr-admin{margin-top:10px;padding-top:14px;border-top:1px solid var(--line);border-radius:0 0 12px 12px}
 .acc-lnk{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:12px;font-size:13.5px;font-weight:600;color:var(--tx2);white-space:nowrap;transition:all var(--tfast)}
 .acc-lnk.on,.acc-lnk:hover{background:var(--g-soft);color:var(--tx)}
 .order-card{border:1px solid var(--line);border-radius:var(--r-l);padding:16px;margin-bottom:13px;background:var(--card)}
@@ -2141,6 +2145,10 @@ function renderShell(){
     <div class="dr-hd"><a class="logo" href="/"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions" style="height:32px"></a><button class="btn btn-icon" data-act="close" aria-label="Close menu">${U.icon("x")}</button></div>
     <div class="dr-body">
       ${NAV.map(n => `<a class="acc-lnk" href="${hostedLink(n[1])}" style="margin-bottom:2px">${U.icon(n[3], "ic-s")} ${n[2]}</a>`).join("")}
+      <!-- Staff link. It used to live only at the end of a 7-item horizontal
+           strip on the account page, so reaching it on a phone meant scrolling
+           down AND then sideways. Here it is one tap from any page. -->
+      <a class="acc-lnk dr-admin" href="/admin/login">${U.icon("shield", "ic-s")} Admin login</a>
     </div>
   </aside>
   <div class="modal-wr" id="modal-wr" aria-hidden="true" role="dialog" aria-modal="true">
@@ -3334,9 +3342,9 @@ Pages.account = tab => {
       <div class="row" style="margin-top:11px;gap:7px">${o.items.slice(0, 5).map(i => { const p = DB.prodMap[i.sku]; return p ? `<a href="/p/${p.sku}" style="width:44px;height:44px;border-radius:10px;overflow:hidden;background:var(--art-bg1);border:1px solid var(--line)" title="${U.esc(p.short)}">${prodArt(p)}</a>` : ""; }).join("")}</div></div>`).join("") : emptyState("package", "No orders yet", "Your demo orders will appear here.", "/categories", "Shop parts")}`;
   } else if (t === "addresses"){
     body = `<h3 style="margin-bottom:14px">Saved addresses</h3>
-    <div class="order-card"><b>Home</b> <span class="badge b-info">Default</span><p class="mut" style="font-size:13px;margin-top:6px">Flat 14B, Volt Residency, MG Road, Bengaluru 560048<br>Asha Sharma · 98450 00000</p></div>
-    <div class="order-card"><b>Workshop</b><p class="mut" style="font-size:13px;margin-top:6px">Unit 7, Service Lane, Whitefield, Bengaluru 560066<br>Asha Sharma · 98450 00000</p></div>
-    <button class="btn btn-ghost" onclick="toast('Address book is read-only in the demo','info')">${U.icon("plus", "ic-s")} Add address</button>`;
+    ${emptyState("pin", "No saved addresses",
+      "You enter a delivery address at checkout, and it is not stored on a server — this shop needs no account. Saving addresses for reuse is not switched on yet.",
+      "/categories", "Browse parts")}`;
   } else if (t === "returns"){
     body = `<h3 style="margin-bottom:14px">Returns & warranty claims</h3>${emptyState("rotate", "No active returns", "Start a return from any delivered order within 7 days.", "/account/orders", "View orders")}`;
   } else if (t === "settings"){
@@ -3349,7 +3357,7 @@ Pages.account = tab => {
     <div class="sec-head" style="margin-top:12px"><div><span class="kick">My G-FLO</span><h2>Account</h2></div></div>
     <div class="acc-user"><span class="ava" style="background:linear-gradient(135deg,hsl(358 62% 46%),hsl(48 66% 40%))">${U.icon("package", "ic-s")}</span><div><b style="font-family:var(--fd);font-size:16px">Your orders &amp; enquiries</b><div class="mut3" style="font-size:12.5px">Saved in this browser — no account needed</div></div></div>
     <div class="acc-grid">
-      <nav class="acc-nav" aria-label="Account sections">${lnk("overview", "dash", "Overview")}${lnk("orders", "package", "Orders")}${lnk("addresses", "pin", "Addresses")}${lnk("returns", "rotate", "Returns")}${lnk("settings", "cog", "Settings")}<a class="acc-lnk" href="/wishlist">${U.icon("heart", "ic-s")} Wishlist</a><a class="acc-lnk" href="/admin/login">${U.icon("lock", "ic-s")} Admin login</a></nav>
+      <nav class="acc-nav" aria-label="Account sections">${lnk("overview", "dash", "Overview")}${lnk("orders", "package", "Orders")}${lnk("addresses", "pin", "Addresses")}${lnk("returns", "rotate", "Returns")}${lnk("settings", "cog", "Settings")}<a class="acc-lnk" href="/wishlist">${U.icon("heart", "ic-s")} Wishlist</a><a class="acc-lnk" href="/admin/login">${U.icon("shield", "ic-s")} Admin login</a></nav>
       <div>${body}</div>
     </div>
   </div>`;

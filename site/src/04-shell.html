@@ -138,6 +138,10 @@ function renderShell(){
     <div class="dr-hd"><a class="logo" href="/"><img class="logo-img" src="${BRAND_LOGO}" alt="G-FLO Electrical Solutions" style="height:32px"></a><button class="btn btn-icon" data-act="close" aria-label="Close menu">${U.icon("x")}</button></div>
     <div class="dr-body">
       ${NAV.map(n => `<a class="acc-lnk" href="${hostedLink(n[1])}" style="margin-bottom:2px">${U.icon(n[3], "ic-s")} ${n[2]}</a>`).join("")}
+      <!-- Staff link. It used to live only at the end of a 7-item horizontal
+           strip on the account page, so reaching it on a phone meant scrolling
+           down AND then sideways. Here it is one tap from any page. -->
+      <a class="acc-lnk dr-admin" href="/admin/login">${U.icon("shield", "ic-s")} Admin login</a>
     </div>
   </aside>
   <div class="modal-wr" id="modal-wr" aria-hidden="true" role="dialog" aria-modal="true">
