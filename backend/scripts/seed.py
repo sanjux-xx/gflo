@@ -18,6 +18,7 @@ from app.store import ensure_defaults                                      # noq
 
 DATA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 SEED_IMAGES = os.path.join(DATA, "seed_images")
+FILTER_IMAGES = os.path.join(DATA, "filter")
 
 # extra categories introduced by the printed price list
 NEW_CATEGORIES = [
@@ -31,6 +32,7 @@ NEW_CATEGORIES = [
     ("plumbing", "Plumbing Accessories", "PL", 190, "Connection pipes, hoses, clamps, tapes, flexible pipe", True, 80),
     ("cable-management", "Cable Management", "CB", 262, "Cable ties, nail clips, battens, menscore wire", False, 90),
     ("measuring", "Measuring Tools", "MT", 96, "Measuring tapes and auto tapes", False, 100),
+    ("filter", "Filter", "FL", 185, "Water filters, RO filter parts and related accessories", True, 110),
 ]
 
 PT_BY_GROUP = {
@@ -56,6 +58,86 @@ def copy_seed_image(filename: str, prefix: str = "") -> str:
     if not os.path.exists(dest):
         shutil.copy2(src, dest)
     return f"/media/products/{dest_name}"
+
+
+def copy_filter_image(filename: str) -> str:
+    """Copy a Filter-category photo into managed media and return its public URL."""
+    if not filename:
+        return ""
+    src = os.path.join(FILTER_IMAGES, filename)
+    if not os.path.isfile(src):
+        return ""
+    dest_dir = os.path.join(MEDIA_DIR, "products", "filter")
+    os.makedirs(dest_dir, exist_ok=True)
+    dest = os.path.join(dest_dir, filename)
+    if not os.path.exists(dest):
+        shutil.copy2(src, dest)
+    return f"/media/products/filter/{filename}"
+
+
+def seed_filter_products(db):
+    """Seed every photo in data/filter as a visible Filter-category product."""
+    from app.models import ProductImage
+
+    if not os.path.isdir(FILTER_IMAGES):
+        print("filter — skipped (data/filter does not exist)")
+        return
+
+    files = sorted(
+        f for f in os.listdir(FILTER_IMAGES)
+        if os.path.splitext(f)[1].lower() in {".jpg", ".jpeg", ".png", ".webp"}
+    )
+    created = updated = 0
+
+    for i, filename in enumerate(files, 1):
+        stem = os.path.splitext(filename)[0]
+        sku = f"GF-FL-{stem}"[:64]
+        image_url = copy_filter_image(filename)
+        if not image_url:
+            print(f"filter — skipped missing image: {filename}")
+            continue
+
+        p = db.query(Product).filter(Product.sku == sku).first()
+        if p is None:
+            p = Product(
+                sku=sku,
+                name=f"Filter {stem}",
+                category_id="filter",
+                part_family="spares",
+                group_name="Filters",
+                price=None,
+                mrp=None,
+                stock=0,
+                unit="piece",
+                description=f"Filter product photo {filename}. Price on request.",
+                brand_names="",
+                rating=0,
+                reviews=0,
+                visible=True,
+                source="filter-import",
+                sort_order=6000 + i,
+                image_url=image_url,
+            )
+            db.add(p)
+            db.flush()
+            created += 1
+        else:
+            p.category_id = "filter"
+            p.image_url = image_url
+            p.visible = True
+            p.source = "filter-import"
+            p.sort_order = 6000 + i
+            updated += 1
+
+        exists = (db.query(ProductImage)
+                  .filter(ProductImage.product_id == p.id,
+                          ProductImage.url == image_url)
+                  .first())
+        if not exists:
+            db.add(ProductImage(product_id=p.id, url=image_url, sort_order=0))
+
+    db.commit()
+    print(f"filter — created {created}, refreshed {updated}, photos {len(files)}")
 
 
 def upsert(db, sku, defaults, protect_manual=True):
@@ -194,6 +276,7 @@ def main():
     try:
         ensure_defaults(db)
         seed_taxonomy(db)
+        seed_filter_products(db)
         if "--skip-legacy" not in sys.argv:
             seed_legacy_products(db)
         seed_pricelist(db, prices_only="--prices" in sys.argv)
