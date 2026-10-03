@@ -60,6 +60,70 @@ def copy_seed_image(filename: str, prefix: str = "") -> str:
     return f"/media/products/{dest_name}"
 
 
+FILTER_NAMES = {
+    "1000080109": "Lexpure Legend RO Water Purifier",
+    "1000080116": "Filter Housing 10in White with Bracket",
+    "1000080119": "Filter Housing 10in White (Front View)",
+    "1000080121": "RO Tubing Coils (Assorted Colours)",
+    "1000080124": "Filter Housing 10in White",
+    "1000080129": "Filter Housing 10in Transparent",
+    "1000080133": "Lexpure RO SMPS Adapter",
+    "1000080135": "Lexpure S Series RO Membrane LPM-1812-80",
+    "1000080138": "Lexpure UV Chamber (Classic and Super)",
+    "1000080140": "Lexpure Durable RO Membrane LXM-1812-80",
+    "1000080143": "Filter Housing Transparent (Cap and Bowl)",
+    "1000080146": "Lexpure Silver+ RO Membrane LPM-1812-80 (Horizontal)",
+    "1000080147": "RO Membrane Element (Top Cap View)",
+    "1000080151": "RO Membrane Element 1812 (Plain)",
+    "1000080153": "RO Membrane Element (Angled View)",
+    "1000080156": "Lexpure Durable-100 Booster Pump",
+    "1000080158": "Lexpure Silver+ RO Membrane LPM-1812-80",
+    "1000080159": "Lexpure LX TFC RO Membrane LPM-1812-80",
+    "1000080160": "Lexpure ECO-100 Booster Pump",
+    "1000080164": "Lexpure Elite-100 Booster Pump",
+    "1000080165": "RO Membrane Housing (White)",
+    "1000080166": "Filter Housing White (Cap and Bowl)",
+    "1000080167": "Lexpure Flux-100 Booster Pump",
+    "1000080168": "Lexpure Silver-100 Booster Pump",
+    "1000080169": "Lexpure Classic+ Filter Cartridges (Pre Carbon, Sediment, Post Carbon)",
+    "1000080170": "FILMAX Solenoid Valve 24V 1/2in",
+    "1000080172": "Lexcru Mini 80 GPD Booster Pump",
+    "1000080174": "Solenoid Valve 24V DC (Blue)",
+    "1000080178": "Pushfit Straight Connectors (Pack)",
+    "1000080182": "Brass Inlet Valve with Red Handle",
+    "1000080184": "Plastic Inlet Valve Kit 1/4in",
+    "1000080185": "TDS Meter",
+    "1000080186": "Float Switch (White)",
+    "1000080189": "Pushfit Elbow Connectors (Blue Clip)",
+    "1000080191": "BioHat Pipe Cutter",
+    "1000080192": "Big Blue Jumbo Filter Housing with Spun Filter",
+    "1000080193": "Pushfit Adjustable Flow Valve",
+    "1000080195": "Anti-Scalant Silica Balls (Handful)",
+    "1000080197": "Dispenser Tap (White and Blue)",
+    "1000080199": "Anti-Scalant Silica Balls",
+    "1000080204": "Double Side Pushfit Elbow 3/8in x 3/8in (Pack of 10)",
+    "1000080211": "Bowl Elbow 3/8in (Pack of 10)",
+    "1000080213": "Plastic Inlet Valve 1/4in (Product Page)",
+    "1000080215": "Plastic Inlet Valve Set 1/4in",
+    "1000080218": "Willfread Filter Cartridge",
+    "1000080221": "Brass Inlet Valve Set with Blue Handle",
+    "1000080223": "Booster Pump Head",
+    "1000080224": "Hastech Inlet Valve Kit",
+    "1000080225": "Double Side Pushfit Elbow 3/8in x 1/4in (Pack of 10)",
+    "1000080226": "Parijata Dispenser Tap (Black)",
+    "1000080227": "Pushfit Stem Elbow (Pack of 10)",
+    "1000080233": "Parijata Silica Balls",
+    "1000080234": "Dispenser Tap with Blue Lever",
+    "1000080235": "BioHat UV Barrel (Aluminium)",
+    "1000080237": "Float Switch (Compact)",
+    "1000080239": "Pushfit Tee Connectors (Pack)",
+    "1000080240": "Inlet Valve Kit 1/4in (Brass, Blue Handle)",
+    "1000080241": "Pushfit Ball Valves (Pair)",
+    "1000080242": "Solenoid Valve 24V (Blue Coil)",
+    "1000080244": "Lexcru 100 GPD Booster Pump",
+}
+
+
 def copy_filter_image(filename: str) -> str:
     """Copy a Filter-category photo into managed media and return its public URL."""
     if not filename:
@@ -76,7 +140,13 @@ def copy_filter_image(filename: str) -> str:
 
 
 def seed_filter_products(db):
-    """Seed every photo in data/filter as a visible Filter-category product."""
+    """Seed every photo in data/filter as a visible product in the Filter category.
+
+    - Name comes from FILTER_NAMES (keyed by the photo's file name without .jpg).
+      A photo not listed there is named "Filter <file name>" so you can rename it.
+    - Re-runnable: matches on SKU. A product you renamed by hand is never renamed back.
+    - A Filter product whose photo you deleted from data/filter is removed.
+    """
     from app.models import ProductImage
 
     if not os.path.isdir(FILTER_IMAGES):
@@ -88,56 +158,58 @@ def seed_filter_products(db):
         if os.path.splitext(f)[1].lower() in {".jpg", ".jpeg", ".png", ".webp"}
     )
     created = updated = 0
+    wanted = set()
 
     for i, filename in enumerate(files, 1):
         stem = os.path.splitext(filename)[0]
         sku = f"GF-FL-{stem}"[:64]
+        wanted.add(sku)
         image_url = copy_filter_image(filename)
         if not image_url:
             print(f"filter — skipped missing image: {filename}")
             continue
+        name = FILTER_NAMES.get(stem, f"Filter {stem}")
 
         p = db.query(Product).filter(Product.sku == sku).first()
         if p is None:
             p = Product(
-                sku=sku,
-                name=f"Filter {stem}",
-                category_id="filter",
-                part_family="spares",
-                group_name="Filters",
-                price=None,
-                mrp=None,
-                stock=0,
-                unit="piece",
-                description=f"Filter product photo {filename}. Price on request.",
-                brand_names="",
-                rating=0,
-                reviews=0,
-                visible=True,
-                source="filter-import",
-                sort_order=6000 + i,
-                image_url=image_url,
+                sku=sku, name=name, category_id="filter", part_family="spares",
+                group_name="Filters", price=None, mrp=None, stock=25, unit="piece",
+                description=f"{name}. Price on request.", brand_names="",
+                rating=0, reviews=0, visible=True, source="filter-import",
+                sort_order=6000 + i, image_url=image_url,
             )
             db.add(p)
             db.flush()
             created += 1
         else:
-            p.category_id = "filter"
+            # only replace the old placeholder name, never a name you typed yourself
+            if (p.name or "").startswith("Filter 1000") or not p.name:
+                p.name = name
+                p.description = f"{name}. Price on request."
+            if p.stock == 0:
+                p.stock = 25
             p.image_url = image_url
-            p.visible = True
-            p.source = "filter-import"
             p.sort_order = 6000 + i
             updated += 1
 
         exists = (db.query(ProductImage)
                   .filter(ProductImage.product_id == p.id,
-                          ProductImage.url == image_url)
-                  .first())
+                          ProductImage.url == image_url).first())
         if not exists:
             db.add(ProductImage(product_id=p.id, url=image_url, sort_order=0))
 
+    # photo removed from data/filter -> remove its product too
+    removed = 0
+    for old in (db.query(Product)
+                .filter(Product.source == "filter-import",
+                        Product.sku.like("GF-FL-%")).all()):
+        if old.sku not in wanted:
+            db.delete(old)
+            removed += 1
+
     db.commit()
-    print(f"filter — created {created}, refreshed {updated}, photos {len(files)}")
+    print(f"filter — created {created}, refreshed {updated}, removed {removed}, photos {len(files)}")
 
 
 def upsert(db, sku, defaults, protect_manual=True):
