@@ -29,6 +29,23 @@ def main():
         else:
             print(f"[bootstrap] catalogue already has {db.query(Product).count()} products")
 
+        # The catalogue is only seeded when empty, so on a live database the new
+        # Filter category + its photos must be added here. Idempotent: creates the
+        # category only if missing and never renames/reorders any other category.
+        try:
+            from app.models import Category
+            from seed import seed_filter_products
+            if db.get(Category, "filter") is None:
+                db.add(Category(id="filter", name="Filter", code="FL", hue=185,
+                                description="Water filters, RO filter parts and related accessories",
+                                popular=True, sort_order=110))
+                db.commit()
+                print("[bootstrap] created category 'filter'")
+            seed_filter_products(db)
+        except Exception as exc:          # never block the server from starting
+            db.rollback()
+            print(f"[bootstrap] filter seeding skipped: {exc!r}")
+
         if db.query(AdminUser).count() == 0:
             pwd = os.environ.get("ADMIN_PASSWORD")
             user = os.environ.get("ADMIN_USERNAME", "admin").lower()
