@@ -51,6 +51,7 @@
       </a>
 
       <div class="nav-lbl">Store</div>
+      <a class="nav-item {{ 'on' if path.startswith('/admin/posters') }}" href="/admin/posters">{{ icon('image') }} Posters &amp; banners</a>
       <a class="nav-item {{ 'on' if path.startswith('/admin/import') }}" href="/admin/import">{{ icon('upload') }} Import / export</a>
       <a class="nav-item {{ 'on' if path.startswith('/admin/settings') }}" href="/admin/settings">{{ icon('cog') }} Settings</a>
       <a class="nav-item {{ 'on' if path.startswith('/admin/activity') }}" href="/admin/activity">{{ icon('activity') }} Activity log</a>
