@@ -1,0 +1,76 @@
+/* G-FLO festival poster popup + promo strip (see poster.js) */
+.gp-lock, .gp-lock body { overflow: hidden !important; }
+
+.gp-ovl {
+  position: fixed; inset: 0; z-index: 1000;
+  display: grid; place-items: center; padding: 20px;
+  background: rgba(4, 7, 14, .66);
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  opacity: 0; transition: opacity .26s cubic-bezier(.22, 1, .36, 1);
+}
+.gp-ovl.on { opacity: 1; }
+
+.gp-box {
+  position: relative; display: flex; flex-direction: column; align-items: stretch;
+  max-width: min(560px, 100%); max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px);
+  background: #fff; border-radius: 20px; overflow: hidden;
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .55);
+  transform: translateY(14px) scale(.96);
+  transition: transform .34s cubic-bezier(.22, 1, .36, 1);
+}
+.gp-ovl.on .gp-box { transform: none; }
+
+.gp-link { display: block; line-height: 0; }
+.gp-box picture { display: block; line-height: 0; min-height: 0; }
+.gp-img {
+  display: block; width: 100%; height: auto;
+  max-height: calc(100vh - 120px); max-height: calc(100dvh - 120px);
+  object-fit: contain; background: #f6f7fa;
+}
+
+.gp-x {
+  position: absolute; top: 10px; right: 10px; z-index: 2;
+  width: 38px; height: 38px; border-radius: 50%; border: 0; cursor: pointer;
+  display: grid; place-items: center;
+  background: rgba(16, 24, 40, .72); color: #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+  transition: background .18s, transform .18s;
+}
+.gp-x:hover { background: #101828; transform: scale(1.06); }
+.gp-x:focus-visible, .gp-cta:focus-visible, .gp-strip-x:focus-visible { outline: 3px solid #fbbf24; outline-offset: 2px; }
+
+.gp-cta {
+  display: block; margin: 14px; padding: 13px 18px; border-radius: 12px;
+  text-align: center; text-decoration: none; font-weight: 700; font-size: 15px;
+  font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif; letter-spacing: .01em;
+  color: #fff; background: linear-gradient(120deg, #f25848, #ec3338 45%, #b5150e);
+  box-shadow: 0 10px 24px -12px rgba(181, 21, 14, .8);
+  transition: filter .18s, transform .18s;
+}
+.gp-cta:hover { filter: brightness(1.07); transform: translateY(-1px); }
+
+@media (max-width: 640px) {
+  .gp-ovl { padding: 14px; }
+  .gp-box { border-radius: 16px; }
+  .gp-x { top: 8px; right: 8px; width: 36px; height: 36px; }
+  .gp-cta { margin: 12px; }
+}
+
+/* ---------- strip ---------- */
+.gp-strip {
+  position: relative; background: #101828; line-height: 0;
+  max-height: 0; overflow: hidden; transition: max-height .4s cubic-bezier(.22, 1, .36, 1);
+}
+.gp-strip.on { max-height: 320px; }
+.gp-strip picture { display: block; }
+.gp-strip-img { display: block; width: 100%; height: auto; max-height: 220px; object-fit: cover; }
+.gp-strip-x {
+  position: absolute; top: 50%; right: 10px; transform: translateY(-50%);
+  width: 28px; height: 28px; border-radius: 50%; border: 0; cursor: pointer;
+  display: grid; place-items: center; background: rgba(16, 24, 40, .6); color: #fff;
+}
+.gp-strip-x:hover { background: rgba(16, 24, 40, .9); }
+
+@media (prefers-reduced-motion: reduce) {
+  .gp-ovl, .gp-box, .gp-strip { transition: none; }
+}
