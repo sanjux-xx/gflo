@@ -11,10 +11,26 @@ os.makedirs(DATA_DIR, exist_ok=True)
 MEDIA_DIR = os.environ.get("MEDIA_DIR", os.path.join(DATA_DIR, "media"))
 os.makedirs(os.path.join(MEDIA_DIR, "products"), exist_ok=True)
 
-DATABASE_URL = os.environ.get("DATABASE_URL") or f"sqlite:///{os.path.join(DATA_DIR, 'gflo.db')}"
+def _database_url() -> str:
+    """SQLite file by default; Postgres when DATABASE_URL (or Northflank's
+    POSTGRES_URI) is set. Accepts the plain postgres:// / postgresql:// form the
+    hosting dashboard gives you and selects the psycopg (v3) driver for it."""
+    url = (os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URI") or "").strip()
+    if not url:
+        return f"sqlite:///{os.path.join(DATA_DIR, 'gflo.db')}"
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url[len(prefix):]
+    return url
+
+
+DATABASE_URL = _database_url()
+IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True, future=True)
+engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True, future=True,
+                       **({} if DATABASE_URL.startswith("sqlite") else {"pool_size": 5, "max_overflow": 5,
+                                                                       "pool_recycle": 1800}))
 
 if DATABASE_URL.startswith("sqlite"):
     @event.listens_for(engine, "connect")

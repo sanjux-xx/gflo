@@ -3,8 +3,8 @@ import os, re, secrets
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from .db import MEDIA_DIR
-from .models import Setting, AuditLog, Product
+from .db import MEDIA_DIR, SessionLocal
+from .models import Setting, AuditLog, Product, MediaFile
 
 DEFAULT_SETTINGS = {
     "store_name": "G-FLO",
@@ -111,7 +111,41 @@ def save_upload(filename: str, data: bytes) -> str:
                 im.save(path)
     except Exception:
         pass
+    # Keep a permanent copy in the database: on free hosting the disk is wiped
+    # on every redeploy, the database is not. The disk file is just a cache.
+    with open(path, "rb") as fh:
+        store_media(f"products/{name}", fh.read())
     return f"/media/products/{name}"
+
+
+MEDIA_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+               ".webp": "image/webp", ".gif": "image/gif", ".avif": "image/avif"}
+
+
+def store_media(rel_path: str, data: bytes):
+    """Save (or replace) a photo in the media_files table. Own short session so
+    it never interferes with the caller's transaction."""
+    ctype = MEDIA_TYPES.get(os.path.splitext(rel_path)[1].lower(), "application/octet-stream")
+    s = SessionLocal()
+    try:
+        row = s.get(MediaFile, rel_path)
+        if row is None:
+            s.add(MediaFile(path=rel_path, content_type=ctype, size=len(data), data=data))
+        else:
+            row.data, row.size, row.content_type = data, len(data), ctype
+        s.commit()
+    finally:
+        s.close()
+
+
+def load_media(rel_path: str):
+    """(bytes, content_type) from the database, or (None, None)."""
+    s = SessionLocal()
+    try:
+        row = s.get(MediaFile, rel_path)
+        return (bytes(row.data), row.content_type) if row else (None, None)
+    finally:
+        s.close()
 
 
 def _probe_image(data: bytes):
@@ -219,11 +253,21 @@ def csv_safe(value):
 
 
 def delete_media(url: Optional[str]):
-    """Remove a locally stored upload; ignores external URLs."""
+    """Remove an uploaded photo (disk cache + database copy); ignores external
+    URLs and the photos bundled with the code."""
     if not url or not url.startswith("/media/products/"):
         return
-    path = os.path.join(MEDIA_DIR, "products", os.path.basename(url))
+    name = os.path.basename(url)
+    path = os.path.join(MEDIA_DIR, "products", name)
     try:
         os.remove(path)
     except OSError:
         pass
+    s = SessionLocal()
+    try:
+        row = s.get(MediaFile, f"products/{name}")
+        if row is not None:
+            s.delete(row)
+            s.commit()
+    finally:
+        s.close()

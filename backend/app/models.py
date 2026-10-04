@@ -1,7 +1,7 @@
 """Catalogue schema. Everything the storefront shows lives here and is editable in /admin."""
 import datetime as dt
 from sqlalchemy import (Column, Integer, String, Float, Boolean, Text, DateTime, Date,
-                        ForeignKey, Index)
+                        ForeignKey, Index, LargeBinary)
 from sqlalchemy.orm import relationship
 from .db import Base
 
@@ -143,3 +143,20 @@ class Poster(Base):
     active = Column(Boolean, default=True, index=True)
     created_at = Column(DateTime, default=now)
     updated_at = Column(DateTime, default=now, onupdate=now)
+
+
+class MediaFile(Base):
+    """Every photo uploaded in the admin, stored in the database itself.
+
+    The container's disk is temporary on free hosting (wiped on each redeploy),
+    so the disk under MEDIA_DIR is only a cache. /media/... is served from disk
+    when the file is there and from this table otherwise — uploads survive
+    redeploys without paying for a volume.
+    path is relative to /media/, e.g. "products/3f2a9c1e0b7d4e21.jpg".
+    """
+    __tablename__ = "media_files"
+    path = Column(String(300), primary_key=True)
+    content_type = Column(String(60), default="image/jpeg")
+    size = Column(Integer, default=0)
+    data = Column(LargeBinary, nullable=False)
+    created_at = Column(DateTime, default=now)

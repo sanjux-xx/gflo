@@ -31,6 +31,47 @@ def safe_next(target: str, fallback: str = "/admin") -> str:
         return fallback
     return t
 
+def _safe_image_ref(ref: str) -> bool:
+    """A photo link typed into a form: same-site path or http(s) URL only, and
+    nothing that could break out of an HTML attribute on the storefront."""
+    r = (ref or "").strip()
+    if not r or len(r) > 500 or any(ch in r for ch in "\"'<>` \t\r\n\\"):
+        return False
+    if r.startswith("/") and not r.startswith("//"):
+        return True
+    return r.lower().startswith(("https://", "http://"))
+
+
+def storage_warning() -> str:
+    """Non-empty when admin changes would be lost on the next redeploy.
+
+    Uploaded photos are stored in the database (see MediaFile), so everything
+    survives as long as the DATABASE does. That is true when DATABASE_URL points
+    at Postgres (e.g. Northflank's free Postgres addon), or when the SQLite file
+    sits on a mounted volume. A SQLite file inside the container is wiped on
+    every redeploy. Set PERSISTENT_STORAGE_OK=1 to silence this."""
+    if os.environ.get("PERSISTENT_STORAGE_OK", "").lower() in ("1", "true", "yes"):
+        return ""
+    from .db import DATA_DIR, IS_SQLITE
+    if not IS_SQLITE:
+        return ""
+    if not os.path.isdir("/app") and not os.path.isdir("/site"):
+        return ""                              # local development, not a container
+    p = os.path.abspath(DATA_DIR)
+    while True:
+        if os.path.ismount(p):
+            if p != "/":
+                return ""
+            break
+        parent = os.path.dirname(p)
+        if parent == p:
+            break
+        p = parent
+    return ("Storage is NOT permanent — products, categories, photos and posters you change "
+            "here will be lost on the next redeploy. Fix (free): add a PostgreSQL addon in "
+            "Northflank and set DATABASE_URL on this service to its connection string.")
+
+
 # ------------------------------------------------------------------- icon set
 # Inline stroke icons rendered server-side, so the console needs no icon font,
 # sprite file or CDN and looks identical offline.
@@ -125,6 +166,10 @@ def render(request: Request, template: str, **ctx) -> HTMLResponse:
     ctx.setdefault("store_name", get_setting(db, "store_name", "G-FLO") if db is not None else "G-FLO")
     ctx.setdefault("username", _user(request))
     ctx.setdefault("path", request.url.path)
+    try:
+        ctx.setdefault("storage_warning", storage_warning() if _user(request) else "")
+    except Exception:
+        ctx.setdefault("storage_warning", "")
     if ctx.get("username"):
         ctx.setdefault("counts", sidebar_counts(db))
     ctx.setdefault("counts", {})
@@ -371,7 +416,14 @@ def _form_to_product(db: Session, p: Product, form) -> Optional[str]:
     p.warranty, p.weight = val("warranty"), val("weight")
     p.description = form.get("description", "").strip()
     p.brand_names = val("brand_names")
-    p.image_url = val("image_url")
+    typed_img = val("image_url")
+    if typed_img and not _safe_image_ref(typed_img):
+        return "That photo link isn't valid. Use /media/… or a full https:// address."
+    if typed_img:
+        p.image_url = typed_img
+    elif not p.image_url and p.images:
+        p.image_url = p.images[0].url     # never leave a product with photos but no main photo
+    # blank box + existing photo = keep it (saving the form must never wipe a photo)
     rating, rerr = parse_money(val("rating") or 0, "Rating")
     if rerr or (rating is not None and rating > 5):
         return rerr or "Rating must be between 0 and 5."
@@ -697,10 +749,31 @@ async def category_save(request: Request, db: Session = Depends(get_db)):
     if not name:
         return flash("/admin/categories", err="Category name is required.")
     c = db.get(Category, cid) or Category(id=cid)
+    # Photo: an uploaded file wins; otherwise a pasted link; otherwise KEEP the
+    # current photo. (This used to overwrite image_url with the empty text box,
+    # so pressing "Save category" after uploading a tile photo wiped it.)
+    upload = form.get("image_file")
+    typed = (form.get("image_url") or "").strip()
+    if typed and not _safe_image_ref(typed):
+        return flash("/admin/categories",
+                     err="That image link isn't valid. Use /media/… or a full https:// address.")
+    new_image = None
+    if upload is not None and getattr(upload, "filename", ""):
+        try:
+            new_image = save_upload(upload.filename, await upload.read())
+        except ValueError as exc:
+            return flash("/admin/categories", err=f"{upload.filename}: {exc}")
+    elif typed:
+        new_image = typed
     c.name = name
     c.code = (form.get("code") or name[:2]).upper()[:8]
     c.description = (form.get("description") or "").strip()
-    c.image_url = (form.get("image_url") or "").strip()
+    if new_image is not None and new_image != c.image_url:
+        if new_image.startswith("/media/") and c.image_url:
+            delete_media(c.image_url)       # replaced by a fresh upload
+        c.image_url = new_image
+    elif c.image_url is None:
+        c.image_url = ""
     try:
         # clamped: a value that parses in Python can still overflow SQLite's
         # 8-byte integer and blow up at commit time with OverflowError

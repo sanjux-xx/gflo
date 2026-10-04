@@ -90,6 +90,7 @@
     </header>
 
     <main class="content">
+      {% if storage_warning %}<div class="alert alert-err" style="font-weight:600">{{ icon('alert') }}<span>{{ storage_warning }}</span></div>{% endif %}
       {% if msg %}<div class="alert alert-ok">{{ icon('check') }}<span>{{ msg }}</span></div>{% endif %}
       {% if err %}<div class="alert alert-err">{{ icon('alert') }}<span>{{ err }}</span></div>{% endif %}
       {% block body %}{% endblock %}

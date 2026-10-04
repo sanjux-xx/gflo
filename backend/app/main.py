@@ -169,7 +169,63 @@ app.include_router(posters_admin_router)    # before admin_router: /admin/poster
 app.include_router(admin_router)
 app.include_router(posters_public_router)
 
-app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
+# ------------------------------------------------------------------ /media
+# Photos are looked up in three places, so none of them can "vanish":
+#   1. MEDIA_DIR on disk      — fast cache (temporary on free hosting)
+#   2. the media_files table  — every admin upload, survives redeploys
+#   3. the photos bundled with the code (backend/data/...) — seeded products
+_DATA_SRC = os.path.join(BASE_DIR, "data")
+_MEDIA_ROOT = os.path.abspath(MEDIA_DIR)
+
+
+def _bundled_candidates(rel: str):
+    base = os.path.basename(rel)
+    yield os.path.join(_DATA_SRC, "media", rel)
+    if "/filter/" in "/" + rel:
+        yield os.path.join(_DATA_SRC, "filter", base)
+    yield os.path.join(_DATA_SRC, "seed_images", base)
+    for prefix in ("pl-", "tool-"):
+        if base.startswith(prefix):
+            yield os.path.join(_DATA_SRC, "seed_images", base[len(prefix):])
+
+
+def _media_headers():
+    return {"Cache-Control": "public, max-age=604800", "Content-Disposition": "inline"}
+
+
+@app.api_route("/media/{rel:path}", methods=["GET", "HEAD"])
+def media_file(rel: str):
+    from .store import load_media, MEDIA_TYPES
+    rel = rel.replace("\\", "/").lstrip("/")
+    if not rel or ".." in rel.split("/") or len(rel) > 300:
+        return JSONResponse({"detail": "Not found"}, 404)
+    ext = os.path.splitext(rel)[1].lower()
+    if ext not in MEDIA_TYPES:
+        return JSONResponse({"detail": "Not found"}, 404)
+    ctype = MEDIA_TYPES[ext]
+    disk = os.path.abspath(os.path.join(_MEDIA_ROOT, rel))
+    if os.path.commonpath([disk, _MEDIA_ROOT]) != _MEDIA_ROOT:
+        return JSONResponse({"detail": "Not found"}, 404)
+    if os.path.isfile(disk):
+        return FileResponse(disk, media_type=ctype, headers=_media_headers())
+    try:
+        data, db_type = load_media(rel)
+    except Exception:
+        data, db_type = None, None
+    if data is not None:
+        try:                                   # re-fill the disk cache
+            os.makedirs(os.path.dirname(disk), exist_ok=True)
+            with open(disk, "wb") as fh:
+                fh.write(data)
+        except OSError:
+            pass
+        return Response(content=data, media_type=db_type or ctype, headers=_media_headers())
+    for cand in _bundled_candidates(rel):
+        if os.path.isfile(cand):
+            return FileResponse(cand, media_type=ctype, headers=_media_headers())
+    return JSONResponse({"detail": "Not found"}, 404)
+
+
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
 
 
