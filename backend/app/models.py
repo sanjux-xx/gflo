@@ -1,6 +1,6 @@
 """Catalogue schema. Everything the storefront shows lives here and is editable in /admin."""
 import datetime as dt
-from sqlalchemy import (Column, Integer, String, Float, Boolean, Text, DateTime,
+from sqlalchemy import (Column, Integer, String, Float, Boolean, Text, DateTime, Date,
                         ForeignKey, Index)
 from sqlalchemy.orm import relationship
 from .db import Base
@@ -117,3 +117,29 @@ class AuditLog(Base):
     entity = Column(String(48), default="")
     entity_id = Column(String(64), default="")
     detail = Column(Text, default="")
+
+
+class Poster(Base):
+    """Festival poster / promo banner shown on the storefront.
+
+    style      "popup" = a poster that opens over the site when a visitor arrives
+               "strip" = a slim full-width banner image above the header
+    frequency  how often one visitor sees a popup: "once" (once ever),
+               "daily" (once a day) or "visit" (every new browser session)
+    starts_on / ends_on are inclusive dates in the shop's local time (IST by
+    default); leave either blank for "from now" / "until switched off".
+    """
+    __tablename__ = "posters"
+    id = Column(Integer, primary_key=True)
+    title = Column(String(120), nullable=False)          # also the image alt text
+    image_url = Column(String(500), nullable=False)      # desktop / main image
+    mobile_image_url = Column(String(500), default="")   # optional portrait version
+    link_url = Column(String(500), default="")           # optional click-through
+    button_text = Column(String(40), default="")         # optional CTA label
+    style = Column(String(16), default="popup")
+    frequency = Column(String(16), default="daily")
+    starts_on = Column(Date, nullable=True)
+    ends_on = Column(Date, nullable=True)
+    active = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime, default=now)
+    updated_at = Column(DateTime, default=now, onupdate=now)

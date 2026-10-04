@@ -4,7 +4,8 @@ Serves:
   /                the storefront (site/gflo.html)
   /api/*           read-only catalogue JSON the storefront loads at boot
   /admin/*         password-protected admin website (no Firebase, no OAuth)
-  /media/*         uploaded product photos
+  /media/*         uploaded product photos and posters
+  /api/posters     the festival poster / banner currently live (see posters.py)
 """
 import os
 import re
@@ -21,6 +22,7 @@ from . import models  # noqa: F401  (registers tables)
 from . import security as sec
 from .api import router as api_router
 from .admin import router as admin_router
+from .posters import admin_router as posters_admin_router, public_router as posters_public_router
 from .store import ensure_defaults
 from . import seo
 
@@ -163,7 +165,9 @@ async def security_middleware(request: Request, call_next):
 
 
 app.include_router(api_router)
+app.include_router(posters_admin_router)    # before admin_router: /admin/posters/*
 app.include_router(admin_router)
+app.include_router(posters_public_router)
 
 app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
@@ -177,6 +181,13 @@ def _storefront_html(index: str) -> str:
     mtime = os.stat(index).st_mtime
     if _SITE_CACHE["mtime"] != mtime:
         html = open(index, encoding="utf-8").read()
+        # festival poster / promo banner (managed at /admin/posters). Loaded as
+        # separate files so gflo.html itself never needs editing for it.
+        if "/static/poster.js" not in html and "</head>" in html:
+            html = html.replace(
+                "</head>",
+                '<link rel="stylesheet" href="/static/poster.css?v=1">'
+                '<script src="/static/poster.js?v=1" defer></script></head>', 1)
         if SITE_HOST and STORE_HOST:
             import json as _json
             cfg = ("<script>window.GFLO_HOSTS=" +
