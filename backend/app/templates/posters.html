@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+{% block title %}Posters &amp; banners{% endblock %}
+{% block body %}
+<style>
+  .pst-card{margin:0 0 16px}
+  .pf-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px 32px;align-items:start}
+  .pf-col{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .pf-pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+  .pf-file{padding:8px 10px;height:auto}
+  .pf-prev{display:block;max-width:100%;max-height:200px;border-radius:10px;margin-bottom:8px;border:1px solid var(--line,#e7eaf0)}
+  .pf-prev-sm{max-width:130px}
+  .pf-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px;padding-top:16px;border-top:1px solid var(--line,#e7eaf0)}
+  .pst-master{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  .pst-master form{margin-left:auto}
+  .pst-tbl .bdg{white-space:nowrap}
+  .pst-tbl .rowacts{opacity:1;flex-wrap:nowrap}
+  @media (max-width:720px){
+    .pst-tbl thead{display:none}
+    .pst-tbl, .pst-tbl tbody{display:block;width:100%}
+    .pst-tbl tr{display:grid;grid-template-columns:64px minmax(0,1fr);column-gap:14px;row-gap:6px;
+                padding:14px 16px;border-bottom:1px solid var(--line,#e7eaf0);align-items:start}
+    .pst-tbl tr:last-child{border-bottom:0}
+    .pst-tbl td{display:block;padding:0 !important;border:0 !important;min-width:0;background:none !important}
+    .pst-tbl td:nth-child(1){grid-row:1 / span 3}
+    .pst-tbl td:nth-child(1) .thumb{width:64px;height:64px}
+    .pst-tbl td:nth-child(2),.pst-tbl td:nth-child(3),.pst-tbl td:nth-child(4){grid-column:2}
+    .pst-tbl td:nth-child(3){display:flex;gap:6px;align-items:baseline;flex-wrap:wrap;font-size:13.5px}
+    .pst-tbl td:nth-child(3) .pmeta{margin:0}
+    .pst-tbl td:nth-child(3) .pmeta::before{content:"· "}
+    .pst-tbl td:nth-child(5){grid-column:1 / -1;margin-top:6px}
+    .pst-tbl .rowacts{justify-content:flex-start;gap:8px}
+    .pst-tbl .rowacts{max-width:none;flex-wrap:nowrap}
+    .tbl.pst-tbl .rowacts .btn{height:38px;padding:0 14px;font-size:13.5px;gap:6px}
+    .pst-tbl .rowacts form:last-child{margin-left:auto}
+  }
+  @media (max-width:900px){ .pf-grid{grid-template-columns:minmax(0,1fr)} }
+  @media (max-width:560px){
+    .pf-pair{grid-template-columns:minmax(0,1fr)}
+    .pst-master form, .pst-master form .btn{width:100%;margin-left:0}
+  }
+</style>
+
+<div class="ph">
+  <div>
+    <h1>Posters &amp; banners</h1>
+    <p class="ph-sub">Festival and offer posters for the storefront. Upload one ahead of time with start and
+       end dates and it switches itself on and off. Today in the shop's time zone is <b>{{ today }}</b>.</p>
+  </div>
+</div>
+
+<div class="card pst-card" style="border:2px solid {{ '#16a34a' if master_on else '#dc2626' }}">
+  <div class="card-b pst-master">
+    <div style="flex:1;min-width:240px">
+      <div style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7280">Posters on the website</div>
+      <div style="font-size:24px;font-weight:800;margin-top:2px;color:{{ '#15803d' if master_on else '#b91c1c' }}">
+        {{ 'ON' if master_on else 'OFF' }}</div>
+      <div class="mut" style="font-size:13.5px;margin-top:2px">
+        {% if master_on %}Live posters are showing to visitors. Switch OFF to hide every poster and banner at once.
+        {% else %}Nothing is showing to visitors. Your posters are saved — switch ON to bring the live ones back.{% endif %}
+      </div>
+    </div>
+    <form method="post" action="/admin/posters/master">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="state" value="{{ 'off' if master_on else 'on' }}">
+      <button class="btn {{ '' if master_on else 'btn-p' }}" type="submit"
+              style="min-width:190px;height:46px;font-size:15px;font-weight:700;{{ 'border-color:#dc2626;color:#b91c1c' if master_on else '' }}">
+        {{ icon('eye-off' if master_on else 'eye', 17) }} {{ 'Turn ALL posters OFF' if master_on else 'Turn posters ON' }}
+      </button>
+    </form>
+  </div>
+</div>
+
+{% if edit %}
+  <div class="card pst-card" id="poster-form">
+    <div class="card-h">{{ icon('edit' if edit else 'plus', 17) }}<h2>{{ 'Edit “' ~ edit.title ~ '”' if edit else 'Add a poster' }}</h2></div>
+    <form class="card-b" method="post" enctype="multipart/form-data" data-busy
+          action="{{ '/admin/posters/%d/edit' % edit.id if edit else '/admin/posters/new' }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="pf-grid">
+        <div class="pf-col">
+          <div class="field">
+            <label class="lbl" for="p-title">Name <span class="req">*</span></label>
+            <input class="inp" id="p-title" name="title" required maxlength="120"
+                   value="{{ edit.title if edit else '' }}" placeholder="e.g. Diwali Sale 2026">
+            <span class="help">Shoppers don't see it, except screen readers, which read it as the image description.</span>
+          </div>
+          <div class="field">
+            <label class="lbl" for="p-image">Poster image {% if not edit %}<span class="req">*</span>{% endif %}</label>
+            {% if edit %}<img class="pf-prev" src="{{ edit.image_url }}" alt="">{% endif %}
+            <input class="inp pf-file" id="p-image" name="image" type="file" accept="image/*" {{ '' if edit else 'required' }}>
+            <span class="help">{{ 'Leave empty to keep the current image. ' if edit else '' }}Popup: 1080×1350 or 1080×1080. Strip: about 1600×200. JPG, PNG, WebP or GIF, max 8 MB.</span>
+          </div>
+          <div class="field">
+            <label class="lbl" for="p-mimage">Mobile version (optional)</label>
+            {% if edit and edit.mobile_image_url %}
+              <img class="pf-prev pf-prev-sm" src="{{ edit.mobile_image_url }}" alt="">
+              <label class="sw" style="margin-bottom:8px">
+                <input type="checkbox" name="remove_mobile"><span class="track"></span>
+                <span class="sw-txt">Remove the mobile version</span>
+              </label>
+            {% endif %}
+            <input class="inp pf-file" id="p-mimage" name="mobile_image" type="file" accept="image/*">
+            <span class="help">Shown on phones instead of the main image. Skip it and phones get the main image.</span>
+          </div>
+        </div>
+
+        <div class="pf-col">
+          <div class="pf-pair">
+            <div class="field">
+              <label class="lbl" for="p-style">Show as</label>
+              <select class="sel" id="p-style" name="style">
+                {% for k, label in styles.items() %}
+                  <option value="{{ k }}" {{ 'selected' if (edit and edit.style == k) or (not edit and k == 'popup') }}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label class="lbl" for="p-freq">How often (popup)</label>
+              <select class="sel" id="p-freq" name="frequency">
+                {% for k, label in frequencies.items() %}
+                  <option value="{{ k }}" {{ 'selected' if (edit and edit.frequency == k) or (not edit and k == 'daily') }}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="pf-pair">
+            <div class="field">
+              <label class="lbl" for="p-start">Start date</label>
+              <input class="inp" id="p-start" name="starts_on" type="date"
+                     value="{{ edit.starts_on.isoformat() if edit and edit.starts_on else '' }}">
+              <span class="help">Blank = from now.</span>
+            </div>
+            <div class="field">
+              <label class="lbl" for="p-end">End date</label>
+              <input class="inp" id="p-end" name="ends_on" type="date"
+                     value="{{ edit.ends_on.isoformat() if edit and edit.ends_on else '' }}">
+              <span class="help">Last day it shows. Blank = no end.</span>
+            </div>
+          </div>
+          <div class="pf-pair">
+            <div class="field">
+              <label class="lbl" for="p-link">Link when tapped (optional)</label>
+              <input class="inp" id="p-link" name="link_url" maxlength="500"
+                     value="{{ edit.link_url if edit else '' }}" placeholder="/categories">
+              <span class="help">A page on this site (/…) or a full https:// link.</span>
+            </div>
+            <div class="field">
+              <label class="lbl" for="p-cta">Button text (optional)</label>
+              <input class="inp" id="p-cta" name="button_text" maxlength="40"
+                     value="{{ edit.button_text if edit else '' }}" placeholder="Shop the offer">
+              <span class="help">Button under the popup. Needs a link.</span>
+            </div>
+          </div>
+          <label class="sw">
+            <input type="checkbox" name="active" {{ 'checked' if (not edit) or edit.active }}>
+            <span class="track"></span>
+            <span class="sw-txt">Switched on
+              <small>Off = saved but never shown, whatever the dates say</small></span>
+          </label>
+        </div>
+      </div>
+      <div class="pf-actions">
+        <button class="btn btn-p" type="submit">{{ icon('save', 15) }} {{ 'Save changes' if edit else 'Upload poster' }}</button>
+        {% if edit %}<a class="btn" href="/admin/posters">Cancel</a>{% endif %}
+      </div>
+    </form>
+  </div>
+{% endif %}
+
+  <div class="card pst-card" style="min-width:0">
+    <div class="card-h">{{ icon('image', 17) }}<h2>{{ rows|length }} poster{{ '' if rows|length == 1 else 's' }}</h2></div>
+    {% if rows %}
+    <div class="tblwrap">
+      <table class="tbl pst-tbl" style="min-width:0">
+        <thead>
+          <tr>
+            <th class="w-img">Poster</th>
+            <th>Name</th>
+            <th>Shows</th>
+            <th>Status</th>
+            <th class="w-act"></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for p in rows %}
+          {% set st = status[p.id] %}
+          <tr>
+            <td><a href="{{ p.image_url }}" target="_blank" rel="noopener"><img class="thumb" src="{{ p.image_url }}" alt="" loading="lazy"></a></td>
+            <td>
+              <b>{{ p.title }}</b>
+              <div class="pmeta">
+                {% if p.starts_on or p.ends_on %}
+                  {{ p.starts_on.strftime('%d %b %Y') if p.starts_on else 'Now' }} → {{ p.ends_on.strftime('%d %b %Y') if p.ends_on else 'no end date' }}
+                {% else %}No dates set{% endif %}
+                {% if p.link_url %}<br>Links to <span class="mono">{{ p.link_url }}</span>{% endif %}
+              </div>
+            </td>
+            <td>
+              <div>{{ 'Popup' if p.style == 'popup' else 'Top strip' }}</div>
+              {% if p.style == 'popup' %}<div class="pmeta">{{ frequencies.get(p.frequency, '') }}</div>{% endif %}
+            </td>
+            <td>
+              {% if not master_on and p.active %}<span class="bdg bdg-mute" title="The master switch at the top is OFF">Paused · all posters OFF</span>
+              {% elif st == 'live' and p.id in showing %}<span class="bdg bdg-ok"><span class="dot"></span>On the site now</span>
+              {% elif st == 'live' %}<span class="bdg bdg-info" title="Another, newer {{ 'popup' if p.style == 'popup' else 'strip' }} is showing instead">Live · waiting</span>
+              {% elif st == 'scheduled' %}<span class="bdg bdg-warn">Scheduled</span>
+              {% elif st == 'expired' %}<span class="bdg bdg-mute">Ended</span>
+              {% else %}<span class="bdg bdg-mute">Off</span>{% endif %}
+            </td>
+            <td>
+              <div class="rowacts">
+                <a class="btn btn-xs" href="/admin/posters/{{ p.id }}/edit">{{ icon('edit', 13) }} Edit</a>
+                <form method="post" action="/admin/posters/{{ p.id }}/toggle" style="display:inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button class="btn btn-xs" title="{{ 'Switch this poster off' if p.active else 'Switch this poster on' }}"
+                          style="min-width:58px;font-weight:700;{{ 'background:#dcfce7;border-color:#86efac;color:#15803d' if p.active else 'color:#6b7280' }}">
+                    {{ 'ON' if p.active else 'OFF' }}</button>
+                </form>
+                <form method="post" action="/admin/posters/{{ p.id }}/delete" style="display:inline"
+                      data-confirm="Delete the poster “{{ p.title }}”? The image is removed too.">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <button class="btn btn-xs btn-ic btn-danger" title="Delete">{{ icon('trash', 13) }}</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-b">
+      <p class="mut">No posters yet. Upload your first festival poster with the form on the right — for example a
+         Diwali offer that runs from 20 Oct to 3 Nov.</p>
+    </div>
+    {% endif %}
+    <div class="card-b" style="border-top:1px solid var(--line, #e7eaf0);padding-top:12px;padding-bottom:12px">
+      <p class="mut" style="font-size:13px;margin:0">Only one popup and one strip show at a time. If several are live, the most recently saved one wins.</p>
+    </div>
+  </div>
+
+{% if not edit %}
+  <div class="card pst-card" id="poster-form">
+    <div class="card-h">{{ icon('edit' if edit else 'plus', 17) }}<h2>{{ 'Edit “' ~ edit.title ~ '”' if edit else 'Add a poster' }}</h2></div>
+    <form class="card-b" method="post" enctype="multipart/form-data" data-busy
+          action="{{ '/admin/posters/%d/edit' % edit.id if edit else '/admin/posters/new' }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="pf-grid">
+        <div class="pf-col">
+          <div class="field">
+            <label class="lbl" for="p-title">Name <span class="req">*</span></label>
+            <input class="inp" id="p-title" name="title" required maxlength="120"
+                   value="{{ edit.title if edit else '' }}" placeholder="e.g. Diwali Sale 2026">
+            <span class="help">Shoppers don't see it, except screen readers, which read it as the image description.</span>
+          </div>
+          <div class="field">
+            <label class="lbl" for="p-image">Poster image {% if not edit %}<span class="req">*</span>{% endif %}</label>
+            {% if edit %}<img class="pf-prev" src="{{ edit.image_url }}" alt="">{% endif %}
+            <input class="inp pf-file" id="p-image" name="image" type="file" accept="image/*" {{ '' if edit else 'required' }}>
+            <span class="help">{{ 'Leave empty to keep the current image. ' if edit else '' }}Popup: 1080×1350 or 1080×1080. Strip: about 1600×200. JPG, PNG, WebP or GIF, max 8 MB.</span>
+          </div>
+          <div class="field">
+            <label class="lbl" for="p-mimage">Mobile version (optional)</label>
+            {% if edit and edit.mobile_image_url %}
+              <img class="pf-prev pf-prev-sm" src="{{ edit.mobile_image_url }}" alt="">
+              <label class="sw" style="margin-bottom:8px">
+                <input type="checkbox" name="remove_mobile"><span class="track"></span>
+                <span class="sw-txt">Remove the mobile version</span>
+              </label>
+            {% endif %}
+            <input class="inp pf-file" id="p-mimage" name="mobile_image" type="file" accept="image/*">
+            <span class="help">Shown on phones instead of the main image. Skip it and phones get the main image.</span>
+          </div>
+        </div>
+
+        <div class="pf-col">
+          <div class="pf-pair">
+            <div class="field">
+              <label class="lbl" for="p-style">Show as</label>
+              <select class="sel" id="p-style" name="style">
+                {% for k, label in styles.items() %}
+                  <option value="{{ k }}" {{ 'selected' if (edit and edit.style == k) or (not edit and k == 'popup') }}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label class="lbl" for="p-freq">How often (popup)</label>
+              <select class="sel" id="p-freq" name="frequency">
+                {% for k, label in frequencies.items() %}
+                  <option value="{{ k }}" {{ 'selected' if (edit and edit.frequency == k) or (not edit and k == 'daily') }}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="pf-pair">
+            <div class="field">
+              <label class="lbl" for="p-start">Start date</label>
+              <input class="inp" id="p-start" name="starts_on" type="date"
+                     value="{{ edit.starts_on.isoformat() if edit and edit.starts_on else '' }}">
+              <span class="help">Blank = from now.</span>
+            </div>
+            <div class="field">
+              <label class="lbl" for="p-end">End date</label>
+              <input class="inp" id="p-end" name="ends_on" type="date"
+                     value="{{ edit.ends_on.isoformat() if edit and edit.ends_on else '' }}">
+              <span class="help">Last day it shows. Blank = no end.</span>
+            </div>
+          </div>
+          <div class="pf-pair">
+            <div class="field">
+              <label class="lbl" for="p-link">Link when tapped (optional)</label>
+              <input class="inp" id="p-link" name="link_url" maxlength="500"
+                     value="{{ edit.link_url if edit else '' }}" placeholder="/categories">
+              <span class="help">A page on this site (/…) or a full https:// link.</span>
+            </div>
+            <div class="field">
+              <label class="lbl" for="p-cta">Button text (optional)</label>
+              <input class="inp" id="p-cta" name="button_text" maxlength="40"
+                     value="{{ edit.button_text if edit else '' }}" placeholder="Shop the offer">
+              <span class="help">Button under the popup. Needs a link.</span>
+            </div>
+          </div>
+          <label class="sw">
+            <input type="checkbox" name="active" {{ 'checked' if (not edit) or edit.active }}>
+            <span class="track"></span>
+            <span class="sw-txt">Switched on
+              <small>Off = saved but never shown, whatever the dates say</small></span>
+          </label>
+        </div>
+      </div>
+      <div class="pf-actions">
+        <button class="btn btn-p" type="submit">{{ icon('save', 15) }} {{ 'Save changes' if edit else 'Upload poster' }}</button>
+        {% if edit %}<a class="btn" href="/admin/posters">Cancel</a>{% endif %}
+      </div>
+    </form>
+  </div>
+{% endif %}
+{% endblock %}
