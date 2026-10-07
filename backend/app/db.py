@@ -60,6 +60,7 @@ def ensure_schema():
     bootstrap.py, seed.py — migrate an older database too instead of failing
     on a missing column before the web app ever starts.
     """
+    _add_missing_columns()
     if engine.dialect.name != "sqlite":
         return
     with engine.begin() as conn:
@@ -78,3 +79,22 @@ def ensure_schema():
             conn.exec_driver_sql("UPDATE admin_users SET role='owner' WHERE is_owner=1")
             conn.exec_driver_sql(
                 "UPDATE admin_users SET role='editor' WHERE role IS NULL OR role=''")
+
+
+# Columns added after the first release, on any database. create_all() only
+# creates missing TABLES, never missing columns, so an existing live database
+# (SQLite file or Postgres) needs these added once.
+_NEW_COLUMNS = [("products", "variants", "TEXT DEFAULT ''")]
+
+
+def _add_missing_columns():
+    from sqlalchemy import inspect, text
+    insp = inspect(engine)
+    tables = set(insp.get_table_names())
+    for table, column, ddl in _NEW_COLUMNS:
+        if table not in tables:
+            continue                    # create_all will make it with the column
+        have = {c["name"] for c in insp.get_columns(table)}
+        if column not in have:
+            with engine.begin() as conn:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))

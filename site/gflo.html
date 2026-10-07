@@ -581,6 +581,16 @@ html[data-theme="light"] .sk::after{background:linear-gradient(90deg,transparent
 .p-price .price{font-size:clamp(26px,3vw,34px)}
 .p-price .mrp{font-size:15px}
 .p-price .off{font-size:14px}
+.from-ln{font-size:12px;font-weight:600;color:var(--tx3);margin-right:-3px}
+.var-box{margin:14px 0 6px}
+.var-lbl{font-size:13.5px;color:var(--tx2);margin-bottom:9px}
+.var-lbl b{color:var(--tx)}
+.var-opts{display:flex;flex-wrap:wrap;gap:8px}
+.var-opt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:96px;padding:9px 13px;border:1.5px solid var(--line2);border-radius:12px;background:var(--card);color:var(--tx);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;transition:border-color var(--tfast),box-shadow var(--tfast)}
+.var-opt small{font-size:12px;font-weight:700;color:var(--brand2)}
+.var-opt:hover{border-color:var(--brand)}
+.var-opt.on{border-color:var(--brand);box-shadow:0 0 0 3px rgba(236,51,56,.14);background:var(--g-soft)}
+.var-opt:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
 .tax-ln{font-size:12px;color:var(--tx3)}
 .compat-box{margin:18px 0;padding:16px;border-radius:var(--r-l);border:1.5px dashed var(--brand);background:var(--g-soft)}
 .compat-box h4{font-size:14px;display:flex;gap:8px;align-items:center;margin-bottom:10px}
@@ -1480,6 +1490,10 @@ function buildDB(){
       art: pt.art, hue: cat.hue, seed: name + "|" + idx,
       img: row.img || "",
       gallery: Array.isArray(row.imgs) ? row.imgs : [],
+      variants: Array.isArray(row.variants) ? row.variants.filter(v => v && v.label).map(v => ({
+        label: String(v.label),
+        price: (v.price === null || v.price === undefined || v.price === "") ? null : Number(v.price)
+      })) : [],
       warranty: row.warranty || ["3 months", "6 months", "6 months", "12 months"][Math.floor(r() * 4)],
       weight: row.weight || (0.05 + r() * 1.8).toFixed(2) + " kg",
       compat,
@@ -1487,8 +1501,40 @@ function buildDB(){
       qa: [Math.floor(r() * QA_POOL.length), (1 + Math.floor(r() * (QA_POOL.length - 1)))],
       revSeed: Math.floor(r() * 1000)
     };
+    if (p.variants.length){
+      // the card shows the lowest size price; each size keeps its own price
+      const vp = p.variants.map(v => v.price).filter(x => x !== null);
+      p.price = vp.length ? Math.min(...vp) : null;
+      p.mrp = p.price; p.off = 0; p.por = p.price === null;
+      p.fromPrice = new Set(vp).size > 1;
+    }
     DB.products.push(p); DB.prodMap[sku] = p;
   });
+  // Size options: each size is a hidden entry with its own SKU and price, so the
+  // cart, checkout and orders work exactly as for any product. They are kept out
+  // of DB.products, so grids and search show only the parent product.
+  DB.products.forEach(p => {
+    (p.variants || []).forEach(v => {
+      // unique per product even if two labels differ only in punctuation ("10 mm" / "10-mm")
+      const base = p.sku + "~" + (v.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "size");
+      let vsku = base, n = 2;
+      while (DB.prodMap[vsku]) vsku = base + "-" + (n++);
+      v.sku = vsku;
+      DB.prodMap[vsku] = Object.assign({}, p, {
+        sku: vsku, parent: p.sku, variant: v.label,
+        name: p.name + " — " + v.label, short: p.short + " — " + v.label,
+        price: v.price, mrp: v.price, off: 0, por: v.price === null,
+        variants: [], fromPrice: false
+      });
+    });
+  });
+  // A saved cart can hold a product or size that was since removed in the admin.
+  // Only prune when the live catalogue answered — never against the offline copy.
+  if (typeof GFLO !== "undefined" && GFLO.live && typeof State !== "undefined"){
+    const before = State.cart.length;
+    State.cart = State.cart.filter(i => i && DB.prodMap[i.sku]);
+    if (State.cart.length !== before) U.store.set("cart", State.cart);
+  }
   // derive each category's part families from the real catalog
   CATS.forEach(c => {
     const counts = {};
@@ -1521,6 +1567,11 @@ const State = {
   inCart(sku){ return this.cart.find(i => i.sku === sku); },
   addCart(sku, qty, silent){
     const p = DB.prodMap[sku]; if (!p) return;
+    if (p.variants && p.variants.length){           // must pick a size first
+      if (!silent) toast("Please choose a size", "info");
+      if (Router.parse().page !== "product") Router.push("/p/" + p.sku);
+      return;
+    }
     if (p.stock === 0){ toast("This part is out of stock", "warn"); return; }
     const it = this.inCart(sku);
     if (it) it.qty = U.clamp(it.qty + (qty || 1), 1, 99); else this.cart.push({ sku, qty: qty || 1 });
@@ -1987,7 +2038,7 @@ function prodPhotoUrls(p){
   const push = u => { if (u && out.indexOf(u) === -1) out.push(u); };
   if ((p.cat === "ceiling-fan" || p.cat === "table-fan") && USER_PT_IMG[p.pt] && typeof USER_IMGS !== "undefined" && fanRep()[p.cat + "|" + p.pt] === p.sku) push(USER_IMGS[USER_PT_IMG[p.pt]]);
   push(p.img);
-  (p.imgs || []).forEach(push);                 // extra photos uploaded in the admin
+  (p.gallery || p.imgs || []).forEach(push);    // extra photos (admin uploads + CSV "gallery")
   if (!out.length){
     const list = PHOTOS[p.cat + "|" + p.pt];    // shared stock photo for the part type
     if (list && list.length) push(list[U.hash(p.sku) % list.length]);
@@ -2023,7 +2074,8 @@ function priceHtml(p, big){
   if (p.price === null || p.price === undefined)
     return `<div class="price-ln"><span class="price price-por">${window.POR_LABEL || "Price on request"}</span></div>`;
   const unit = p.unit && p.unit !== "piece" ? `<span class="unit-ln">/ ${U.esc(p.unit)}</span>` : "";
-  return `<div class="price-ln"><span class="price">${U.inr(p.price)}</span>${unit}${p.off ? `<span class="mrp">${U.inr(p.mrp)}</span><span class="off">${p.off}% off</span>` : ""}</div>`;
+  const from = p.fromPrice ? `<span class="from-ln">From</span>` : "";
+  return `<div class="price-ln">${from}<span class="price">${U.inr(p.price)}</span>${unit}${p.off ? `<span class="mrp">${U.inr(p.mrp)}</span><span class="off">${p.off}% off</span>` : ""}</div>`;
 }
 function stockHtml(p){
   if (p.stock === 0) return `<span class="stock-ln s-out">Out of stock</span>`;
@@ -2814,9 +2866,27 @@ Mount.search = listingMount;
 
 /* ================= PRODUCT PAGE ================= */
 let V360 = null;
-Pages.product = sku => {
-  const p = DB.prodMap[sku];
+/* /p/<base>~<size> opens the base product with that size selected */
+function resolveVariant(sku){
+  let p = DB.prodMap[sku], sel = null;
+  if (p && p.parent){ sel = sku; sku = p.parent; p = DB.prodMap[sku]; }
+  if (p && p.variants && p.variants.length && !sel) sel = p.variants[0].sku;
+  return { sku, p, sel };
+}
+function variantPicker(p, sel){
+  if (!p.variants || !p.variants.length) return "";
+  const cur = DB.prodMap[sel] || {};
+  return `<div class="var-box">
+    <div class="var-lbl">Size: <b id="var-cur">${U.esc(cur.variant || "")}</b></div>
+    <div class="var-opts" role="radiogroup" aria-label="Choose a size">${p.variants.map(v => `
+      <button type="button" class="var-opt ${v.sku === sel ? "on" : ""}" data-var="${U.esc(v.sku)}" role="radio" aria-checked="${v.sku === sel}">
+        <span>${U.esc(v.label)}</span>${CATALOG_MODE || v.price === null ? "" : `<small>${U.inr(v.price)}</small>`}</button>`).join("")}
+    </div></div>`;
+}
+Pages.product = skuIn => {
+  const R = resolveVariant(skuIn), sku = R.sku, p = R.p;
   if (!p) return Pages.notfound();
+  const pv = R.sel ? DB.prodMap[R.sel] : p;           // what the price box shows
   State.pushRecent(sku);
   const c = catOf(p), pt = ptOf(p);
   const eta = deliveryEta(State.pin);
@@ -2848,9 +2918,11 @@ Pages.product = sku => {
         <span class="cat-ln" style="font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--tx3)">${U.esc(c.name)} · ${pt.name}</span>
         <h1 style="margin-top:6px">${U.esc(p.name)}</h1>
         <div class="sub-ln">${U.stars(p.rating)}<b>${p.rating}</b><a href="#tab-reviews" data-tab-link="reviews" style="color:var(--brand2)">${p.reviews} ratings</a><span>·</span><span>${p.sold.toLocaleString("en-IN")}+ sold</span><span>·</span><span class="mono">${p.sku}</span></div>
-        ${CATALOG_MODE ? `<p class="tax-ln" style="margin-top:14px">${U.icon("info", "ic-s")} Pricing shared on request — add to cart to raise a quote enquiry.</p>` : `<div class="p-price">${priceHtml(p)}</div>
+        ${CATALOG_MODE ? `<p class="tax-ln" style="margin-top:14px">${U.icon("info", "ic-s")} Pricing shared on request — add to cart to raise a quote enquiry.</p>` : `<div class="p-price" id="p-price">${priceHtml(pv)}</div>
         <p class="tax-ln">Inclusive of all taxes · GST invoice available</p>
         ${p.off ? `<p style="font-size:12.5px;color:var(--ok);font-weight:600;margin-top:4px">You save ${U.inr(p.mrp - p.price)} vs MRP</p>` : ""}`}
+
+        ${variantPicker(p, R.sel)}
 
         <div class="compat-box">
           <h4>${U.icon("spark", "ic-s")} Will it fit my appliance?</h4>
@@ -2938,13 +3010,21 @@ Pages.product = sku => {
     <section class="sec-tight">${sectionHead("Related parts", "More for your " + c.name.toLowerCase(), null, "/c/" + c.id, "Browse " + c.name)}${railOf(rel)}</section>
   </div>`;
 };
-Mount.product = sku => {
-  const p = DB.prodMap[sku]; if (!p) return;
+Mount.product = skuIn => {
+  const R = resolveVariant(skuIn), sku = R.sku, p = R.p; if (!p) return;
+  let buySku = R.sel || sku;                           // the chosen size, if any
   bindSearch("hd-q", "hd-sug");
   let qty = 1;
   document.querySelectorAll("[data-pq]").forEach(b => b.addEventListener("click", () => { qty = U.clamp(qty + (+b.getAttribute("data-pq")), 1, 99); document.getElementById("pq").textContent = qty; }));
-  document.getElementById("p-add").addEventListener("click", () => State.addCart(sku, qty));
-  document.getElementById("p-buy").addEventListener("click", () => { State.addCart(sku, qty, true); Router.push("/checkout"); });
+  document.getElementById("p-add").addEventListener("click", () => State.addCart(buySku, qty));
+  document.getElementById("p-buy").addEventListener("click", () => { State.addCart(buySku, qty, true); Router.push("/checkout"); });
+  document.querySelectorAll("[data-var]").forEach(b => b.addEventListener("click", () => {
+    buySku = b.getAttribute("data-var");
+    const v = DB.prodMap[buySku]; if (!v) return;
+    document.querySelectorAll("[data-var]").forEach(x => { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-checked", on); });
+    const cur = document.getElementById("var-cur"); if (cur) cur.textContent = v.variant;
+    const pr = document.getElementById("p-price"); if (pr) pr.innerHTML = priceHtml(v);
+  }));
   // tabs
   document.querySelectorAll("[data-ptab]").forEach(t => t.addEventListener("click", () => {
     document.querySelectorAll("[data-ptab]").forEach(x => { x.classList.toggle("on", x === t); x.setAttribute("aria-selected", x === t); });
@@ -3148,7 +3228,7 @@ Pages.cart = () => {
   <div class="co-grid">
     <div>
       <div class="co-sec">
-        ${State.cart.map(i => { const p = DB.prodMap[i.sku]; return `
+        ${State.cart.map(i => { const p = DB.prodMap[i.sku]; if (!p) return ""; return `
         <div class="citem"><a class="art" href="/p/${p.sku}">${prodArt(p)}</a>
           <div class="inf"><b><a href="/p/${p.sku}">${U.esc(p.name)}</a></b>
             <span class="mut3" style="font-size:11.5px">${catOf(p).name} · <span class="mono">${p.sku}</span> · ${p.warranty} warranty</span>
@@ -3218,7 +3298,7 @@ Pages.checkout = () => {
         <p class="mut3" style="font-size:12px;margin-top:8px">${U.icon("shield", "ic-s")} This is a frontend demo — the button below places a mock order locally. No gateway, no charge.</p></div>
     </div>
     <div><div class="co-sec sum-card"><h3>Order summary</h3>
-      ${State.cart.map(i => { const p = DB.prodMap[i.sku]; return `<div class="tot-row" style="margin-bottom:7px"><span style="display:flex;gap:8px;align-items:center;min-width:0"><span style="width:34px;height:34px;border-radius:8px;overflow:hidden;flex:none;background:var(--art-bg1)">${prodArt(p)}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${U.esc(p.short)} × ${i.qty}</span></span>${CATALOG_MODE ? "" : `<span>${U.inr(p.price * i.qty)}</span>`}</div>`; }).join("")}
+      ${State.cart.map(i => { const p = DB.prodMap[i.sku]; if (!p) return ""; return `<div class="tot-row" style="margin-bottom:7px"><span style="display:flex;gap:8px;align-items:center;min-width:0"><span style="width:34px;height:34px;border-radius:8px;overflow:hidden;flex:none;background:var(--art-bg1)">${prodArt(p)}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${U.esc(p.short)} × ${i.qty}</span></span>${CATALOG_MODE ? "" : `<span>${U.inr(p.price * i.qty)}</span>`}</div>`; }).join("")}
       <hr style="border:0;border-top:1px dashed var(--line)">
       <div style="display:grid;gap:8px;margin-top:8px">
         ${CATALOG_MODE ? `<div class="tot-row big"><span>Items</span><span>${t.count}</span></div>

@@ -54,6 +54,9 @@ class Product(Base):
     weight = Column(String(48), default="")
     description = Column(Text, default="")
     brand_names = Column(String(240), default="")        # comma separated
+    # Size options with their own price, e.g. "20 x 10 mm=850|25 x 10 mm=1000".
+    # Empty = a normal single-price product.
+    variants = Column(Text, default="")
 
     rating = Column(Float, default=0)
     reviews = Column(Integer, default=0)

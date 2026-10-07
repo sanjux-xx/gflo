@@ -166,9 +166,27 @@ Mount.search = listingMount;
 
 /* ================= PRODUCT PAGE ================= */
 let V360 = null;
-Pages.product = sku => {
-  const p = DB.prodMap[sku];
+/* /p/<base>~<size> opens the base product with that size selected */
+function resolveVariant(sku){
+  let p = DB.prodMap[sku], sel = null;
+  if (p && p.parent){ sel = sku; sku = p.parent; p = DB.prodMap[sku]; }
+  if (p && p.variants && p.variants.length && !sel) sel = p.variants[0].sku;
+  return { sku, p, sel };
+}
+function variantPicker(p, sel){
+  if (!p.variants || !p.variants.length) return "";
+  const cur = DB.prodMap[sel] || {};
+  return `<div class="var-box">
+    <div class="var-lbl">Size: <b id="var-cur">${U.esc(cur.variant || "")}</b></div>
+    <div class="var-opts" role="radiogroup" aria-label="Choose a size">${p.variants.map(v => `
+      <button type="button" class="var-opt ${v.sku === sel ? "on" : ""}" data-var="${U.esc(v.sku)}" role="radio" aria-checked="${v.sku === sel}">
+        <span>${U.esc(v.label)}</span>${CATALOG_MODE || v.price === null ? "" : `<small>${U.inr(v.price)}</small>`}</button>`).join("")}
+    </div></div>`;
+}
+Pages.product = skuIn => {
+  const R = resolveVariant(skuIn), sku = R.sku, p = R.p;
   if (!p) return Pages.notfound();
+  const pv = R.sel ? DB.prodMap[R.sel] : p;           // what the price box shows
   State.pushRecent(sku);
   const c = catOf(p), pt = ptOf(p);
   const eta = deliveryEta(State.pin);
@@ -200,9 +218,11 @@ Pages.product = sku => {
         <span class="cat-ln" style="font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--tx3)">${U.esc(c.name)} · ${pt.name}</span>
         <h1 style="margin-top:6px">${U.esc(p.name)}</h1>
         <div class="sub-ln">${U.stars(p.rating)}<b>${p.rating}</b><a href="#tab-reviews" data-tab-link="reviews" style="color:var(--brand2)">${p.reviews} ratings</a><span>·</span><span>${p.sold.toLocaleString("en-IN")}+ sold</span><span>·</span><span class="mono">${p.sku}</span></div>
-        ${CATALOG_MODE ? `<p class="tax-ln" style="margin-top:14px">${U.icon("info", "ic-s")} Pricing shared on request — add to cart to raise a quote enquiry.</p>` : `<div class="p-price">${priceHtml(p)}</div>
+        ${CATALOG_MODE ? `<p class="tax-ln" style="margin-top:14px">${U.icon("info", "ic-s")} Pricing shared on request — add to cart to raise a quote enquiry.</p>` : `<div class="p-price" id="p-price">${priceHtml(pv)}</div>
         <p class="tax-ln">Inclusive of all taxes · GST invoice available</p>
         ${p.off ? `<p style="font-size:12.5px;color:var(--ok);font-weight:600;margin-top:4px">You save ${U.inr(p.mrp - p.price)} vs MRP</p>` : ""}`}
+
+        ${variantPicker(p, R.sel)}
 
         <div class="compat-box">
           <h4>${U.icon("spark", "ic-s")} Will it fit my appliance?</h4>
@@ -290,13 +310,21 @@ Pages.product = sku => {
     <section class="sec-tight">${sectionHead("Related parts", "More for your " + c.name.toLowerCase(), null, "/c/" + c.id, "Browse " + c.name)}${railOf(rel)}</section>
   </div>`;
 };
-Mount.product = sku => {
-  const p = DB.prodMap[sku]; if (!p) return;
+Mount.product = skuIn => {
+  const R = resolveVariant(skuIn), sku = R.sku, p = R.p; if (!p) return;
+  let buySku = R.sel || sku;                           // the chosen size, if any
   bindSearch("hd-q", "hd-sug");
   let qty = 1;
   document.querySelectorAll("[data-pq]").forEach(b => b.addEventListener("click", () => { qty = U.clamp(qty + (+b.getAttribute("data-pq")), 1, 99); document.getElementById("pq").textContent = qty; }));
-  document.getElementById("p-add").addEventListener("click", () => State.addCart(sku, qty));
-  document.getElementById("p-buy").addEventListener("click", () => { State.addCart(sku, qty, true); Router.push("/checkout"); });
+  document.getElementById("p-add").addEventListener("click", () => State.addCart(buySku, qty));
+  document.getElementById("p-buy").addEventListener("click", () => { State.addCart(buySku, qty, true); Router.push("/checkout"); });
+  document.querySelectorAll("[data-var]").forEach(b => b.addEventListener("click", () => {
+    buySku = b.getAttribute("data-var");
+    const v = DB.prodMap[buySku]; if (!v) return;
+    document.querySelectorAll("[data-var]").forEach(x => { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-checked", on); });
+    const cur = document.getElementById("var-cur"); if (cur) cur.textContent = v.variant;
+    const pr = document.getElementById("p-price"); if (pr) pr.innerHTML = priceHtml(v);
+  }));
   // tabs
   document.querySelectorAll("[data-ptab]").forEach(t => t.addEventListener("click", () => {
     document.querySelectorAll("[data-ptab]").forEach(x => { x.classList.toggle("on", x === t); x.setAttribute("aria-selected", x === t); });

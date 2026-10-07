@@ -164,6 +164,13 @@
                      placeholder="G-FLO, Usha, Crompton">
               <span class="help">Comma separated.</span>
             </div>
+            <div class="field span2">
+              <label class="lbl" for="variants">Sizes &amp; prices (optional)</label>
+              <textarea class="inp" id="variants" name="variants" rows="4" style="height:auto;font-family:inherit"
+                        placeholder="20 x 10 mm = 850&#10;25 x 10 mm = 1000&#10;25 x 12 mm = 1200">{{ variants_lines(p.variants or '') }}</textarea>
+              <span class="help">One size per line: <b>size = price</b>. Shoppers pick a size and see its price.
+                Leave empty for a normal single-price product. The main Price becomes the lowest size price.</span>
+            </div>
             <div class="field">
               <label class="lbl">Rating &amp; review count</label>
               <div style="display:flex;gap:8px">

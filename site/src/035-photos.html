@@ -130,7 +130,7 @@ function prodPhotoUrls(p){
   const push = u => { if (u && out.indexOf(u) === -1) out.push(u); };
   if ((p.cat === "ceiling-fan" || p.cat === "table-fan") && USER_PT_IMG[p.pt] && typeof USER_IMGS !== "undefined" && fanRep()[p.cat + "|" + p.pt] === p.sku) push(USER_IMGS[USER_PT_IMG[p.pt]]);
   push(p.img);
-  (p.imgs || []).forEach(push);                 // extra photos uploaded in the admin
+  (p.gallery || p.imgs || []).forEach(push);    // extra photos (admin uploads + CSV "gallery")
   if (!out.length){
     const list = PHOTOS[p.cat + "|" + p.pt];    // shared stock photo for the part type
     if (list && list.length) push(list[U.hash(p.sku) % list.length]);

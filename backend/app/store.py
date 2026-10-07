@@ -271,3 +271,61 @@ def delete_media(url: Optional[str]):
             s.commit()
     finally:
         s.close()
+
+
+# ------------------------------------------------------------- size options
+MAX_VARIANTS = 40
+
+
+def parse_variants(raw: str):
+    """Text -> ([{"label", "price"}], error).
+
+    Accepts one option per line or "|"-separated, each "label = price"
+    (price may be blank for "price on request"), e.g.
+        20 x 10 mm = 850
+        25 x 10 mm = 1000
+    """
+    out, seen = [], set()
+    parts = [x.strip() for x in (raw or "").replace("\r", "\n").replace("|", "\n").split("\n")]
+    for part in parts:
+        if not part:
+            continue
+        if "=" in part:
+            label, price_raw = part.rsplit("=", 1)
+        else:
+            label, price_raw = part, ""
+        label = " ".join(label.split())
+        if not label:
+            return [], f"Size option '{part[:40]}' has no name."
+        if len(label) > 60 or any(ch in label for ch in "<>\"`"):
+            return [], f"Size name '{label[:40]}' is too long or has invalid characters."
+        if label.lower() in seen:
+            return [], f"Size '{label}' is listed twice."
+        price, err = parse_money(price_raw.strip().replace("₹", "").replace(",", ""), f"Price for {label}")
+        if err:
+            return [], err
+        seen.add(label.lower())
+        out.append({"label": label, "price": price})
+    if len(out) > MAX_VARIANTS:
+        return [], f"Too many size options (max {MAX_VARIANTS})."
+    return out, ""
+
+
+def format_variants(items) -> str:
+    """List -> stored form 'label=price|label=price'."""
+    def money(v):
+        if v is None:
+            return ""
+        return str(int(v)) if float(v).is_integer() else f"{v:.2f}"
+    return "|".join(f"{v['label']}={money(v['price'])}" for v in items)
+
+
+def variants_list(stored: str):
+    items, err = parse_variants(stored or "")
+    return [] if err else items
+
+
+def variants_lines(stored: str) -> str:
+    """Stored form -> one 'label = price' per line, for the admin textarea."""
+    return "\n".join(f"{v['label']} = {'' if v['price'] is None else format_variants([v]).split('=',1)[1]}"
+                     for v in variants_list(stored))

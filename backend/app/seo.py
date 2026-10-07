@@ -156,7 +156,7 @@ def page_meta(path: str, db: Session, site_host: str = "", store_host: str = "")
 
     try:
         if page == "product" and param:
-            p = db.query(Product).filter(Product.sku == param).first()
+            p = db.query(Product).filter(Product.sku == param.split("~", 1)[0]).first()
             if p:
                 cat = db.get(Category, p.category_id) if p.category_id else None
                 title = f"{p.name} — Genuine Spare Part | {BRAND_NAME}"

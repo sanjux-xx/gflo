@@ -14,7 +14,8 @@ from .models import Product, ProductImage, Category, Brand, AdminUser, AuditLog
 from . import security as sec
 from .store import (get_setting, set_setting, log, save_upload, delete_media,
                     unique_sku, slugify, DEFAULT_SETTINGS, parse_money, parse_qty,
-                    clamp_money, csv_safe)
+                    clamp_money, csv_safe, parse_variants, format_variants,
+                    variants_lines)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 TEMPLATES = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
@@ -127,6 +128,7 @@ def icon(name: str, size: int = 18) -> Markup:
 
 
 TEMPLATES.env.globals["icon"] = icon
+TEMPLATES.env.globals["variants_lines"] = variants_lines
 
 PART_FAMILIES = ["spares", "blade", "motor", "bearing", "capacitor", "switch", "knob",
                  "gasket", "seal", "filter", "pump", "gear", "belt", "pcb", "valve",
@@ -416,6 +418,15 @@ def _form_to_product(db: Session, p: Product, form) -> Optional[str]:
     p.warranty, p.weight = val("warranty"), val("weight")
     p.description = form.get("description", "").strip()
     p.brand_names = val("brand_names")
+    if "variants" in form:
+        items, verr = parse_variants(form.get("variants") or "")
+        if verr:
+            return verr
+        p.variants = format_variants(items)
+        if items:                       # card / sort price = lowest size price
+            prices = [v["price"] for v in items if v["price"] is not None]
+            p.price = min(prices) if prices else None
+            p.mrp = None                # each size has its own price; no single MRP
     typed_img = val("image_url")
     if typed_img and not _safe_image_ref(typed_img):
         return "That photo link isn't valid. Use /media/… or a full https:// address."
@@ -563,6 +574,9 @@ async def product_inline(request: Request, db: Session = Depends(get_db)):
     if not p:
         return JSONResponse({"ok": False, "error": "Product not found"}, 404)
     field, raw = data.get("field"), data.get("value")
+    if field in ("price", "mrp") and (p.variants or "").strip():
+        return JSONResponse({"ok": False, "error": "This product has sizes — open it and change the prices "
+                                                   "in “Sizes & prices”."}, 400)
     if field == "price":
         value, err = parse_money(raw, "Price")
         if err:
@@ -889,7 +903,33 @@ def brand_delete(request: Request, bid: str, db: Session = Depends(get_db)):
 # ----------------------------------------------------------------- import
 CSV_FIELDS = ["sku", "name", "category_id", "group_name", "price", "mrp", "stock", "unit",
               "size", "pack", "colours", "material", "warranty", "weight", "brand_names",
-              "part_family", "rating", "reviews", "visible", "image_url", "description"]
+              "part_family", "rating", "reviews", "visible", "image_url", "description",
+              "gallery", "variants"]
+# "gallery" = extra photos for the product page, separated by "|". The main
+# photo stays in image_url; gallery photos show as extra thumbnails.
+
+
+def _gallery_urls(p) -> str:
+    return "|".join(i.url for i in p.images if i.url and i.url != p.image_url)
+
+
+def _apply_gallery(p, raw: str, row_no: int, problems: list):
+    """Add the photos listed in a CSV 'gallery' cell (main photo first).
+    Only adds missing ones — never deletes photos uploaded in the admin."""
+    urls = [u.strip() for u in (raw or "").split("|") if u.strip()]
+    if not urls:
+        return
+    wanted = ([p.image_url] if p.image_url else []) + urls
+    have = {i.url for i in p.images}
+    order = len(p.images)
+    for u in wanted:
+        if not _safe_image_ref(u):
+            problems.append(f"row {row_no}: gallery photo '{u[:60]}' isn't a valid link")
+            continue
+        if u not in have:
+            p.images.append(ProductImage(url=u, sort_order=order))
+            have.add(u)
+            order += 1
 
 
 @router.get("/import", response_class=HTMLResponse)
@@ -913,7 +953,9 @@ def export_csv(request: Request, db: Session = Depends(get_db)):
     w = csv.DictWriter(buf, fieldnames=CSV_FIELDS, extrasaction="ignore")
     w.writeheader()
     for p in db.query(Product).order_by(Product.category_id, Product.name).all():
-        w.writerow({f: csv_safe(getattr(p, f, "")) for f in CSV_FIELDS})
+        row = {f: csv_safe(getattr(p, f, "") or "") for f in CSV_FIELDS if f != "gallery"}
+        row["gallery"] = csv_safe(_gallery_urls(p))
+        w.writerow(row)
     buf.seek(0)
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
                              headers={"Content-Disposition": "attachment; filename=gflo-catalogue.csv"})
@@ -959,7 +1001,7 @@ async def import_csv(request: Request, file: UploadFile = File(...),
         else:
             updated += 1
         for field in CSV_FIELDS:
-            if field not in row or field == "sku":
+            if field not in row or field in ("sku", "gallery", "variants"):
                 continue
             raw = (row.get(field) or "").strip()
             if field in ("price", "mrp"):
@@ -987,8 +1029,24 @@ async def import_csv(request: Request, file: UploadFile = File(...),
                     p.category_id = raw
                 elif raw:
                     problems.append(f"row {i}: unknown category '{raw}'")
+            elif field == "image_url":
+                if raw and not _safe_image_ref(raw):
+                    problems.append(f"row {i}: photo link isn't valid")
+                elif raw:
+                    p.image_url = raw
             elif raw or field in ("description", "size", "pack"):
                 setattr(p, field, raw)
+        if "gallery" in row:
+            _apply_gallery(p, row.get("gallery") or "", i, problems)
+        if "variants" in row:
+            items, verr = parse_variants(row.get("variants") or "")
+            if verr:
+                problems.append(f"row {i}: {verr}")
+            else:
+                p.variants = format_variants(items)
+                prices = [v["price"] for v in items if v["price"] is not None]
+                if items and prices and not (row.get("price") or "").strip():
+                    p.price = min(prices)
     log(db, _user(request), "csv_import", "product",
         detail=f"created={created} updated={updated} skipped={skipped}")
     db.commit()

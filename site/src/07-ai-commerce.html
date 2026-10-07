@@ -142,7 +142,7 @@ Pages.cart = () => {
   <div class="co-grid">
     <div>
       <div class="co-sec">
-        ${State.cart.map(i => { const p = DB.prodMap[i.sku]; return `
+        ${State.cart.map(i => { const p = DB.prodMap[i.sku]; if (!p) return ""; return `
         <div class="citem"><a class="art" href="/p/${p.sku}">${prodArt(p)}</a>
           <div class="inf"><b><a href="/p/${p.sku}">${U.esc(p.name)}</a></b>
             <span class="mut3" style="font-size:11.5px">${catOf(p).name} · <span class="mono">${p.sku}</span> · ${p.warranty} warranty</span>
@@ -212,7 +212,7 @@ Pages.checkout = () => {
         <p class="mut3" style="font-size:12px;margin-top:8px">${U.icon("shield", "ic-s")} This is a frontend demo — the button below places a mock order locally. No gateway, no charge.</p></div>
     </div>
     <div><div class="co-sec sum-card"><h3>Order summary</h3>
-      ${State.cart.map(i => { const p = DB.prodMap[i.sku]; return `<div class="tot-row" style="margin-bottom:7px"><span style="display:flex;gap:8px;align-items:center;min-width:0"><span style="width:34px;height:34px;border-radius:8px;overflow:hidden;flex:none;background:var(--art-bg1)">${prodArt(p)}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${U.esc(p.short)} × ${i.qty}</span></span>${CATALOG_MODE ? "" : `<span>${U.inr(p.price * i.qty)}</span>`}</div>`; }).join("")}
+      ${State.cart.map(i => { const p = DB.prodMap[i.sku]; if (!p) return ""; return `<div class="tot-row" style="margin-bottom:7px"><span style="display:flex;gap:8px;align-items:center;min-width:0"><span style="width:34px;height:34px;border-radius:8px;overflow:hidden;flex:none;background:var(--art-bg1)">${prodArt(p)}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${U.esc(p.short)} × ${i.qty}</span></span>${CATALOG_MODE ? "" : `<span>${U.inr(p.price * i.qty)}</span>`}</div>`; }).join("")}
       <hr style="border:0;border-top:1px dashed var(--line)">
       <div style="display:grid;gap:8px;margin-top:8px">
         ${CATALOG_MODE ? `<div class="tot-row big"><span>Items</span><span>${t.count}</span></div>

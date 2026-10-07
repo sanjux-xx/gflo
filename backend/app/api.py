@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from .db import get_db
 from .models import Product, Category, Brand
-from .store import get_setting, PUBLIC_SETTING_KEYS
+from .store import get_setting, PUBLIC_SETTING_KEYS, variants_list
 
 router = APIRouter(prefix="/api", tags=["public"])
 
@@ -38,6 +38,8 @@ def product_json(p: Product, show_prices: bool) -> dict:
         "isFeat": bool(p.is_featured),
         "img": p.image_url or "",
         "imgs": [i.url for i in p.images],
+        "variants": [{"label": v["label"], "price": v["price"] if show_prices else None}
+                     for v in variants_list(getattr(p, "variants", "") or "")],
     }
 
 

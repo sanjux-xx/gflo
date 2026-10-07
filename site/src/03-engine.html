@@ -61,6 +61,10 @@ function buildDB(){
       art: pt.art, hue: cat.hue, seed: name + "|" + idx,
       img: row.img || "",
       gallery: Array.isArray(row.imgs) ? row.imgs : [],
+      variants: Array.isArray(row.variants) ? row.variants.filter(v => v && v.label).map(v => ({
+        label: String(v.label),
+        price: (v.price === null || v.price === undefined || v.price === "") ? null : Number(v.price)
+      })) : [],
       warranty: row.warranty || ["3 months", "6 months", "6 months", "12 months"][Math.floor(r() * 4)],
       weight: row.weight || (0.05 + r() * 1.8).toFixed(2) + " kg",
       compat,
@@ -68,8 +72,40 @@ function buildDB(){
       qa: [Math.floor(r() * QA_POOL.length), (1 + Math.floor(r() * (QA_POOL.length - 1)))],
       revSeed: Math.floor(r() * 1000)
     };
+    if (p.variants.length){
+      // the card shows the lowest size price; each size keeps its own price
+      const vp = p.variants.map(v => v.price).filter(x => x !== null);
+      p.price = vp.length ? Math.min(...vp) : null;
+      p.mrp = p.price; p.off = 0; p.por = p.price === null;
+      p.fromPrice = new Set(vp).size > 1;
+    }
     DB.products.push(p); DB.prodMap[sku] = p;
   });
+  // Size options: each size is a hidden entry with its own SKU and price, so the
+  // cart, checkout and orders work exactly as for any product. They are kept out
+  // of DB.products, so grids and search show only the parent product.
+  DB.products.forEach(p => {
+    (p.variants || []).forEach(v => {
+      // unique per product even if two labels differ only in punctuation ("10 mm" / "10-mm")
+      const base = p.sku + "~" + (v.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "size");
+      let vsku = base, n = 2;
+      while (DB.prodMap[vsku]) vsku = base + "-" + (n++);
+      v.sku = vsku;
+      DB.prodMap[vsku] = Object.assign({}, p, {
+        sku: vsku, parent: p.sku, variant: v.label,
+        name: p.name + " — " + v.label, short: p.short + " — " + v.label,
+        price: v.price, mrp: v.price, off: 0, por: v.price === null,
+        variants: [], fromPrice: false
+      });
+    });
+  });
+  // A saved cart can hold a product or size that was since removed in the admin.
+  // Only prune when the live catalogue answered — never against the offline copy.
+  if (typeof GFLO !== "undefined" && GFLO.live && typeof State !== "undefined"){
+    const before = State.cart.length;
+    State.cart = State.cart.filter(i => i && DB.prodMap[i.sku]);
+    if (State.cart.length !== before) U.store.set("cart", State.cart);
+  }
   // derive each category's part families from the real catalog
   CATS.forEach(c => {
     const counts = {};
@@ -102,6 +138,11 @@ const State = {
   inCart(sku){ return this.cart.find(i => i.sku === sku); },
   addCart(sku, qty, silent){
     const p = DB.prodMap[sku]; if (!p) return;
+    if (p.variants && p.variants.length){           // must pick a size first
+      if (!silent) toast("Please choose a size", "info");
+      if (Router.parse().page !== "product") Router.push("/p/" + p.sku);
+      return;
+    }
     if (p.stock === 0){ toast("This part is out of stock", "warn"); return; }
     const it = this.inCart(sku);
     if (it) it.qty = U.clamp(it.qty + (qty || 1), 1, 99); else this.cart.push({ sku, qty: qty || 1 });

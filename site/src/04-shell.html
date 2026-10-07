@@ -16,7 +16,8 @@ function priceHtml(p, big){
   if (p.price === null || p.price === undefined)
     return `<div class="price-ln"><span class="price price-por">${window.POR_LABEL || "Price on request"}</span></div>`;
   const unit = p.unit && p.unit !== "piece" ? `<span class="unit-ln">/ ${U.esc(p.unit)}</span>` : "";
-  return `<div class="price-ln"><span class="price">${U.inr(p.price)}</span>${unit}${p.off ? `<span class="mrp">${U.inr(p.mrp)}</span><span class="off">${p.off}% off</span>` : ""}</div>`;
+  const from = p.fromPrice ? `<span class="from-ln">From</span>` : "";
+  return `<div class="price-ln">${from}<span class="price">${U.inr(p.price)}</span>${unit}${p.off ? `<span class="mrp">${U.inr(p.mrp)}</span><span class="off">${p.off}% off</span>` : ""}</div>`;
 }
 function stockHtml(p){
   if (p.stock === 0) return `<span class="stock-ln s-out">Out of stock</span>`;
