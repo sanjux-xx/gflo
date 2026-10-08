@@ -97,7 +97,9 @@ function cleanCatalog(v, key){
   if (v === null || v === undefined || typeof v === "number" || typeof v === "boolean") return v;
   if (Array.isArray(v)){
     if (URL_LIST_KEYS.has(key)) return v.map(SAFE_URL).filter(Boolean);
-    if (key === "brands") return v.map(SAFE_ID);
+    /* a product's "brands" is a list of brand ids; the catalogue's top-level
+       "brands" is a list of brand objects — only the ids are cleaned as ids */
+    if (key === "brands") return v.map(x => (x && typeof x === "object") ? cleanCatalog(x, "") : SAFE_ID(x));
     return v.map(x => cleanCatalog(x, key));
   }
   if (typeof v === "object"){
