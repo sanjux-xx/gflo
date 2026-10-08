@@ -1,5 +1,5 @@
 """Admin website: login, dashboard, product CRUD, categories, brands, import, settings."""
-import csv, io, math, os
+import csv, io, math, os, re
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Request, UploadFile, File
@@ -1003,6 +1003,9 @@ async def import_csv(request: Request, file: UploadFile = File(...),
         if p is None:
             if mode != "create":
                 skipped += 1
+                continue
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", sku):
+                problems.append(f"row {i}: product code '{sku[:40]}' may only use letters, numbers, - . _")
                 continue
             cat = (row.get("category_id") or "").strip()
             if not db.get(Category, cat):

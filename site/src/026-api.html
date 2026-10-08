@@ -68,14 +68,46 @@ function applySettings(s, showPrices){
   GFLO.settings = s || {};
   if (typeof showPrices === "boolean") CATALOG_MODE = !showPrices;
   if (s && typeof CONTACT === "object" && CONTACT){
-    if (s.contact_email) CONTACT.email = s.contact_email;
-    if (s.contact_phone) CONTACT.phone = s.contact_phone;
-    if (s.contact_phone2) CONTACT.phone2 = s.contact_phone2;
-    if (s.contact_address) CONTACT.address = s.contact_address;
-    if (s.whatsapp) CONTACT.whatsapp = s.whatsapp;
-    if (s.por_label) window.POR_LABEL = s.por_label;
-    if (s.price_note) window.PRICE_NOTE = s.price_note;
+    /* These are dropped straight into page HTML (footer, support page, price
+       labels), so make them safe text here, once, before anything uses them. */
+    const t = v => U.esc(String(v).slice(0, 300));
+    if (s.contact_email) CONTACT.email = t(s.contact_email);
+    if (s.contact_phone) CONTACT.phone = t(s.contact_phone);
+    if (s.contact_phone2) CONTACT.phone2 = t(s.contact_phone2);
+    if (s.contact_address) CONTACT.address = t(s.contact_address);
+    if (s.whatsapp) CONTACT.whatsapp = t(s.whatsapp);
+    if (s.por_label) window.POR_LABEL = t(s.por_label);
+    if (s.price_note) window.PRICE_NOTE = t(s.price_note);
   }
+}
+
+/* Everything in the catalogue is typed by staff or imported from a spreadsheet,
+   and the pages drop it straight into HTML. So clean it ONCE, here, as it
+   arrives: no text value can carry markup (< > " ' become look-alike
+   typographic characters, so 5" Blade still reads 5″ Blade), codes are limited
+   to safe characters and photo links must be real photo addresses. */
+const SAFE_ID = v => String(v ?? "").replace(/[^A-Za-z0-9~._-]/g, "-").slice(0, 120);
+const SAFE_URL = v => { const u = String(v ?? "").trim();
+  return (/^(\/(?!\/)|https:\/\/)[^\s"'<>`\\]*$/.test(u) && u.length < 600) ? u : ""; };
+const SAFE_TXT = v => String(v ?? "").replace(/</g, "‹").replace(/>/g, "›").replace(/"/g, "″").replace(/'/g, "’").replace(/`/g, "ʼ");
+const ID_KEYS = new Set(["sku", "id", "cat", "pt", "code", "icon", "parent"]);
+const URL_KEYS = new Set(["img", "image", "image_url", "imgMobile"]);
+const URL_LIST_KEYS = new Set(["imgs", "gallery", "images"]);
+function cleanCatalog(v, key){
+  if (v === null || v === undefined || typeof v === "number" || typeof v === "boolean") return v;
+  if (Array.isArray(v)){
+    if (URL_LIST_KEYS.has(key)) return v.map(SAFE_URL).filter(Boolean);
+    if (key === "brands") return v.map(SAFE_ID);
+    return v.map(x => cleanCatalog(x, key));
+  }
+  if (typeof v === "object"){
+    const out = {};
+    Object.keys(v).forEach(k => { out[k] = cleanCatalog(v[k], k); });
+    return out;
+  }
+  if (ID_KEYS.has(key)) return SAFE_ID(v);
+  if (URL_KEYS.has(key)) return SAFE_URL(v);
+  return SAFE_TXT(v);
 }
 
 async function loadCatalog(){
@@ -84,7 +116,7 @@ async function loadCatalog(){
   // set window.GFLO_PRELOAD to the same JSON that /api/catalog returns. Handy for
   // static hosting and offline previews. The admin panel still needs the backend.
   if (typeof window !== "undefined" && window.GFLO_PRELOAD){
-    data = window.GFLO_PRELOAD;
+    data = cleanCatalog(window.GFLO_PRELOAD, "");
     console.info("[G-FLO] snapshot catalogue embedded in the page");
   } else try {
     const ctrl = typeof AbortController === "function" ? new AbortController() : null;
@@ -93,7 +125,7 @@ async function loadCatalog(){
                             { headers: { "Accept": "application/json" }, signal: ctrl && ctrl.signal });
     if (timer) clearTimeout(timer);
     if (!res.ok) throw new Error("API returned " + res.status);
-    data = await res.json();
+    data = cleanCatalog(await res.json(), "");
     if (!data || !Array.isArray(data.products) || !data.products.length)
       throw new Error("API returned an empty catalogue");
   } catch (err){

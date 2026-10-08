@@ -158,19 +158,15 @@ def _check_rate_ok(ip: str, limit: int = 0, window: int = 600) -> bool:
 
 @public_router.post("/coupons/check")
 async def coupon_check(request: Request, db: Session = Depends(get_db)):
-    from .orders import cart_subtotal                     # late import: orders imports us
-    if "application/json" not in (request.headers.get("content-type") or "").lower():
-        return JSONResponse({"ok": False, "error": "Invalid request."}, 415)
-    try:
-        data = await request.json()
-        assert isinstance(data, dict)
-    except Exception:
-        return JSONResponse({"ok": False, "error": "Invalid request."}, 400)
+    from .orders import cart_subtotal, read_json, _text  # late import: orders imports us
+    data, bad = await read_json(request)
+    if bad:
+        return bad
     if not _check_rate_ok("ip:" + sec.client_ip(request)):
         return JSONResponse({"ok": False, "error": "Too many tries. Please wait a few minutes."}, 429)
     sub = cart_subtotal(db, data.get("items"))
-    phone = re.sub(r"\D", "", str(data.get("phone") or ""))[-10:]
-    c, disc, free_ship, err = evaluate(db, str(data.get("code") or ""), sub, phone)
+    phone = re.sub(r"\D", "", _text(data.get("phone")))[-10:]
+    c, disc, free_ship, err = evaluate(db, _text(data.get("code")), sub, phone)
     if err or not c:
         return JSONResponse({"ok": False, "error": err or "Enter a coupon code."}, 200)
     return {"ok": True, **public_info(c, disc, free_ship)}

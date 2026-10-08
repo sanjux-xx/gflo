@@ -142,16 +142,51 @@ def _clean(v, n):
     return " ".join(str(v or "").split())[:n]
 
 
+MAX_BODY = 64_000
+NO_STORE = {"Cache-Control": "no-store"}
+
+
+async def read_json(request: Request):
+    """(data, error_response). Reads at most MAX_BODY bytes however the body is
+    sent (a chunked upload has no Content-Length to check), and never lets odd
+    JSON (very deep nesting, wrong types) turn into a server error."""
+    if "application/json" not in (request.headers.get("content-type") or "").lower():
+        return None, JSONResponse({"ok": False, "error": "Invalid request."}, 415)
+    try:
+        if int(request.headers.get("content-length") or 0) > MAX_BODY:
+            return None, JSONResponse({"ok": False, "error": "Request too large."}, 413)
+    except ValueError:
+        return None, JSONResponse({"ok": False, "error": "Invalid request."}, 400)
+    buf = bytearray()
+    async for chunk in request.stream():
+        buf += chunk
+        if len(buf) > MAX_BODY:
+            return None, JSONResponse({"ok": False, "error": "Request too large."}, 413)
+    try:
+        data = json.loads(bytes(buf))
+    except (ValueError, RecursionError):
+        return None, JSONResponse({"ok": False, "error": "Invalid request."}, 400)
+    if not isinstance(data, dict):
+        return None, JSONResponse({"ok": False, "error": "Invalid request."}, 400)
+    return data, None
+
+
+def _text(v) -> str:
+    """Only plain text / numbers count as text; objects and lists become ""."""
+    return str(v) if isinstance(v, (str, int, float)) and not isinstance(v, bool) else ""
+
+
 def price_cart(db: Session, raw_items):
     """Server-side pricing of a cart: (lines, subtotal, quote_count, problems)."""
     merged = {}
     for it in (raw_items if isinstance(raw_items, list) else [])[:MAX_LINES]:
         if not isinstance(it, dict):
             continue
-        sku = str(it.get("sku") or "")[:120]
+        sku = _text(it.get("sku"))[:120]
+        raw_q = it.get("qty")
         try:
-            q = int(it.get("qty") or 0)
-        except (TypeError, ValueError):
+            q = int(raw_q) if isinstance(raw_q, (int, float, str)) and not isinstance(raw_q, bool) else 0
+        except (TypeError, ValueError, OverflowError):
             q = 0
         if sku and 0 < q:
             merged[sku] = min(MAX_QTY, merged.get(sku, 0) + q)
@@ -164,6 +199,9 @@ def price_cart(db: Session, raw_items):
         p, size, price = r
         if (p.stock or 0) <= 0:
             problems.append(f"“{p.name}” is out of stock.")
+            continue
+        if q > p.stock:
+            problems.append(f"Only {p.stock} of “{p.name}” left in stock.")
             continue
         line = None if price is None else round(price * q, 2)
         if line is None:
@@ -183,20 +221,13 @@ def cart_subtotal(db: Session, raw_items) -> float:
 async def place_order(request: Request, db: Session = Depends(get_db)):
     # JSON only: a plain cross-site <form> can't send application/json, so other
     # websites can't submit orders on a visitor's behalf.
-    if "application/json" not in (request.headers.get("content-type") or "").lower():
-        return JSONResponse({"ok": False, "error": "Invalid request."}, 415)
-    if int(request.headers.get("content-length") or 0) > 64_000:
-        return JSONResponse({"ok": False, "error": "Request too large."}, 413)
-    try:
-        data = await request.json()
-    except Exception:
-        return JSONResponse({"ok": False, "error": "Invalid request."}, 400)
-    if not isinstance(data, dict):
-        return JSONResponse({"ok": False, "error": "Invalid request."}, 400)
-    name, phone = _clean(data.get("name"), 80), re.sub(r"\D", "", str(data.get("phone") or ""))[-10:]
-    addr, city = _clean(data.get("address"), 300), _clean(data.get("city"), 60)
-    state = _clean(data.get("state"), 60)
-    pin = re.sub(r"\D", "", str(data.get("pincode") or ""))
+    data, bad = await read_json(request)
+    if bad:
+        return bad
+    name, phone = _clean(_text(data.get("name")), 80), re.sub(r"\D", "", _text(data.get("phone")))[-10:]
+    addr, city = _clean(_text(data.get("address")), 300), _clean(_text(data.get("city")), 60)
+    state = _clean(_text(data.get("state")), 60)
+    pin = re.sub(r"\D", "", _text(data.get("pincode")))
     if len(name) < 2:
         return JSONResponse({"ok": False, "error": "Please enter your name."}, 400)
     if not re.fullmatch(r"[6-9]\d{9}", phone):
@@ -212,7 +243,8 @@ async def place_order(request: Request, db: Session = Depends(get_db)):
     city = f"{city}, {state}"
     if not re.fullmatch(r"\d{6}", pin):
         return JSONResponse({"ok": False, "error": "Please enter a valid 6-digit pincode."}, 400)
-    ship = data.get("ship") if data.get("ship") in SHIP else "std"
+    ship = _text(data.get("ship"))
+    ship = ship if ship in SHIP else "std"
     raw_items = data.get("items")
     if not isinstance(raw_items, list) or not raw_items:
         return JSONResponse({"ok": False, "error": "Your cart is empty."}, 400)
@@ -225,7 +257,7 @@ async def place_order(request: Request, db: Session = Depends(get_db)):
     if not lines:
         return JSONResponse({"ok": False, "error": "Your cart is empty."}, 400)
 
-    code = _clean(data.get("coupon"), 24).upper()
+    code = _clean(_text(data.get("coupon")), 24).upper()
     free_ship, disc = False, 0.0
     if code:
         cpn, disc, free_ship, cerr = evaluate(db, code, sub, phone)
@@ -274,7 +306,7 @@ def order_track(request: Request, number: str, phone: str = "", db: Session = De
         while q and now - q[0] > 600:
             q.popleft()
         if len(q) >= 300:
-            return JSONResponse({"ok": False, "error": "Too many requests."}, 429)
+            return JSONResponse({"ok": False, "error": "Too many requests."}, 429, headers=NO_STORE)
         q.append(now)
         if len(_track_hits) > 5000:                     # forget idle visitors
             for k in [k for k, v in _track_hits.items() if not v or now - v[-1] > 600]:
@@ -298,7 +330,7 @@ _LOOKUP_IP, _LOOKUP_PHONE = 20, 10        # per 10 minutes
 def order_lookup(request: Request, phone: str = "", db: Session = Depends(get_db)):
     ph = re.sub(r"\D", "", phone or "")[-10:]
     if not re.fullmatch(r"[6-9]\d{9}", ph):
-        return JSONResponse({"ok": False, "error": "Enter the 10-digit mobile number you ordered with."}, 400)
+        return JSONResponse({"ok": False, "error": "Enter the 10-digit mobile number you ordered with."}, 400, headers=NO_STORE)
     now = time.time()
     with _lock:
         for key, lim in (("lk-ip:" + sec.client_ip(request), _LOOKUP_IP), ("lk-ph:" + ph, _LOOKUP_PHONE)):
@@ -306,7 +338,7 @@ def order_lookup(request: Request, phone: str = "", db: Session = Depends(get_db
             while q and now - q[0] > 600:
                 q.popleft()
             if len(q) >= lim:
-                return JSONResponse({"ok": False, "error": "Too many searches. Please try again in a few minutes, or call us."}, 429)
+                return JSONResponse({"ok": False, "error": "Too many searches. Please try again in a few minutes, or call us."}, 429, headers=NO_STORE)
         for key in ("lk-ip:" + sec.client_ip(request), "lk-ph:" + ph):
             _track_hits[key].append(now)
     rows = db.query(Order).filter(Order.phone == ph).order_by(Order.id.desc()).limit(20).all()

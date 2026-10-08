@@ -51,13 +51,21 @@ ADMIN_HOST = (os.environ.get("ADMIN_HOST") or "").split(":")[0].strip().lower()
 SITE_HOST = (os.environ.get("SITE_HOST") or "").split(":")[0].strip().lower()
 STORE_HOST = (os.environ.get("STORE_HOST") or "").split(":")[0].strip().lower()
 
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def _lifespan(_app):
+    startup()          # create tables, add new columns, first admin, coupon examples
+    yield
+
+
 app = FastAPI(title="G-FLO Store",
               docs_url="/api/docs" if ENABLE_DOCS else None,
               openapi_url="/openapi.json" if ENABLE_DOCS else None,
-              redoc_url=None)
+              redoc_url=None, lifespan=_lifespan)
 
 
-@app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
     try:
@@ -163,6 +171,15 @@ async def security_middleware(request: Request, call_next):
             "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; "
             "script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         response.headers.setdefault("Cache-Control", "no-store")
+    else:
+        # shop pages: other sites may not show them in a frame (clickjacking),
+        # no plugins, no <base> hijack. Scripts aren't restricted here because
+        # the storefront is one self-contained page with inline code.
+        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        response.headers.setdefault(
+            "Content-Security-Policy", "frame-ancestors 'self'; base-uri 'self'; object-src 'none'")
+        response.headers.setdefault("Permissions-Policy",
+                                    "camera=(self), microphone=(self), geolocation=(), payment=(), usb=()")
     if path.startswith("/media"):
         response.headers.setdefault("Content-Disposition", "inline")
     if sec.COOKIE_SECURE_ALWAYS or request.headers.get("x-forwarded-proto") == "https" \
