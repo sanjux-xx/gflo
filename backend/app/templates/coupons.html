@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Coupons{% endblock %}
+{% block body %}
+<style>
+  .cp-card{margin:0 0 16px}
+  .cp-master{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  .cp-master form{margin-left:auto}
+  .cp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 22px;align-items:start}
+  .cp-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px;padding-top:16px;border-top:1px solid var(--line,#e7eaf0)}
+  .cp-tbl .bdg{white-space:nowrap}
+  .cp-tbl .rowacts{opacity:1;flex-wrap:nowrap;justify-content:flex-end}
+  .cp-tbl th,.cp-tbl td{vertical-align:middle}
+  .cp-tbl td:nth-child(2){min-width:220px}
+  .cp-tbl td:nth-child(3){white-space:nowrap}
+  .cp-tbl td:last-child{width:1%;white-space:nowrap}
+  .cp-tbl .rowacts form{margin:0}
+  .cp-code{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:800;font-size:14.5px;letter-spacing:.03em}
+  @media (max-width:900px){ .cp-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} }
+  @media (max-width:560px){
+    .cp-grid{grid-template-columns:minmax(0,1fr)}
+    .cp-master form, .cp-master form .btn{width:100%;margin-left:0}
+  }
+  @media (max-width:720px){
+    .cp-tbl thead{display:none}
+    .cp-tbl, .cp-tbl tbody{display:block;width:100%}
+    .cp-tbl tr{display:block;padding:14px 16px;border-bottom:1px solid var(--line,#e7eaf0)}
+    .cp-tbl td{display:block;padding:2px 0 !important;border:0 !important;background:none !important}
+    .cp-tbl .rowacts{justify-content:flex-start;margin-top:8px;max-width:none;flex-wrap:nowrap;gap:8px}
+    .tbl.cp-tbl .rowacts .btn{font-size:13.5px;height:38px;padding:0 14px;gap:6px}
+    .tbl.cp-tbl .rowacts form:last-child{margin-left:auto}
+    .cp-tbl td.r{text-align:left}
+    .cp-used::before{content:"Used: "}
+  }
+  #c-code::placeholder{text-transform:none}
+</style>
+
+<div class="ph">
+  <div>
+    <h1>Coupons</h1>
+    <p class="ph-sub">Create discount codes for festivals and offers. Customers type the code in their cart;
+       the discount is checked again when the order is placed. Today in the shop's time zone is <b>{{ today }}</b>.</p>
+  </div>
+</div>
+
+<div class="card cp-card" style="border:2px solid {{ '#16a34a' if master_on else '#dc2626' }}">
+  <div class="card-b cp-master">
+    <div>
+      <div class="lbl" style="margin:0">Coupons on the website</div>
+      <div style="font-size:24px;font-weight:800;margin-top:2px;color:{{ '#15803d' if master_on else '#b91c1c' }}">
+        {{ 'ON' if master_on else 'OFF' }}</div>
+      <div class="mut" style="font-size:13px;margin-top:2px">
+        {% if master_on %}The coupon box shows in the cart and coupons marked Live below work.
+        {% else %}The coupon box is hidden in the cart and no code works, even ones switched on below.{% endif %}
+      </div>
+    </div>
+    <form method="post" action="/admin/coupons/master">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="state" value="{{ 'off' if master_on else 'on' }}">
+      <button class="btn {{ '' if master_on else 'btn-p' }}" type="submit"
+              style="min-width:190px;height:46px;font-size:15px;font-weight:700;{{ 'border-color:#dc2626;color:#b91c1c' if master_on else '' }}">
+        {{ icon('eye-off' if master_on else 'eye', 17) }} {{ 'Turn coupons OFF' if master_on else 'Turn coupons ON' }}
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="card cp-card" id="coupon-form">
+  <div class="card-h">{{ icon('edit' if edit else 'plus', 17) }}<h2>{{ 'Edit coupon ' ~ edit.code if edit else 'Create a coupon' }}</h2></div>
+  <form class="card-b" method="post" data-busy
+        action="{{ '/admin/coupons/%d/edit' % edit.id if edit else '/admin/coupons/new' }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="cp-grid">
+      <div class="field">
+        <label class="lbl" for="c-code">Coupon code <span class="req">*</span></label>
+        <input class="inp mono" id="c-code" name="code" required maxlength="24" autocomplete="off"
+               style="text-transform:uppercase" value="{{ edit.code if edit else '' }}" placeholder="e.g. DIWALI10">
+        <span class="help">Letters and numbers, no spaces. Customers type this.</span>
+      </div>
+      <div class="field">
+        <label class="lbl" for="c-kind">Type of discount</label>
+        <select class="sel" id="c-kind" name="kind">
+          {% for k, label in kinds.items() %}
+            <option value="{{ k }}" {{ 'selected' if (edit and edit.kind == k) or (not edit and k == 'pct') }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <span class="help">Free delivery removes the ₹99 delivery charge.</span>
+      </div>
+      <div class="field">
+        <label class="lbl" for="c-value">Discount amount</label>
+        <input class="inp" id="c-value" name="value" inputmode="decimal" maxlength="10"
+               value="{{ '%g' % edit.value if edit and edit.value else '' }}" placeholder="10 for 10%, or 100 for ₹100">
+        <span class="help">Leave empty for Free delivery.</span>
+      </div>
+      <div class="field">
+        <label class="lbl" for="c-min">Minimum order (₹)</label>
+        <input class="inp" id="c-min" name="min_order" inputmode="decimal" maxlength="10"
+               value="{{ '%g' % edit.min_order if edit and edit.min_order else '' }}" placeholder="e.g. 999">
+        <span class="help">Blank = any order.</span>
+      </div>
+      <div class="field">
+        <label class="lbl" for="c-max">Maximum discount (₹) — for % coupons</label>
+        <input class="inp" id="c-max" name="max_discount" inputmode="decimal" maxlength="10"
+               value="{{ '%g' % edit.max_discount if edit and edit.max_discount else '' }}" placeholder="e.g. 500">
+        <span class="help">“10% off, up to ₹500”. Blank = no cap.</span>
+      </div>
+      <div class="field">
+        <label class="lbl" for="c-limit">Usage limit (orders)</label>
+        <input class="inp" id="c-limit" name="usage_limit" inputmode="numeric" maxlength="7"
+               value="{{ edit.usage_limit if edit and edit.usage_limit else '' }}" placeholder="e.g. 50">
+        <span class="help">Stops after this many orders. Blank = unlimited.</span>
+      </div>
+      <div class="field">
+        <label class="lbl" for="c-start">Start date</label>
+        <input class="inp" id="c-start" name="starts_on" type="date"
+               value="{{ edit.starts_on.isoformat() if edit and edit.starts_on else '' }}">
+        <span class="help">Blank = from now.</span>
+      </div>
+      <div class="field">
+        <label class="lbl" for="c-end">End date</label>
+        <input class="inp" id="c-end" name="ends_on" type="date"
+               value="{{ edit.ends_on.isoformat() if edit and edit.ends_on else '' }}">
+        <span class="help">Last day it works. Blank = no end.</span>
+      </div>
+      <div class="field">
+        <label class="lbl" for="c-note">Note (only you see it)</label>
+        <input class="inp" id="c-note" name="note" maxlength="200"
+               value="{{ edit.note if edit else '' }}" placeholder="e.g. Diwali WhatsApp offer">
+      </div>
+    </div>
+    <div style="display:flex;gap:22px;flex-wrap:wrap;margin-top:16px">
+      <label class="sw"><input type="checkbox" name="once_per_phone" {{ 'checked' if edit and edit.once_per_phone }}>
+        <span class="track"></span><span class="sw-txt">One use per mobile number</span></label>
+      <label class="sw"><input type="checkbox" name="active" {{ 'checked' if (not edit) or edit.active }}>
+        <span class="track"></span><span class="sw-txt">Switched on</span></label>
+    </div>
+    <div class="cp-actions">
+      <button class="btn btn-p" type="submit">{{ icon('save', 15) }} {{ 'Save coupon' if edit else 'Create coupon' }}</button>
+      {% if edit %}<a class="btn" href="/admin/coupons">Cancel</a>{% endif %}
+    </div>
+  </form>
+</div>
+
+<div class="card cp-card">
+  <div class="card-h">{{ icon('percent', 17) }}<h2>Your coupons</h2></div>
+  {% if rows %}
+  <div class="tblwrap">
+    <table class="tbl cp-tbl" style="min-width:0">
+      <thead><tr><th>Code</th><th>Discount</th><th>Dates</th><th class="r">Used</th><th>Status</th><th class="r"></th></tr></thead>
+      <tbody>
+      {% set badge = {'live':'bdg-ok','scheduled':'bdg-info','expired':'bdg-mute','used up':'bdg-warn','off':'bdg-mute'} %}
+      {% for c in rows %}{% set st = status[c.id] %}
+        <tr>
+          <td><span class="cp-code">{{ c.code }}</span>{% if c.note %}<div class="pmeta">{{ c.note }}</div>{% endif %}</td>
+          <td>{{ describe(c) }}{% if c.once_per_phone %}<div class="pmeta">One use per mobile number</div>{% endif %}</td>
+          <td class="pmeta" style="margin:0">
+            {% if c.starts_on or c.ends_on %}{{ c.starts_on.strftime('%d %b') if c.starts_on else 'Now' }} → {{ c.ends_on.strftime('%d %b %Y') if c.ends_on else 'no end' }}
+            {% else %}Always{% endif %}</td>
+          <td class="r cp-used">{{ used[c.id] }}{% if c.usage_limit %} / {{ c.usage_limit }}{% endif %}</td>
+          <td><span class="bdg {{ 'bdg-warn' if st == 'live' and not master_on else badge.get(st, 'bdg-mute') }}">{{ 'Live' if st == 'live' and master_on else ('Ready — coupons are OFF' if st == 'live' else st|capitalize) }}</span></td>
+          <td>
+            <div class="rowacts">
+              <a class="btn btn-xs" href="/admin/coupons/{{ c.id }}/edit#coupon-form">{{ icon('edit', 13) }} Edit</a>
+              <form method="post" action="/admin/coupons/{{ c.id }}/toggle">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button class="btn btn-xs" type="submit">{{ 'Switch off' if c.active else 'Switch on' }}</button>
+              </form>
+              <form method="post" action="/admin/coupons/{{ c.id }}/delete" data-confirm="Delete coupon {{ c.code }}?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button class="btn btn-xs btn-ic btn-danger" type="submit" aria-label="Delete {{ c.code }}">{{ icon('trash', 13) }}</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-b"><p class="mut">No coupons yet. Create one above.</p></div>
+  {% endif %}
+</div>
+{% endblock %}

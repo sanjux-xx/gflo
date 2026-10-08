@@ -56,6 +56,7 @@ def catalog(db: Session = Depends(get_db)):
         "version": 1,
         "settings": {k: get_setting(db, k, "") for k in PUBLIC_SETTING_KEYS},
         "showPrices": show_prices,
+        "couponsEnabled": show_prices and get_setting(db, "coupons_enabled", "false") == "true",
         "categories": [{
             "id": c.id, "name": c.name, "code": c.code, "hue": c.hue,
             "desc": c.description, "popular": bool(c.popular),

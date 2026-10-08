@@ -116,6 +116,11 @@ ICON_PATHS = {
     "package": '<path d="M21 16V8a2 2 0 00-1-1.7l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.7l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.3 7L12 12l8.7-5M12 22V12"/>',
     "sliders": '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
     "list": '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+    "percent": '<path d="M19 5L5 19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+    "bell": '<path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/>',
+    "phone": '<path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012.1 4.2 2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.4 1.8.7 2.7a2 2 0 01-.5 2.1L8 9.8a16 16 0 006 6l1.3-1.3a2 2 0 012.1-.4c.9.3 1.8.6 2.7.7a2 2 0 011.7 2z"/>',
+    "chat": '<path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.6 8.6 0 01-4-1L3 20l1.1-4.6A8.4 8.4 0 1121 11.5z"/>',
+    "print": '<path d="M6 9V2h12v7"/><rect x="6" y="14" width="12" height="8"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>',
 }
 
 
@@ -157,7 +162,16 @@ def sidebar_counts(db: Session) -> dict:
         "no_price": db.query(Product).filter(Product.price == None).count(),      # noqa: E711
         "out_of_stock": db.query(Product).filter(Product.stock <= 0).count(),
         "hidden": db.query(Product).filter(Product.visible == False).count(),     # noqa: E712
+        "new_orders": _unseen_orders(db),
     }
+
+
+def _unseen_orders(db) -> int:
+    try:
+        from .models import Order
+        return db.query(Order).filter(Order.seen == False).count()               # noqa: E712
+    except Exception:
+        return 0
 
 
 def render(request: Request, template: str, **ctx) -> HTMLResponse:

@@ -541,3 +541,11 @@ tr:hover .rowacts,.rowacts:focus-within{opacity:1}
   .tbl td,.tbl th{padding:10px}
 }
 @media print{.side,.top,.bulk,.toasts,.savebar{display:none!important}.main{margin:0}}
+[hidden]{display:none!important}
+
+/* dark sidebar colour runs the full height of long pages (also in full-page screenshots / prints to PDF) */
+@media (min-width:1001px){
+  .app{--fill-w:var(--side-w);background:linear-gradient(to right,var(--side) 0,var(--side) var(--fill-w),transparent var(--fill-w))}
+  .side{height:100vh;height:100dvh}
+}
+@media (min-width:1001px) and (max-width:1500px){ .app{--fill-w:228px} }

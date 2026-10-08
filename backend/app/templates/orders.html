@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Orders{% endblock %}
+{% block body %}
+<style>@media (max-width:640px){.hide-sm{display:none}.ord-tbl td,.ord-tbl th{padding-left:8px;padding-right:8px}}</style>
+{% set badge = {'new':'bdg-err','confirmed':'bdg-info','packed':'bdg-warn','shipped':'bdg-info','delivered':'bdg-ok','cancelled':'bdg-mute'} %}
+<div class="ph">
+  <div>
+    <h1>Orders</h1>
+    <p class="ph-sub">Orders placed on the website. New orders are highlighted — open one to see the full invoice.</p>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+    <button class="btn btn-sm" type="button" id="notify-enable" hidden>{{ icon('bell', 14) }} Turn on order alerts</button>
+    <span class="mut" id="notify-state" style="font-size:12.5px"></span>
+  </div>
+</div>
+
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+  <a class="btn btn-sm {{ 'btn-p' if not status }}" href="/admin/orders">All</a>
+  {% for k, label in statuses.items() %}
+    <a class="btn btn-sm {{ 'btn-p' if status == k }}" href="/admin/orders?status={{ k }}">{{ label }}
+      {% if scounts.get(k) %}<span class="mut" style="margin-left:4px">{{ scounts.get(k) }}</span>{% endif %}</a>
+  {% endfor %}
+</div>
+
+<div class="card" style="margin:0">
+  {% if rows %}
+  <div class="tblwrap">
+    <table class="tbl ord-tbl" style="min-width:0">
+      <thead><tr><th>Order</th><th>Customer</th><th class="r hide-sm">Items</th><th class="r">Total</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for r in rows %}{% set o = r.o %}
+        <tr style="{{ 'background:#fff7f7;font-weight:600' if not o.seen }}">
+          <td><a href="/admin/orders/{{ o.id }}"><b class="mono">{{ o.number }}</b></a>
+            {% if not o.seen %}<span class="bdg bdg-err" style="margin-left:6px">NEW</span>{% endif %}
+            <div class="pmeta">{{ shop_time(o.created_at) }}</div></td>
+          <td>{{ o.customer_name }}<div class="pmeta">{{ o.phone }} · {{ o.city }}</div></td>
+          <td class="r hide-sm">{{ r['items']|length }}</td>
+          <td class="r"><b>{{ money(o.total) }}</b>{% if o.quote_items %}<div class="pmeta">+ {{ o.quote_items }} on request</div>{% endif %}</td>
+          <td><span class="bdg {{ badge.get(o.status, 'bdg-mute') }}">{{ r.status }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-b"><p class="mut">No orders {{ 'with this status ' if status }}yet. When a customer places an order on the website it appears here, and you get an alert.</p></div>
+  {% endif %}
+</div>
+{% if pages > 1 %}
+<div style="display:flex;gap:8px;margin-top:14px">
+  {% if page > 1 %}<a class="btn btn-sm" href="?status={{ status }}&page={{ page-1 }}">← Newer</a>{% endif %}
+  <span class="mut" style="align-self:center">Page {{ page }} of {{ pages }}</span>
+  {% if page < pages %}<a class="btn btn-sm" href="?status={{ status }}&page={{ page+1 }}">Older →</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

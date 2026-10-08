@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Order {{ o.number }}{% endblock %}
+{% block body %}
+<style>
+  .inv{max-width:860px}
+  .inv-h{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .inv-tbl td,.inv-tbl th{padding:9px 10px;border-bottom:1px solid var(--line-2,#eef0f3);font-size:13.5px;text-align:left}
+  .inv-tbl .r{text-align:right}
+  .inv-tot{margin-left:auto;max-width:320px;display:grid;gap:6px;margin-top:14px}
+  .inv-tot div{display:flex;justify-content:space-between}
+  .inv-tot .big{font-size:18px;font-weight:800;border-top:2px solid #111;padding-top:8px}
+  @media print{ .no-print, .alert{display:none!important} .content{padding:0!important} .card{box-shadow:none;border:0} }
+</style>
+<div class="ph no-print">
+  <div><a href="/admin/orders" class="mut">← All orders</a><h1 style="margin-top:6px">Order {{ o.number }}</h1></div>
+  <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+    <a class="btn btn-sm" href="tel:+91{{ o.phone }}">{{ icon('phone', 14) }} Call</a>
+    <a class="btn btn-sm" target="_blank" rel="noopener" href="https://wa.me/91{{ o.phone }}">{{ icon('chat', 14) }} WhatsApp customer</a>
+    <button class="btn btn-sm btn-p" type="button" data-print>{{ icon('print', 14) }} Print / save PDF</button>
+  </div>
+</div>
+
+<div class="card inv" style="margin:0 0 16px">
+  <div class="card-b">
+    <div class="inv-h">
+      <div>
+        <div style="font-size:22px;font-weight:800">{{ store_name }}</div>
+        <div class="mut" style="font-size:13px">Order / invoice</div>
+      </div>
+      <div style="text-align:right;font-size:13.5px">
+        <div><b class="mono">{{ o.number }}</b></div>
+        <div class="mut">{{ shop_time(o.created_at) }}</div>
+        <div style="margin-top:4px"><span class="bdg bdg-info">{{ status }}</span></div>
+      </div>
+    </div>
+    <div class="grid-2" style="grid-template-columns:1fr 1fr;margin-top:16px;gap:16px">
+      <div><div class="lbl">Customer</div>
+        <b>{{ o.customer_name }}</b><br>{{ o.phone }}<br>{{ o.address }}<br>{{ o.city }} — {{ o.pincode }}</div>
+      <div><div class="lbl">Delivery</div>
+        {{ ship }}<br><span class="mut">Payment: arrange with the customer</span>{% if o.coupon %}<br>Coupon: <b>{{ o.coupon }}</b>{% endif %}</div>
+    </div>
+    <table class="inv-tbl" style="width:100%;border-collapse:collapse;margin-top:18px">
+      <thead><tr><th>#</th><th>Item</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead>
+      <tbody>
+      {% for it in items %}
+        <tr><td>{{ loop.index }}</td>
+          <td><b>{{ it.name }}</b>{% if it.size %} — {{ it.size }}{% endif %}
+            <div class="pmeta mono">{{ it.sku }}</div></td>
+          <td class="r">{{ it.qty }}{% if it.unit and it.unit != 'piece' %} × {{ it.unit }}{% endif %}</td>
+          <td class="r">{{ money(it.price) if it.price is not none else 'On request' }}</td>
+          <td class="r">{{ money(it.line) if it.line is not none else 'On request' }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="inv-tot">
+      <div><span>Subtotal</span><span>{{ money(o.subtotal) }}</span></div>
+      {% if o.discount %}<div><span>Discount</span><span>−{{ money(o.discount) }}</span></div>{% endif %}
+      <div><span>Delivery</span><span>{{ money(o.shipping) if o.shipping else 'FREE' }}</span></div>
+      <div class="big"><span>Total</span><span>{{ money(o.total) }}</span></div>
+      {% if o.quote_items %}<div class="mut" style="font-size:12px">+ {{ o.quote_items }} item(s) price on request — confirm with the customer.</div>{% endif %}
+      <div class="mut" style="font-size:12px">Prices inclusive of GST.</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2 no-print inv" style="grid-template-columns:1fr 1fr;gap:16px">
+  <form class="card" style="margin:0" method="post" action="/admin/orders/{{ o.id }}/status">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="card-h"><h2>Status</h2></div>
+    <div class="card-b" style="display:flex;gap:8px;flex-wrap:wrap">
+      {% for k, label in statuses.items() %}
+        <button class="btn btn-sm {{ 'btn-p' if o.status == k }}" name="status" value="{{ k }}">{{ label }}</button>
+      {% endfor %}
+    </div>
+  </form>
+  <form class="card" style="margin:0" method="post" action="/admin/orders/{{ o.id }}/note">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="card-h"><h2>Staff note</h2></div>
+    <div class="card-b">
+      <textarea class="inp" name="note" rows="3" style="height:auto" maxlength="2000" placeholder="e.g. Called customer, dispatch tomorrow">{{ o.note or '' }}</textarea>
+      <button class="btn btn-sm" style="margin-top:8px">{{ icon('save', 14) }} Save note</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

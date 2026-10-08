@@ -23,6 +23,8 @@ from . import security as sec
 from .api import router as api_router
 from .admin import router as admin_router
 from .posters import admin_router as posters_admin_router, public_router as posters_public_router
+from .orders import admin_router as orders_admin_router, public_router as orders_public_router
+from .coupons import admin_router as coupons_admin_router, public_router as coupons_public_router, seed_examples
 from .store import ensure_defaults
 from . import seo
 
@@ -65,6 +67,11 @@ def startup():
     db = SessionLocal()
     try:
         ensure_defaults(db)
+        try:
+            seed_examples(db)
+        except Exception as exc:                      # pragma: no cover
+            db.rollback()
+            print(f"[gflo] coupon examples skipped: {exc}")
         from .models import AdminUser
         if db.query(AdminUser).count() == 0:
             user = os.environ.get("ADMIN_USERNAME", "admin")
@@ -166,8 +173,12 @@ async def security_middleware(request: Request, call_next):
 
 app.include_router(api_router)
 app.include_router(posters_admin_router)    # before admin_router: /admin/posters/*
+app.include_router(orders_admin_router)     # /admin/orders/*
+app.include_router(coupons_admin_router)    # /admin/coupons/*
 app.include_router(admin_router)
 app.include_router(posters_public_router)
+app.include_router(orders_public_router)
+app.include_router(coupons_public_router)
 
 # ------------------------------------------------------------------ /media
 # Photos are looked up in three places, so none of them can "vanish":

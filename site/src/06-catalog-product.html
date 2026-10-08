@@ -149,7 +149,7 @@ Pages.deals = () => listingHtml({
   pool: DB.products.filter(p => p.off >= 15), showCats: true, kick: "Deal zone",
   title: CATALOG_MODE ? "Featured picks" : "Today's best part deals",
   sub: CATALOG_MODE ? "Hand-picked fast movers across every category." : "Genuine parts, honest discounts. Prices refresh at midnight.", crumbs: [["Deals"]],
-  hero: CATALOG_MODE ? "" : `<div class="deal-hero rv" style="margin:6px 0 22px"><div class="spread" style="flex-wrap:wrap;gap:18px"><div><span class="badge" style="background:rgba(255,255,255,.2);color:#fff">⚡ Flash window live</span><h2 style="font-size:clamp(20px,3vw,28px);margin:10px 0 6px">Extra savings end at midnight</h2><p style="opacity:.85;font-size:13.5px">Use coupon <b class="mono">GFLO10</b> for 10% off over ₹999.</p><div class="cd" id="deal-cd"></div></div></div></div>`
+  hero: CATALOG_MODE ? "" : `<div class="deal-hero rv" style="margin:6px 0 22px"><div class="spread" style="flex-wrap:wrap;gap:18px"><div><span class="badge" style="background:rgba(255,255,255,.2);color:#fff">⚡ Flash window live</span><h2 style="font-size:clamp(20px,3vw,28px);margin:10px 0 6px">Extra savings end at midnight</h2><p style="opacity:.85;font-size:13.5px">${GFLO.coupons ? "Have a coupon? Apply it in your cart." : "Genuine parts at honest prices."}</p><div class="cd" id="deal-cd"></div></div></div></div>`
 });
 Mount.deals = p => { listingMount(p); countdownInto("deal-cd"); };
 

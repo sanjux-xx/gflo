@@ -107,6 +107,7 @@ async function loadCatalog(){
   try { mergeCategories(data.categories); } catch (e){ console.warn("[G-FLO] categories:", e.message); }
   try { mergeBrands(data.brands); } catch (e){ console.warn("[G-FLO] brands:", e.message); }
   try { applySettings(data.settings, data.showPrices); } catch (e){ console.warn("[G-FLO] settings:", e.message); }
+  GFLO.coupons = data.couponsEnabled === true;       /* owner's switch in Admin -> Coupons */
   GFLO.rows = data.products.filter(p => p && CAT_MAP[p.cat]);
   GFLO.live = true;
   console.info("[G-FLO] live catalogue loaded — " + GFLO.rows.length + " products");

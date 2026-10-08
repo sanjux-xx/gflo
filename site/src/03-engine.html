@@ -105,6 +105,8 @@ function buildDB(){
     const before = State.cart.length;
     State.cart = State.cart.filter(i => i && DB.prodMap[i.sku]);
     if (State.cart.length !== before) U.store.set("cart", State.cart);
+    // coupons switched off in the admin, or a code saved by an older version of the shop
+    if (State.coupon && (!GFLO.coupons || !State.coupon.kind)){ State.coupon = null; U.store.set("coupon", null); }
   }
   // derive each category's part families from the real catalog
   CATS.forEach(c => {
@@ -168,12 +170,19 @@ const State = {
     this.cart.forEach(i => { const p = DB.prodMap[i.sku]; if (!p) return;
       if (p.price === null){ quote += i.qty; } else { sub += p.price * i.qty; mrp += (p.mrp === null ? p.price : p.mrp) * i.qty; }
       count += i.qty; });
-    let disc = 0; const c = this.coupon;
-    if (c){ if (c.type === "pct") disc = Math.round(sub * c.val / 100); if (c.type === "flat") disc = c.val; disc = Math.min(disc, Math.round(sub * .4)); }
+    /* coupon rules come from the server (Admin -> Coupons); the same maths runs
+       there when the order is placed, so the cart total is the order total */
+    let disc = 0, freeShip = false; const c = this.coupon;
+    if (c && c.kind && typeof GFLO !== "undefined" && GFLO.coupons && sub >= (c.min || 0)){
+      if (c.kind === "pct"){ disc = Math.round(sub * (c.value || 0) / 100); if (c.max) disc = Math.min(disc, c.max); }
+      else if (c.kind === "flat") disc = c.value || 0;
+      else if (c.kind === "ship") freeShip = true;
+      disc = Math.max(0, Math.min(disc, sub));
+    }
     const afterDisc = sub - disc;
-    const ship = afterDisc >= 4999 || count === 0 ? 0 : 99;
+    const ship = freeShip || afterDisc >= 4999 || count === 0 ? 0 : 99;
     const gst = Math.round(afterDisc * .18);
-    return { sub, mrp, saveMrp: mrp - sub, disc, ship, gst, total: afterDisc + ship, count, quote,
+    return { sub, mrp, saveMrp: mrp - sub, disc, freeShip, ship, gst, total: afterDisc + ship, count, quote,
              freeGap: Math.max(0, 4999 - afterDisc) };
   },
   toggleWish(sku){ const i = this.wish.indexOf(sku); if (i >= 0){ this.wish.splice(i, 1); toast("Removed from wishlist", "info"); } else { this.wish.push(sku); toast("Saved to wishlist ♥"); } this.save(); },

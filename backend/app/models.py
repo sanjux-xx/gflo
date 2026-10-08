@@ -163,3 +163,54 @@ class MediaFile(Base):
     size = Column(Integer, default=0)
     data = Column(LargeBinary, nullable=False)
     created_at = Column(DateTime, default=now)
+
+
+class Order(Base):
+    """An order placed on the storefront. Prices are recomputed on the server
+    from the catalogue at the moment of ordering, never taken from the browser."""
+    __tablename__ = "orders"
+    id = Column(Integer, primary_key=True)
+    number = Column(String(24), unique=True, index=True)     # e.g. GF1042
+    created_at = Column(DateTime, default=now, index=True)
+    status = Column(String(16), default="new", index=True)   # new/confirmed/packed/shipped/delivered/cancelled
+    seen = Column(Boolean, default=False, index=True)         # opened in the admin yet?
+    customer_name = Column(String(80), default="")
+    phone = Column(String(20), default="")
+    address = Column(String(300), default="")
+    city = Column(String(120), default="")
+    pincode = Column(String(10), default="")
+    ship_method = Column(String(16), default="std")
+    payment = Column(String(16), default="cod")
+    coupon = Column(String(24), default="")
+    items_json = Column(Text, default="[]")
+    subtotal = Column(Float, default=0)
+    discount = Column(Float, default=0)
+    shipping = Column(Float, default=0)
+    total = Column(Float, default=0)
+    quote_items = Column(Integer, default=0)                  # lines with "price on request"
+    note = Column(Text, default="")                           # staff note
+
+
+class Coupon(Base):
+    """A discount code the owner creates in Admin -> Coupons.
+
+    kind   "pct"  = value % off the items (optional max_discount cap)
+           "flat" = value rupees off (never more than the items cost)
+           "ship" = free standard delivery (express / install charges still apply)
+    Times used is counted from the orders table (cancelled orders don't count).
+    """
+    __tablename__ = "coupons"
+    id = Column(Integer, primary_key=True)
+    code = Column(String(24), unique=True, index=True, nullable=False)
+    kind = Column(String(8), default="pct")
+    value = Column(Float, default=0)
+    min_order = Column(Float, default=0)
+    max_discount = Column(Float, nullable=True)
+    starts_on = Column(Date, nullable=True)
+    ends_on = Column(Date, nullable=True)
+    usage_limit = Column(Integer, nullable=True)       # total orders; blank = unlimited
+    once_per_phone = Column(Boolean, default=False)
+    active = Column(Boolean, default=True)
+    note = Column(String(200), default="")
+    created_at = Column(DateTime, default=now)
+    updated_at = Column(DateTime, default=now, onupdate=now)

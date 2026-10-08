@@ -36,6 +36,11 @@
         {% if counts.brands %}<span class="cnt">{{ counts.brands }}</span>{% endif %}
       </a>
 
+      <a class="nav-item {{ 'on' if path.startswith('/admin/orders') }}" href="/admin/orders">
+        {{ icon('package') }} Orders
+        <span class="cnt hot" id="ord-badge" {{ '' if counts.new_orders else 'hidden' }}>{{ counts.new_orders or 0 }}</span>
+      </a>
+
       <div class="nav-lbl">Needs attention</div>
       <a class="nav-item" href="/admin/products?price=none">
         {{ icon('rupee') }} No price yet
@@ -52,6 +57,7 @@
 
       <div class="nav-lbl">Store</div>
       <a class="nav-item {{ 'on' if path.startswith('/admin/posters') }}" href="/admin/posters">{{ icon('image') }} Posters &amp; banners</a>
+      <a class="nav-item {{ 'on' if path.startswith('/admin/coupons') }}" href="/admin/coupons">{{ icon('percent') }} Coupons</a>
       <a class="nav-item {{ 'on' if path.startswith('/admin/import') }}" href="/admin/import">{{ icon('upload') }} Import / export</a>
       <a class="nav-item {{ 'on' if path.startswith('/admin/settings') }}" href="/admin/settings">{{ icon('cog') }} Settings</a>
       <a class="nav-item {{ 'on' if path.startswith('/admin/activity') }}" href="/admin/activity">{{ icon('activity') }} Activity log</a>
@@ -103,6 +109,7 @@
 
 <div class="toasts" id="toasts" aria-live="polite" aria-atomic="true"></div>
 <script src="/static/admin.js" defer></script>
+{% if username %}<script src="/static/orders-notify.js?v=2" defer></script>{% endif %}
 {% block scripts %}{% endblock %}
 </body>
 </html>
