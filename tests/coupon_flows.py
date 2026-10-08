@@ -60,7 +60,7 @@ def check(code, items=CART, ph=""):
 
 def order(code, items=CART, ph=None):
     return anon.post("/api/orders", json={"name": "Coupon Tester", "phone": ph or phone(), "address": "12 MG Road",
-                                          "city": "Hyderabad", "pincode": "500080", "coupon": code, "items": items})
+                                          "city": "Hyderabad", "state": "Telangana", "pincode": "500080", "coupon": code, "items": items})
 
 
 today = (dt.datetime.utcnow() + dt.timedelta(minutes=330)).date()
@@ -113,7 +113,7 @@ rec("₹ off never more than the items cost", d.get("discount") == 300, str(d))
 new(code="SHIPFREE", kind="ship")
 o = order("SHIPFREE", [{"sku": "CP-300", "qty": 1}]).json()
 rec("free-delivery coupon removes the ₹99", o.get("shipping") == 0 and o.get("total") == 300, str(o))
-o = anon.post("/api/orders", json={"name": "Coupon Tester", "phone": phone(), "address": "12 MG Road", "city": "Hyd",
+o = anon.post("/api/orders", json={"name": "Coupon Tester", "phone": phone(), "address": "12 MG Road", "city": "Hyderabad", "state": "telangana",
                                    "pincode": "500080", "coupon": "SHIPFREE", "ship": "install",
                                    "items": [{"sku": "CP-300", "qty": 1}]}).json()
 rec("...but install charge still applies", o.get("shipping") == 249, str(o))

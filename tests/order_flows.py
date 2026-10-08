@@ -48,7 +48,7 @@ def order(body):
 
 
 BASE = {"name": "Ravi Kumar", "phone": "9876543210", "address": "12 MG Road, Gandhi Nagar",
-        "city": "Hyderabad, Telangana", "pincode": "500080", "ship": "std"}
+        "city": "Hyderabad", "state": "Telangana", "pincode": "500080", "ship": "std"}
 
 # ------------------------------------------------------------- test products
 post("/admin/categories/save", {"name": "Order Test", "id": "order-test"})
@@ -139,10 +139,14 @@ rec("coupons OFF in admin: code refused", r.status_code == 409, r.text)
 
 print("orders: validation")
 bad = [({"name": ""}, "name"), ({"phone": "12345"}, "mobile"), ({"phone": "1234567890"}, "mobile"),
-       ({"address": "x"}, "address"), ({"pincode": "5000"}, "pincode")]
+       ({"address": "x"}, "address"), ({"pincode": "5000"}, "pincode"),
+       ({"city": "12345"}, "city"), ({"city": "x"}, "city"), ({"state": ""}, "state"), ({"state": "Narnia"}, "state")]
 for patch, word in bad:
     r = order({**BASE, **patch, "items": [{"sku": "OT-PLAIN", "qty": 1}]})
     rec(f"rejects bad {word}", r.status_code == 400 and word in r.json().get("error", "").lower(), r.text)
+for good_city in ("नोएडा", "சென்னை", "Gurugram Sector 14", "St. Thomas Mount"):
+    r = order({**BASE, "city": good_city, "items": [{"sku": "OT-PLAIN", "qty": 1}]})
+    rec(f"accepts city {good_city!r}", r.status_code == 200, r.text)
 r = order({**BASE, "items": []})
 rec("empty cart refused", r.status_code == 400)
 r = order({**BASE, "items": [{"sku": "OT-OOS", "qty": 1}]})
@@ -172,6 +176,7 @@ unseen_before = feed["unseen"]
 rec("sidebar badge shows unseen count", re.search(r'id="ord-badge"\s*>\s*%d<' % unseen_before, page) is not None)
 oid = int(re.search(r'/admin/orders/(\d+)">\s*<b class="mono">%s<' % first, page).group(1))
 det = c.get(f"/admin/orders/{oid}").text
+rec("order shows city and state", "Hyderabad, Telangana" in det)
 rec("order page shows customer, items and total",
     "Ravi Kumar" in det and "Plain Part" in det and "₹1,099" in det and "500080" in det, det[:200])
 rec("order page has call / WhatsApp / print", re.search(r"tel:\+91\d{10}", det) and re.search(r"wa\.me/91\d{10}", det) and "data-print" in det)
@@ -195,6 +200,34 @@ rec("missing order handled", "doesn" in c.get("/admin/orders/999999", follow_red
 rec("orders in activity log", "order" in c.get("/admin/activity").text)
 rec("notifier script is served", httpx.get(B + "/static/orders-notify.js").status_code == 200
     and "orders-notify.js" in page)
+
+print("orders: customer can see the status")
+r = order({**BASE, "phone": "9822222222", "items": [{"sku": "OT-PLAIN", "qty": 1}]}); tn = r.json()["number"]
+t = anon.get(f"/api/orders/{tn}/status", params={"phone": "9822222222"}).json()
+rec("new order: status 'new' with placed time", t.get("status") == "new" and t.get("times", {}).get("new"), str(t))
+rec("wrong mobile number can't see the order", anon.get(f"/api/orders/{tn}/status", params={"phone": "9833333333"}).status_code == 404)
+rec("no mobile number can't see the order", anon.get(f"/api/orders/{tn}/status").status_code == 404)
+tid = re.search(r'/admin/orders/(\d+)">\s*<b class="mono">%s<' % tn, c.get("/admin/orders").text).group(1)
+for st in ("confirmed", "shipped", "delivered"):
+    post(f"/admin/orders/{tid}/status", {"status": st})
+t = anon.get(f"/api/orders/{tn}/status", params={"phone": "+91 98222 22222"}).json()
+rec("after Delivered in admin, customer sees 'delivered'", t.get("status") == "delivered" and t.get("label") == "Delivered", str(t))
+rec("each step's time is recorded", all(t.get("times", {}).get(k) for k in ("new", "confirmed", "shipped", "delivered")), str(t))
+rec("admin order page lists the status history", "Delivered:" in c.get(f"/admin/orders/{tid}").text)
+
+print("orders: track by mobile number")
+lk = anon.get("/api/orders/lookup", params={"phone": "9822222222"}).json()
+rec("lookup finds the customer's order", lk.get("ok") and any(o["number"] == tn for o in lk.get("orders", [])), str(lk)[:300])
+one = next((o for o in lk.get("orders", []) if o["number"] == tn), {})
+rec("lookup shows status, items and total", one.get("status") == "delivered" and one.get("items") and one.get("total"), str(one))
+rec("lookup never shows name or address", "Ravi" not in str(lk) and "MG Road" not in str(lk) and "500080" not in str(lk), str(lk)[:300])
+rec("unknown number: empty list", anon.get("/api/orders/lookup", params={"phone": "9700000001"}).json().get("orders") == [])
+rec("bad number refused", anon.get("/api/orders/lookup", params={"phone": "12345"}).status_code == 400)
+codes = [anon.get("/api/orders/lookup", params={"phone": "9822222222"}).status_code for _ in range(12)]
+rec("one number can't be looked up endlessly (429)", 429 in codes, str(codes))
+codes = [anon.get("/api/orders/lookup", params={"phone": str(9700000100 + n)}).status_code for n in range(25)]
+rec("trawling many numbers is slowed down (429)", 429 in codes, str(codes))
+rec("/track page opens", httpx.get(B + "/track").status_code == 200)
 
 print("orders: rate limit")
 same = {**BASE, "phone": "9811111111", "items": [{"sku": "OT-PLAIN", "qty": 1}]}

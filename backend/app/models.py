@@ -189,6 +189,7 @@ class Order(Base):
     total = Column(Float, default=0)
     quote_items = Column(Integer, default=0)                  # lines with "price on request"
     note = Column(Text, default="")                           # staff note
+    status_log = Column(Text, default="")                     # JSON {"new": "...Z", "shipped": "...Z"}
 
 
 class Coupon(Base):

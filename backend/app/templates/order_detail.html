@@ -67,10 +67,18 @@
   <form class="card" style="margin:0" method="post" action="/admin/orders/{{ o.id }}/status">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <div class="card-h"><h2>Status</h2></div>
-    <div class="card-b" style="display:flex;gap:8px;flex-wrap:wrap">
+    <div class="card-b">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
       {% for k, label in statuses.items() %}
-        <button class="btn btn-sm {{ 'btn-p' if o.status == k }}" name="status" value="{{ k }}">{{ label }}</button>
+        <button class="btn btn-sm {{ 'btn-p' if o.status == k }}" name="status" value="{{ k }}" type="submit">{{ label }}</button>
       {% endfor %}
+      </div>
+      <div class="mut" style="font-size:12.5px;margin-top:12px;line-height:1.8">
+        {% for k, label in statuses.items() if times.get(k) %}
+          <div>{{ label }}: {{ shop_time_iso(times[k]) }}</div>
+        {% endfor %}
+        <div style="margin-top:4px">The customer sees the current status on their order page.</div>
+      </div>
     </div>
   </form>
   <form class="card" style="margin:0" method="post" action="/admin/orders/{{ o.id }}/note">

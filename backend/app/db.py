@@ -84,7 +84,8 @@ def ensure_schema():
 # Columns added after the first release, on any database. create_all() only
 # creates missing TABLES, never missing columns, so an existing live database
 # (SQLite file or Postgres) needs these added once.
-_NEW_COLUMNS = [("products", "variants", "TEXT DEFAULT ''")]
+_NEW_COLUMNS = [("products", "variants", "TEXT DEFAULT ''"),
+                ("orders", "status_log", "TEXT DEFAULT ''")]
 
 
 def _add_missing_columns():

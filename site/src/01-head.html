@@ -793,6 +793,17 @@ body{padding-bottom:74px}
 .tl.act .dot{background:var(--g);border-color:var(--brand);color:#fff;box-shadow:0 0 0 5px rgba(236,51,56,.18)}
 .tl.done::before{background:var(--ok)}
 .tl b{font-size:14px;display:block}
+.ms{display:grid;grid-template-columns:repeat(5,1fr);position:relative}
+.ms::before{content:"";position:absolute;left:10%;right:10%;top:11px;height:2px;background:var(--line2)}
+.ms::after{content:"";position:absolute;left:10%;width:var(--p,0%);top:11px;height:2px;background:var(--ok)}
+.ms-st{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;text-align:center;min-width:0}
+.ms-dot{width:24px;height:24px;border-radius:50%;background:var(--chip);border:2px solid var(--line2);display:grid;place-items:center;color:#fff;z-index:1}
+.ms-dot .ic{width:13px;height:13px}
+.ms-st.done .ms-dot{background:var(--ok);border-color:var(--ok)}
+.ms-st.act .ms-dot{background:var(--g);border-color:var(--brand);box-shadow:0 0 0 4px rgba(236,51,56,.16)}
+.ms-lb{font-size:11.5px;line-height:1.25;color:var(--tx3);font-weight:600}
+.ms-st.done .ms-lb,.ms-st.act .ms-lb{color:var(--tx)}
+.ms-cancel{display:flex;align-items:center;gap:8px;color:var(--hot);font-weight:700;font-size:13.5px}
 .tl span{font-size:12.5px;color:var(--tx3)}
 .acc-grid{display:grid;gap:18px;padding-bottom:50px}
 @media(min-width:900px){.acc-grid{grid-template-columns:250px 1fr}}

@@ -50,12 +50,12 @@ DEFAULT_DESC = ("G-FLO is India's premium marketplace for genuine home-appliance
 DEFAULT_IMAGE = "/assets/hero-fan-white.jpg"
 
 # Pages that must never be indexed: private, transactional, or per-visitor.
-NOINDEX_PAGES = {"cart", "checkout", "account", "wishlist", "order", "search", "notfound"}
+NOINDEX_PAGES = {"cart", "checkout", "account", "wishlist", "order", "search", "notfound", "track"}
 
 # Brand-site pages vs shop pages. Mirrors SHOP_PAGES in site/src/03-engine.html —
 # if you add a route in one place, add it in the other.
 SHOP_PAGES = {"categories", "category", "brands", "brand", "deals", "search",
-              "product", "finder", "cart", "checkout", "order", "wishlist", "account"}
+              "product", "finder", "cart", "checkout", "order", "wishlist", "account", "track"}
 
 STATIC_TITLES = {
     "home": (DEFAULT_TITLE, DEFAULT_DESC),
@@ -79,6 +79,7 @@ STATIC_TITLES = {
     "checkout": ("Checkout — G-FLO", DEFAULT_DESC),
     "account": ("My Account — G-FLO", DEFAULT_DESC),
     "wishlist": ("Wishlist — G-FLO", DEFAULT_DESC),
+    "track": ("Track your order — G-FLO", "Check the status of your G-FLO order with your mobile number."),
     "notfound": ("Page not found — G-FLO", DEFAULT_DESC),
 }
 
@@ -121,7 +122,7 @@ def page_of_path(path: str) -> Tuple[str, Optional[str]]:
     one = {"categories": "categories", "brands": "brands", "deals": "deals",
            "guides": "guides", "support": "support", "cart": "cart",
            "checkout": "checkout", "wishlist": "wishlist", "about": "about",
-           "contact": "contact"}
+           "contact": "contact", "track": "track"}
     if head in one and len(seg) == 1:
         return one[head], None
     two = {"c": "category", "b": "brand", "p": "product", "g": "guide",

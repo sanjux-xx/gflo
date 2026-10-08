@@ -9,6 +9,7 @@ Admin (any signed-in staff):
   POST /admin/orders/{id}/note     save a staff note
   GET  /admin/orders/feed          JSON for the new-order notifier
 """
+import datetime as dt
 import json, os, re, time, threading
 from collections import defaultdict, deque
 
@@ -33,6 +34,16 @@ def shop_time(ts) -> str:
 
 TEMPLATES.env.globals["shop_time"] = shop_time
 
+
+def shop_time_iso(v: str) -> str:
+    try:
+        return shop_time(dt.datetime.fromisoformat(v.rstrip("Z")))
+    except (ValueError, AttributeError):
+        return ""
+
+
+TEMPLATES.env.globals["shop_time_iso"] = shop_time_iso
+
 public_router = APIRouter(prefix="/api", tags=["public"])
 admin_router = APIRouter(prefix="/admin/orders", tags=["admin"])
 
@@ -41,6 +52,8 @@ STATUSES = {"new": "New", "confirmed": "Confirmed", "packed": "Packed", "shipped
 SHIP = {"std": ("Standard delivery", 0), "exp": ("Express delivery", 99), "install": ("Expert install", 249)}
 FREE_SHIP_FROM, BASE_SHIP = 4999, 99
 MAX_LINES, MAX_QTY = 50, 99
+# all 28 states + 8 union territories; the checkout shows them as a list to pick from
+STATES = ['Andaman and Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chandigarh', 'Chhattisgarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir', 'Jharkhand', 'Karnataka', 'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Puducherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal']
 
 # --- abuse guard (in-process) ------------------------------------------------
 # Per mobile number: stops one person flooding the Orders page.
@@ -100,6 +113,31 @@ def _resolve(db: Session, sku: str):
     return p, None, p.price
 
 
+def _iso(ts) -> str:
+    return ts.replace(microsecond=0).isoformat() + "Z" if ts else ""
+
+
+def _log_status(o: Order, status: str):
+    """Remember when each status was first reached (shown to the customer)."""
+    try:
+        log_ = json.loads(o.status_log or "{}")
+    except ValueError:
+        log_ = {}
+    if not log_.get("new") and o.created_at:
+        log_["new"] = _iso(o.created_at)
+    log_[status] = _iso(dt.datetime.utcnow())
+    o.status_log = json.dumps(log_)
+
+
+def status_times(o: Order) -> dict:
+    try:
+        log_ = json.loads(o.status_log or "{}")
+    except ValueError:
+        log_ = {}
+    log_.setdefault("new", _iso(o.created_at))
+    return log_
+
+
 def _clean(v, n):
     return " ".join(str(v or "").split())[:n]
 
@@ -156,14 +194,22 @@ async def place_order(request: Request, db: Session = Depends(get_db)):
     if not isinstance(data, dict):
         return JSONResponse({"ok": False, "error": "Invalid request."}, 400)
     name, phone = _clean(data.get("name"), 80), re.sub(r"\D", "", str(data.get("phone") or ""))[-10:]
-    addr, city = _clean(data.get("address"), 300), _clean(data.get("city"), 120)
+    addr, city = _clean(data.get("address"), 300), _clean(data.get("city"), 60)
+    state = _clean(data.get("state"), 60)
     pin = re.sub(r"\D", "", str(data.get("pincode") or ""))
     if len(name) < 2:
         return JSONResponse({"ok": False, "error": "Please enter your name."}, 400)
     if not re.fullmatch(r"[6-9]\d{9}", phone):
         return JSONResponse({"ok": False, "error": "Please enter a valid 10-digit mobile number."}, 400)
-    if len(addr) < 5 or len(city) < 2:
-        return JSONResponse({"ok": False, "error": "Please enter your full address and city."}, 400)
+    if len(addr) < 5:
+        return JSONResponse({"ok": False, "error": "Please enter your full address."}, 400)
+    if (len(city) < 2 or not city[0].isalpha() or sum(ch.isalpha() for ch in city) < 2
+            or any(ch in '<>"`{}[]\\|;=*@#$%^~' for ch in city)):
+        return JSONResponse({"ok": False, "error": "Please enter a valid city or town name."}, 400)
+    state = next((st for st in STATES if st.lower() == state.lower()), "")
+    if not state:
+        return JSONResponse({"ok": False, "error": "Please select your state from the list."}, 400)
+    city = f"{city}, {state}"
     if not re.fullmatch(r"\d{6}", pin):
         return JSONResponse({"ok": False, "error": "Please enter a valid 6-digit pincode."}, 400)
     ship = data.get("ship") if data.get("ship") in SHIP else "std"
@@ -201,6 +247,7 @@ async def place_order(request: Request, db: Session = Depends(get_db)):
               ship_method=ship, payment="", coupon=code, items_json=json.dumps(lines),
               subtotal=sub, discount=disc, shipping=shipping, total=total, quote_items=quote,
               status="new", seen=False)
+    _log_status(o, "new")
     db.add(o)
     db.flush()
     o.number = f"GF{1000 + o.id}"
@@ -210,6 +257,71 @@ async def place_order(request: Request, db: Session = Depends(get_db)):
         return {"ok": True, "number": o.number, "items": [{"sku": l["sku"], "qty": l["qty"]} for l in lines]}
     return {"ok": True, "number": o.number, "total": total, "subtotal": sub, "discount": disc,
             "shipping": shipping, "quote_items": quote, "items": lines}
+
+
+# --- customer: order status --------------------------------------------------
+_track_hits = defaultdict(deque)
+
+
+@public_router.get("/orders/{number}/status")
+def order_track(request: Request, number: str, phone: str = "", db: Session = Depends(get_db)):
+    """The live status of one order for the customer's order page. The mobile
+    number on the order must match, so order numbers can't be used to look up
+    other people's orders."""
+    now = time.time()
+    with _lock:
+        q = _track_hits["ip:" + sec.client_ip(request)]
+        while q and now - q[0] > 600:
+            q.popleft()
+        if len(q) >= 300:
+            return JSONResponse({"ok": False, "error": "Too many requests."}, 429)
+        q.append(now)
+        if len(_track_hits) > 5000:                     # forget idle visitors
+            for k in [k for k, v in _track_hits.items() if not v or now - v[-1] > 600]:
+                del _track_hits[k]
+    ph = re.sub(r"\D", "", phone or "")[-10:]
+    o = db.query(Order).filter(Order.number == (number or "").strip().upper()[:24]).first() if ph else None
+    if not o or o.phone != ph:
+        return JSONResponse({"ok": False, "error": "Order not found."}, 404, headers={"Cache-Control": "no-store"})
+    return JSONResponse({"ok": True, "number": o.number, "status": o.status,
+                         "label": STATUSES.get(o.status, o.status), "times": status_times(o)},
+                        headers={"Cache-Control": "no-store"})
+
+
+# --- customer: find my orders by mobile number ----------------------------------
+# Shows status, date, items and total only — never the name or address — and
+# is rate-limited per connection and per number so numbers can't be trawled.
+_LOOKUP_IP, _LOOKUP_PHONE = 20, 10        # per 10 minutes
+
+
+@public_router.get("/orders/lookup")
+def order_lookup(request: Request, phone: str = "", db: Session = Depends(get_db)):
+    ph = re.sub(r"\D", "", phone or "")[-10:]
+    if not re.fullmatch(r"[6-9]\d{9}", ph):
+        return JSONResponse({"ok": False, "error": "Enter the 10-digit mobile number you ordered with."}, 400)
+    now = time.time()
+    with _lock:
+        for key, lim in (("lk-ip:" + sec.client_ip(request), _LOOKUP_IP), ("lk-ph:" + ph, _LOOKUP_PHONE)):
+            q = _track_hits[key]
+            while q and now - q[0] > 600:
+                q.popleft()
+            if len(q) >= lim:
+                return JSONResponse({"ok": False, "error": "Too many searches. Please try again in a few minutes, or call us."}, 429)
+        for key in ("lk-ip:" + sec.client_ip(request), "lk-ph:" + ph):
+            _track_hits[key].append(now)
+    rows = db.query(Order).filter(Order.phone == ph).order_by(Order.id.desc()).limit(20).all()
+    show_prices = get_setting(db, "show_prices", "true") == "true"
+    out = []
+    for o in rows:
+        try:
+            items = json.loads(o.items_json or "[]")
+        except ValueError:
+            items = []
+        out.append({"number": o.number, "date": _iso(o.created_at), "status": o.status,
+                    "label": STATUSES.get(o.status, o.status), "times": status_times(o),
+                    "total": o.total if show_prices else None, "quote": o.quote_items or 0,
+                    "items": [{"name": i.get("name", ""), "size": i.get("size", ""), "qty": i.get("qty", 0)} for i in items][:30]})
+    return JSONResponse({"ok": True, "orders": out}, headers={"Cache-Control": "no-store"})
 
 
 # ------------------------------------------------------------------- admin
@@ -262,7 +374,7 @@ def order_detail(request: Request, oid: int, db: Session = Depends(get_db)):
     if not o.seen:
         o.seen = True
         db.commit()
-    return render(request, "order_detail.html", db=db, statuses=STATUSES, **_order_view(o),
+    return render(request, "order_detail.html", db=db, statuses=STATUSES, times=status_times(o), **_order_view(o),
                   msg=request.query_params.get("msg", ""), err=request.query_params.get("err", ""))
 
 
@@ -277,6 +389,7 @@ async def order_status(request: Request, oid: int, db: Session = Depends(get_db)
     if st not in STATUSES:
         return flash(f"/admin/orders/{oid}", err="Unknown status.")
     o.status, o.seen = st, True
+    _log_status(o, st)
     log(db, _user(request), "status", "order", o.number, st)
     db.commit()
     return flash(f"/admin/orders/{oid}", msg=f"Order {o.number} marked {STATUSES[st]}.")
