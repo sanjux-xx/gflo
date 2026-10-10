@@ -243,8 +243,7 @@ async def place_order(request: Request, db: Session = Depends(get_db)):
     city = f"{city}, {state}"
     if not re.fullmatch(r"\d{6}", pin):
         return JSONResponse({"ok": False, "error": "Please enter a valid 6-digit pincode."}, 400)
-    ship = _text(data.get("ship"))
-    ship = ship if ship in SHIP else "std"
+    ship = "std"            # one delivery option only (no express / install choice)
     raw_items = data.get("items")
     if not isinstance(raw_items, list) or not raw_items:
         return JSONResponse({"ok": False, "error": "Your cart is empty."}, 400)

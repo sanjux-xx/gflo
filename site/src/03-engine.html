@@ -466,6 +466,7 @@ const Router = {
     syncNav(page);
     if (typeof renderFooter === "function") renderFooter(page);
     document.body.classList.toggle("brand-page", page === "home");
+    document.body.classList.toggle("checkout-page", page === "checkout");
     app.focus({ preventScroll: true });
   }
 };

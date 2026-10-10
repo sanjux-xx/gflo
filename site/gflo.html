@@ -58,6 +58,7 @@ ul,ol{margin:0;padding:0;list-style:none}
 ::selection{background:rgba(236,51,56,.35)}
 :focus{outline:none}
 :focus-visible{outline:2px solid var(--brand2);outline-offset:2px;border-radius:6px}
+#app:focus,#app:focus-visible,main[tabindex="-1"]:focus{outline:none}
 /* ...but not for a field sitting inside a search pill: the pill itself already
    shows focus via .sbox:focus-within, and the ring above was being drawn as a
    second red rounded box INSIDE the bar as soon as you started typing.
@@ -780,6 +781,11 @@ body{padding-bottom:74px}
 .co-sec h3 .n{width:26px;height:26px;border-radius:9px;background:var(--g-soft);color:var(--brand2);display:grid;place-items:center;font-size:13px;font-family:var(--fd)}
 .form-grid{display:grid;gap:13px}
 @media(min-width:640px){.form-grid{grid-template-columns:1fr 1fr}.form-grid .full{grid-column:1/-1}}
+.fld-row3{display:grid;gap:13px}
+@media(min-width:640px){.fld-row3{grid-template-columns:.8fr 1.1fr 1.1fr}}
+.co-sec h3 .ic{color:var(--brand2)}
+.sum-card .tot-row{align-items:center}
+body.checkout-page #ai-fab{display:none!important}
 .pay-opt{display:flex;align-items:center;gap:12px;padding:14px;border:1.5px solid var(--line);border-radius:14px;margin-bottom:10px;cursor:pointer;transition:all var(--tfast)}
 .pay-opt.on{border-color:var(--brand);background:var(--g-soft)}
 .pay-opt input{accent-color:var(--brand);width:17px;height:17px}
@@ -1941,6 +1947,7 @@ const Router = {
     syncNav(page);
     if (typeof renderFooter === "function") renderFooter(page);
     document.body.classList.toggle("brand-page", page === "home");
+    document.body.classList.toggle("checkout-page", page === "checkout");
     app.focus({ preventScroll: true });
   }
 };
@@ -3361,19 +3368,17 @@ Pages.checkout = () => {
   <div class="sec-head" style="margin-top:12px"><div><span class="kick">Checkout</span><h2>Almost done</h2><p>No online payment needed. After you place the order we call you to confirm availability, delivery and payment.</p></div></div>
   <form class="co-grid" id="co-form" novalidate>
     <div>
-      <div class="co-sec"><h3><span class="n">1</span> Delivery address</h3>
+      <div class="co-sec"><h3>${U.icon("pin", "ic-s")} Delivery address</h3>
         <div class="form-grid">
-          <div class="fld"><label for="f-name">Full name</label><input class="inp" id="f-name" required placeholder="Asha Sharma"><span class="err-tx">Enter your name</span></div>
-          <div class="fld"><label for="f-phone">Mobile</label><input class="inp" id="f-phone" required inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="10-digit mobile"><span class="err-tx">Enter a valid 10-digit mobile</span></div>
-          <div class="fld full"><label for="f-addr">Address (house, street, area)</label><input class="inp" id="f-addr" required placeholder="Flat 14B, MG Road…"><span class="err-tx">Enter your address</span></div>
-          <div class="fld"><label for="f-pin">Pincode</label><input class="inp" id="f-pin" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" value="${State.pin}"><span class="err-tx">6-digit pincode</span></div>
+          <div class="fld"><label for="f-name">Full name</label><input class="inp" id="f-name" required maxlength="80" autocomplete="name" placeholder="Asha Sharma"><span class="err-tx">Enter your name</span></div>
+          <div class="fld"><label for="f-phone">Mobile</label><input class="inp" id="f-phone" required autocomplete="tel-national" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="10-digit mobile"><span class="err-tx">Enter a valid 10-digit mobile</span></div>
+          <div class="fld full"><label for="f-addr">Address (house, street, area)</label><input class="inp" id="f-addr" required maxlength="300" autocomplete="street-address" placeholder="Flat 14B, MG Road…"><span class="err-tx">Enter your address</span></div>
+          <div class="full fld-row3">
+          <div class="fld"><label for="f-pin">Pincode</label><input class="inp" id="f-pin" required autocomplete="postal-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" value="${State.pin}"><span class="err-tx">6-digit pincode</span></div>
           <div class="fld"><label for="f-city">City / town</label><input class="inp" id="f-city" required maxlength="60" autocomplete="address-level2" pattern="[^0-9\s].*[^0-9\s].*|[^0-9\s]{2,}" placeholder="e.g. Ahmedabad"><span class="err-tx">Enter your city or town</span></div>
           <div class="fld"><label for="f-state">State</label><select class="inp sel" id="f-state" required autocomplete="address-level1"><option value="">Select your state</option>${IN_STATES.map(st => `<option>${st}</option>`).join("")}</select><span class="err-tx">Select your state</span></div>
+          </div>
         </div></div>
-      <div class="co-sec"><h3><span class="n">2</span> Delivery speed</h3>
-        <label class="pay-opt on"><input type="radio" name="ship" checked value="std"><div style="flex:1"><b>Standard</b><div class="mut3" style="font-size:12.5px">${deliveryEta(State.pin).label} · tracked</div></div>${CATALOG_MODE ? "" : `<b>${t.ship ? U.inr(t.ship) : "FREE"}</b>`}</label>
-        <label class="pay-opt"><input type="radio" name="ship" value="exp"><div style="flex:1"><b>Express</b><div class="mut3" style="font-size:12.5px">Next-day in metro pincodes</div></div>${CATALOG_MODE ? "" : `<b>₹99</b>`}</label>
-        <label class="pay-opt"><input type="radio" name="ship" value="install"><div style="flex:1"><b>Expert install <span class="badge b-info">popular</span></b><div class="mut3" style="font-size:12.5px">Certified technician fits it for you</div></div>${CATALOG_MODE ? "" : `<b>₹249</b>`}</label></div>
     </div>
     <div><div class="co-sec sum-card"><h3>Order summary</h3>
       ${State.cart.map(i => { const p = DB.prodMap[i.sku]; if (!p) return ""; return `<div class="tot-row" style="margin-bottom:7px"><span style="display:flex;gap:8px;align-items:center;min-width:0"><span style="width:34px;height:34px;border-radius:8px;overflow:hidden;flex:none;background:var(--art-bg1)">${prodArt(p)}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${U.esc(p.short)} × ${i.qty}</span></span>${CATALOG_MODE ? "" : `<span>${U.inr(p.price * i.qty)}</span>`}</div>`; }).join("")}
@@ -3398,17 +3403,7 @@ Mount.checkout = () => {
   if (stEl) stEl.addEventListener("change", () => { stTouched = !!stEl.value; stEl.closest(".fld").classList.remove("bad"); });
   const suggest = () => { if (!stTouched && stEl && /^\d{6}$/.test(pinEl.value)){ const st = stateForPin(pinEl.value); if (st) stEl.value = st; } };
   if (pinEl){ pinEl.addEventListener("input", suggest); suggest(); }
-  let shipExtra = 0;
-  form.addEventListener("change", e => {
-    if (e.target.name === "ship"){
-      form.querySelectorAll(`[name=${e.target.name}]`).forEach(r => r.closest(".pay-opt").classList.toggle("on", r.checked));
-      if (e.target.name === "ship"){ shipExtra = e.target.value === "exp" ? 99 : e.target.value === "install" ? 249 : 0; }
-      const t = State.cartTotals();
-      const cs = document.getElementById("co-ship"), ct = document.getElementById("co-total");
-      if (cs) cs.textContent = (t.ship + shipExtra) ? U.inr(t.ship + shipExtra) : "FREE";
-      if (ct) ct.textContent = U.inr(t.total + shipExtra);
-    }
-  });
+  const shipExtra = 0;
   form.addEventListener("submit", e => {
     e.preventDefault();
     let ok = true;
@@ -3418,7 +3413,7 @@ Mount.checkout = () => {
     const label = btn.innerHTML;
     btn.disabled = true; btn.innerHTML = `<span class="spinner" style="width:18px;height:18px;border-width:2.5px"></span> Placing order…`;
     const v = id => document.getElementById(id).value.trim();
-    const ship = (form.querySelector("[name=ship]:checked") || {}).value || "std";
+    const ship = "std";
     const customer = { name: v("f-name"), phone: v("f-phone"), address: v("f-addr"), city: v("f-city"), state: v("f-state"), pincode: v("f-pin") };
     const addr = customer.address + ", " + customer.city + ", " + customer.state + " — " + customer.pincode;
     if (typeof GFLO === "undefined" || !GFLO.live){
@@ -3732,7 +3727,7 @@ Pages.support = () => `<div class="wrap">${crumb([["Support"]])}
   </div>
   <h3 style="margin-bottom:14px">Frequently asked questions</h3>
   <div style="max-width:760px;padding-bottom:40px">
-    ${[["How do I know a part will fit my appliance?", "Every listing has a compatibility checker — enter your brand and model number and we verify against the fitment database. You can also photograph the model sticker in the AI finder and we'll match it automatically."], ["What are the delivery charges and timelines?", CATALOG_MODE ? "Delivery charges are confirmed on your quote before dispatch. Standard delivery reaches most pincodes in 5–6 days; express options are available in metros." : "Delivery is a flat ₹99, and FREE on orders above ₹4,999. Standard delivery reaches most pincodes in 5–6 days; express options are available in metros."], ["What is the return policy?", "7-day easy returns on unused parts in original packaging. Refunds are processed within 48 hours of pickup QC. Installed electrical parts aren't returnable unless defective."], ["Do parts come with a warranty?", "Yes — every certified part carries a 3, 6 or 12-month replacement warranty as listed in its specifications, backed by doorstep replacement support."], ["Is Cash on Delivery available?", CATALOG_MODE ? "Yes. No online payment is taken — when we call to confirm your order you can choose cash on delivery, UPI or bank transfer." : "Yes. No online payment is taken — when we call to confirm your order you can choose cash on delivery, UPI or bank transfer."], ["Can you install the part for me?", "Choose 'Expert Install' at checkout — a certified technician fits the part at your home. Available in 60+ cities."]].map((f, i) => `
+    ${[["How do I know a part will fit my appliance?", "Every listing has a compatibility checker — enter your brand and model number and we verify against the fitment database. You can also photograph the model sticker in the AI finder and we'll match it automatically."], ["What are the delivery charges and timelines?", CATALOG_MODE ? "Delivery charges are confirmed on your quote before dispatch. Delivery reaches most pincodes in 5–6 days." : "Delivery is a flat ₹99, and FREE on orders above ₹4,999. Delivery reaches most pincodes in 5–6 days."], ["What is the return policy?", "7-day easy returns on unused parts in original packaging. Refunds are processed within 48 hours of pickup QC. Installed electrical parts aren't returnable unless defective."], ["Do parts come with a warranty?", "Yes — every certified part carries a 3, 6 or 12-month replacement warranty as listed in its specifications, backed by doorstep replacement support."], ["Is Cash on Delivery available?", CATALOG_MODE ? "Yes. No online payment is taken — when we call to confirm your order you can choose cash on delivery, UPI or bank transfer." : "Yes. No online payment is taken — when we call to confirm your order you can choose cash on delivery, UPI or bank transfer."], ["Can you install the part for me?", "Call or WhatsApp us after ordering and we'll tell you if a technician visit is available in your area."]].map((f, i) => `
     <div class="faq-item ${i === 0 ? "open" : ""}"><button class="faq-q" aria-expanded="${i === 0}">${f[0]} ${U.icon("chev-d")}</button><div class="faq-a"><div>${f[1]}</div></div></div>`).join("")}
   </div></div>`;
 Mount.support = () => {
@@ -3807,7 +3802,7 @@ const POLICIES = {
     ["Orders & payment", "Orders placed on this site are received by the G-FLO team. No payment is taken online — we call you to confirm the order, delivery charge and payment method before dispatch."]
   ]],
   shipping: ["Shipping Policy", [
-    ["Charges", "Flat ₹99 delivery on all orders; FREE delivery on orders above ₹4,999. Express and Expert-Install options are shown at checkout where serviceable."],
+    ["Charges", "Flat ₹99 delivery on all orders; FREE delivery on orders above ₹4,999."],
     ["Timelines", "Dispatch within 24 hours on working days. Standard delivery reaches most of India in 5–6 days; metros usually sooner. Every shipment is tracked end-to-end."],
     ["Coverage", "19,000+ pincodes across India via our courier partners. ODA pincodes may take 1–2 extra days."],
     ["Packaging", "Parts ship in protective foam with batch slips; fragile components get double-boxing as standard."]

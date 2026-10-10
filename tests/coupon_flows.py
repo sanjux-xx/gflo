@@ -116,7 +116,7 @@ rec("free-delivery coupon removes the ₹99", o.get("shipping") == 0 and o.get("
 o = anon.post("/api/orders", json={"name": "Coupon Tester", "phone": phone(), "address": "12 MG Road", "city": "Hyderabad", "state": "telangana",
                                    "pincode": "500080", "coupon": "SHIPFREE", "ship": "install",
                                    "items": [{"sku": "CP-300", "qty": 1}]}).json()
-rec("...but install charge still applies", o.get("shipping") == 249, str(o))
+rec("...and asking for install adds nothing", o.get("shipping") == 0, str(o))
 
 print("coupons: validation in the admin")
 for f, word in [({"code": "A B!"}, "letters or numbers"), ({"code": "X"}, "letters or numbers"),
