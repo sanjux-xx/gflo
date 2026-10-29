@@ -137,6 +137,22 @@ function prodPhotoUrls(p){
   }
   return out;
 }
+/* The picture for a category, wherever categories are listed (category page,
+   Categories menu, filter list). Uses the photo set in the admin or built into
+   the site; a category without one (e.g. one added later in the admin) borrows
+   its first product photo, so no category is ever shown blank. */
+const __catPic = {};
+function catPic(id){
+  if (CAT_IMG[id]) return CAT_IMG[id];
+  if (id in __catPic) return __catPic[id];
+  const p = DB.products.find(x => x.cat === id && x.img);
+  return (__catPic[id] = p ? p.img : "");
+}
+function catThumb(id, cls){
+  const url = catPic(id);
+  const ic = U.icon("c-" + id, "ic-s");
+  return `<span class="${cls}">${url ? `<img src="${U.esc(url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<span class="ct-fb">${ic}</span></span>`;
+}
 function prodMediaIdx(p, idx, label){
   const svg = artFor(p.art, p.hue, p.seed + (idx ? "|t" + idx : ""), label || p.name);
   const url = prodPhotoUrls(p)[idx || 0] || "";

@@ -190,7 +190,7 @@ function buildMega(){
      "Cannot set properties of null", boot aborted before Router.go() ever ran,
      and the whole page rendered blank. */
   if (!document.getElementById("mega-cats") || !document.getElementById("mega-body")) return;
-  document.getElementById("mega-cats").innerHTML = CATS.map(c => `<button class="mega-cat ${c.id === megaCat ? "on" : ""}" data-mega-cat="${c.id}" role="menuitem"><span class="ci">${U.icon("c-" + c.id, "ic-s")}</span>${U.esc(c.name)}</button>`).join("");
+  document.getElementById("mega-cats").innerHTML = CATS.map(c => `<button class="mega-cat ${c.id === megaCat ? "on" : ""}" data-mega-cat="${c.id}" role="menuitem">${catThumb(c.id, "ci ci-pic")}${U.esc(c.name)}</button>`).join("");
   megaBody(megaCat);
 }
 function megaBody(cid){

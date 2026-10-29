@@ -158,7 +158,7 @@ Pages.categories = () => `
     ${crumb([["Categories"]])}
     <div class="sec-head" style="margin-top:14px"><div><span class="kick">Browse everything</span><h2>All appliance categories</h2><p>${CATS.length} appliances · ${PT.length} part families · ${DB.products.length} genuine parts. Every category carries the complete spare-part catalogue.</p></div></div>
     <div class="cat-grid" style="padding-bottom:50px">${CATS.map((c, i) => `
-      <a class="cat-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" style="--i:${i}" href="/c/${c.id}"><span class="cat-img"><span class="ct-ic">${U.icon("c-" + c.id)}</span>${CAT_IMG[c.id] ? `<img src="${CAT_IMG[c.id]}" alt="${U.esc(c.name)} spare parts" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</span>
+      <a class="cat-tile rv ${i % 4 ? "rv-d" + (i % 4) : ""}" style="--i:${i}" href="/c/${c.id}"><span class="cat-img"><span class="ct-ic">${U.icon("c-" + c.id)}</span>${catPic(c.id) ? `<img src="${U.esc(catPic(c.id))}" alt="${U.esc(c.name)} spare parts" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</span>
         <div><b>${U.esc(c.name)}</b><br><span>${DB.products.filter(p => p.cat === c.id).length} parts · ${c.pts.length} families</span></div>
         <span class="mut3" style="font-size:11.5px">${U.esc(c.desc)}</span></a>`).join("")}
     </div>

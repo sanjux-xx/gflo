@@ -65,6 +65,11 @@ app = FastAPI(title="G-FLO Store",
               openapi_url="/openapi.json" if ENABLE_DOCS else None,
               redoc_url=None, lifespan=_lifespan)
 
+# Compress pages and data (the shop page and the catalogue are mostly text and
+# shrink ~4x). Done here so it works whatever sits in front of the app.
+from starlette.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=6)
+
 
 def startup():
     Base.metadata.create_all(bind=engine)
@@ -157,6 +162,11 @@ async def security_middleware(request: Request, call_next):
             pass
 
     response = await call_next(request)
+
+    # anything changed in the admin may change what the shop shows
+    if request.method not in SAFE_METHODS and path.startswith("/admin") and response.status_code < 500:
+        from .api import invalidate_catalog
+        invalidate_catalog()
 
     # hand out a CSRF token so forms and the inline-edit fetch can echo it back
     if fresh_csrf:
@@ -352,7 +362,14 @@ def _render_storefront(request: Request, path: str = "/"):
             status = 404
     except Exception:
         pass                      # never let meta generation take the shop down
-    return HTMLResponse(html, status_code=status, headers={"Cache-Control": "no-cache"})
+    # ETag: a returning visitor's browser asks "has it changed?" and gets a
+    # tiny 304 instead of downloading the whole page again.
+    import hashlib as _h
+    etag = '"' + _h.sha1(html.encode("utf-8")).hexdigest()[:20] + '"'
+    headers = {"Cache-Control": "no-cache", "ETag": etag}
+    if status == 200 and request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return HTMLResponse(html, status_code=status, headers=headers)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -422,7 +439,11 @@ def site_assets(request: Request, asset_path: str):
     if os.path.commonpath([os.path.abspath(full), os.path.abspath(SITE_DIR)]) != os.path.abspath(SITE_DIR):
         return JSONResponse({"detail": "Not found"}, 404)
     if os.path.isfile(full):
-        return FileResponse(full, headers={"Cache-Control": "public, max-age=86400"})
+        # assets/img/* file names carry a content fingerprint, so they never
+        # change: browsers may keep them for a year.
+        cache = ("public, max-age=31536000, immutable" if safe.startswith("assets/")
+                 else "public, max-age=86400")
+        return FileResponse(full, headers={"Cache-Control": cache})
 
     # A path with a file extension was asking for a file that is not there —
     # a missing image should stay a 404 and not silently become a web page.

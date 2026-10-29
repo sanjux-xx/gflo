@@ -236,6 +236,9 @@ def login_blocked(keys) -> int:
 
 
 def record_failure(keys):
+    if len(_attempts) > 5000:            # a flood of made-up names can't grow memory forever
+        for k in list(_attempts):
+            _prune(k)
     for key in keys:
         _attempts.setdefault(key, []).append(time.time())
 

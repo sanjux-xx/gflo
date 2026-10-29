@@ -1,10 +1,15 @@
-FROM python:3.12-slim
+# Python 3.14 (newest stable, full bug-fix support). Each deploy also pulls the
+# latest operating-system security patches and the latest pip.
+FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 WORKDIR /app
 
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY backend/requirements.txt ./requirements.txt
-RUN pip install -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY backend/ /app/
 COPY site/ /site/

@@ -26,9 +26,8 @@ def safe_next(target: str, fallback: str = "/admin") -> str:
     """Only ever redirect to our own admin pages. An unvalidated ?next= let a
     signed-in admin be bounced to an attacker's site (open redirect)."""
     t = (target or "").strip()
-    if not t.startswith("/admin"):
-        return fallback
-    if t.startswith("//") or "\\" in t or "\n" in t or "\r" in t:
+    # only our own admin pages: "/admin" or "/admin/..." made of plain URL characters
+    if not re.fullmatch(r"/admin(/[A-Za-z0-9/_.~?=&%+-]*)?", t) or "//" in t or ".." in t:
         return fallback
     return t
 
@@ -271,13 +270,18 @@ def login_form(request: Request, next: str = "/admin", db: Session = Depends(get
 def login_submit(request: Request, username: str = Form(...), password: str = Form(...),
                  next: str = Form("/admin"), db: Session = Depends(get_db)):
     ip = sec.client_ip(request)
-    keys = [f"ip:{ip}", f"user:{username.lower()}"]
+    # one normalised name for both the lockout counter and the lookup, so
+    # " gflo", "GFLO " and "gflo" all count against the same account
+    uname = username.strip().lower()[:64]
+    keys = [f"ip:{ip}", f"user:{uname}"]
     wait = sec.login_blocked(keys)
     if wait:
         mins = max(1, wait // 60)
         return render(request, "login.html", db=db, next=next, username=None,
                       err=f"Too many failed attempts. Try again in about {mins} minute(s).")
-    user = db.query(AdminUser).filter(func.lower(AdminUser.username) == username.lower().strip()).first()
+    user = None
+    if len(password) <= 256 and len(username.strip()) <= 64:   # oversize input = straight failure
+        user = db.query(AdminUser).filter(func.lower(AdminUser.username) == uname).first()
     # burn equivalent scrypt work when the account doesn't exist, so response
     # time can't be used to enumerate valid usernames
     ok = sec.verify_password(password, user.password_hash) if user else sec.dummy_verify(password)
@@ -1140,6 +1144,8 @@ async def add_user(request: Request, username: str = Form(...), name: str = Form
     uname = username.strip().lower()
     if not uname:
         return flash("/admin/settings", err="Username is required.")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{2,31}", uname):
+        return flash("/admin/settings", err="Username must be 3–32 characters: letters, numbers, dot, dash or underscore.")
     if db.query(AdminUser).filter(func.lower(AdminUser.username) == uname).first():
         return flash("/admin/settings", err="That username already exists.")
     problem = sec.password_problem(password)
